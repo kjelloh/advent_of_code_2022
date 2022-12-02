@@ -1,9 +1,18 @@
 #include <iostream>
-#include <vector>
+#include <iomanip> // E.g., std::quoted
 #include <string>
-#include <utility>
-#include <sstream>
-#include <algorithm>
+#include <sstream> // E.g., std::istringstream, std::ostringstream
+#include <vector>
+#include <set>
+#include <map>
+#include <stack>
+#include <queue>
+#include <deque>
+#include <ranges> // E.g., std::subrange, std::view 
+#include <utility> // E.g., std::pair,..
+#include <algorithm> // E.g., std::find, std::all_of,...
+#include <numeric> // E.g., std::accumulate
+#include <limits> // E.g., std::numeric_limits
 
 extern char const* pTest;
 extern char const* pData;

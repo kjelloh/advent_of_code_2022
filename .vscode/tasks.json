@@ -12,7 +12,7 @@
         "-fdiagnostics-color=always",
         "-std=c++20",
         "-g",
-        "${file}",
+        "${file}"
       ],
       "options": {
         "cwd": "${fileDirname}"
@@ -32,7 +32,7 @@
         "-fdiagnostics-color=always",
         "-std=c++20",
         "-g",
-        "${file}",
+        "${file}"
       ],
       "options": {
         "cwd": "${fileDirname}"
@@ -42,7 +42,7 @@
       ],
       "group": "build",
       "detail": "compiler: /opt/local/bin/g++-mp-12"
-    },      
+    },
     {
       "type": "cppbuild",
       "label": "macOS C/C++: Brew installed clang-15 build",
@@ -75,7 +75,7 @@
         "-fdiagnostics-color=always",
         "-std=c++20",
         "-g",
-        "${file}",
+        "${file}"
       ],
       "options": {
         "cwd": "${fileDirname}"
@@ -85,7 +85,7 @@
       ],
       "group": "build",
       "detail": "compiler: /opt/local/libexec/llvm-15/bin/clang++"
-    },      
+    },
     {
       "type": "cppbuild",
       "label": "Linux C/C++: clang-14 build",
@@ -94,7 +94,7 @@
         "-fdiagnostics-color=always",
         "-std=c++20",
         "-stdlib=libc++",
-        "${file}",
+        "${file}"
       ],
       "options": {
         "cwd": "${fileDirname}"
@@ -104,6 +104,28 @@
       ],
       "group": "build",
       "detail": "compiler: /usr/lib/llvm-14/bin/clang++"
+    },
+    {
+      "type": "cppbuild",
+      "label": "C/C++: clang++ build active file",
+      "command": "/usr/bin/clang++",
+      "args": [
+        "-fcolor-diagnostics",
+        "-fansi-escape-codes",
+        "-std=c++20",
+        "-g",
+        "${file}",
+        "-o",
+        "${fileDirname}/${fileBasenameNoExtension}"
+      ],
+      "options": {
+        "cwd": "${fileDirname}"
+      },
+      "problemMatcher": [
+        "$gcc"
+      ],
+      "group": "build",
+      "detail": "compiler: /usr/bin/clang++"
     }
-]
+  ]
 }
