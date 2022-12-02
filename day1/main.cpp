@@ -67,8 +67,7 @@ namespace part2 {
       auto calories_v = to_calories(data_model);
       auto sums = to_sums(calories_v);
       std::sort(sums.begin(),sums.end(),std::greater<int>());
-      auto end = sums.begin(); std::advance(end,3);
-      result = std::accumulate(sums.begin(),end,std::size_t{0});
+      result = std::accumulate(sums.begin(),sums.begin()+3,std::size_t{0});
       return result;
   }
 }
