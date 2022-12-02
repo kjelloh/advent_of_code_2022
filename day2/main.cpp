@@ -24,127 +24,127 @@ using Move = std::pair<char,char>;
 using Model = std::vector<Move>;
 
 std::ostream& operator<<(std::ostream& os,Move const& move) {
-    os << "move: " << move.first << " " << move.second;
-    return os;
+  os << "move: " << move.first << " " << move.second;
+  return os;
 }
 
-using ScoreTable = std::map<Move,Result>;
+using ScoreTable = std::map<Move, Result>;
 
 const char ROCK{'A'};
 const char PAPER{'B'};
 const char SCISSORS{'C'};
 
 Model parse(auto& in) {
-    Model result{};
-    std::string line{};
-    char c1,c2;
-    while (in >> c1 >> c2) {
-        result.push_back({c1,c2});
-    }
-    return result;
+  Model result{};
+  std::string line{};
+  char c1, c2;
+  while (in >> c1 >> c2) {
+    result.push_back({c1, c2});
+  }
+  return result;
 }
 
 namespace part1 {
-    // The score for a single round is the score for the shape you selected (1 for Rock, 2 for Paper, and 3 for Scissors) plus the score for the outcome of the round (0 if you lost, 3 if the round was a draw, and 6 if you won)
-    const ScoreTable SCORE_TABLE = {
-        {{ROCK,'X'},1+3}
-        ,{{ROCK,'Y'},2+6}
-        ,{{ROCK,'Z'},3+0}
-        ,{{PAPER,'X'},1+0}
-        ,{{PAPER,'Y'},2+3}
-        ,{{PAPER,'Z'},3+6}
-        ,{{SCISSORS,'X'},1+6}
-        ,{{SCISSORS,'Y'},2+0}
-        ,{{SCISSORS,'Z'},3+3}
-    };
+  // The score for a single round is the score for the shape you selected (1 for Rock, 2 for Paper, and 3 for Scissors) plus the score for the outcome of the round (0 if you lost, 3 if the round was a draw, and 6 if you won)
+  const ScoreTable SCORE_TABLE = {
+    {{ROCK,'X'},1+3}
+    ,{{ROCK,'Y'},2+6}
+    ,{{ROCK,'Z'},3+0}
+    ,{{PAPER,'X'},1+0}
+    ,{{PAPER,'Y'},2+3}
+    ,{{PAPER,'Z'},3+6}
+    ,{{SCISSORS,'X'},1+6}
+    ,{{SCISSORS,'Y'},2+0}
+    ,{{SCISSORS,'Z'},3+3}
+  };
 
-    Result score(Move const& move) {
-        Result result{};
-        if (SCORE_TABLE.contains(move)) result = SCORE_TABLE.at(move);
-        else std::cerr << "\nERROR: No mapping from " << move << " to a score";
-        return result;
-    }
+  Result score(Move const& move) {
+    Result result{};
+    if (SCORE_TABLE.contains(move)) result = SCORE_TABLE.at(move);
+    else std::cerr << "\nERROR: No mapping from " << move << " to a score";
+    return result;
+  }
 
   Result solve_for(char const* pData) {
-      Result result{};
-      std::stringstream in{ pData };
-      auto data_model = parse(in);
-      for (auto const& move : data_model) {
-          std::cout << "\n" << move << " score:" << score(move);
-          result += score(move);
-      }
-      return result;
+    Result result{};
+    std::stringstream in{ pData };
+    auto data_model = parse(in);
+    for (auto const& move : data_model) {
+        std::cout << "\n" << move << " score:" << score(move);
+        result += score(move);
+    }
+    return result;
   }
 }
 
 namespace part2 {
 
-    const char LOOSE{'X'};
-    const char DRAW{'Y'};
-    const char WIN{'Z'};
+  const char LOOSE{'X'};
+  const char DRAW{'Y'};
+  const char WIN{'Z'};
 
-    const ScoreTable SCORE_TABLE = {
-        {{ROCK,ROCK},1+3}
-        ,{{ROCK,PAPER},2+6}
-        ,{{ROCK,SCISSORS},3+0}
-        ,{{PAPER,ROCK},1+0}
-        ,{{PAPER,PAPER},2+3}
-        ,{{PAPER,SCISSORS},3+6}
-        ,{{SCISSORS,ROCK},1+6}
-        ,{{SCISSORS,PAPER},2+0}
-        ,{{SCISSORS,SCISSORS},3+3}
-    };
+  const ScoreTable SCORE_TABLE = {
+    {{ROCK,ROCK},1+3}
+    ,{{ROCK,PAPER},2+6}
+    ,{{ROCK,SCISSORS},3+0}
+    ,{{PAPER,ROCK},1+0}
+    ,{{PAPER,PAPER},2+3}
+    ,{{PAPER,SCISSORS},3+6}
+    ,{{SCISSORS,ROCK},1+6}
+    ,{{SCISSORS,PAPER},2+0}
+    ,{{SCISSORS,SCISSORS},3+3}
+  };
 
-    char to_loose(char c1) {
-        char result{' '};
-        switch (c1) {
-            case ROCK: result = SCISSORS; break;
-            case PAPER: result = ROCK; break;
-            case SCISSORS: result = PAPER; break;
-        }
-        return result;
+  char to_loose(char c1) {
+    char result{' '};
+    switch (c1) {
+        case ROCK: result = SCISSORS; break;
+        case PAPER: result = ROCK; break;
+        case SCISSORS: result = PAPER; break;
     }
+    return result;
+  }
 
-    char to_draw(char c1) {
-        return c1;
-    }
+  char to_draw(char c1) {
+    return c1;
+  }
 
-    char to_win(char c1) {
-        char result{' '};
-        switch (c1) {
-            case ROCK: result = PAPER; break;
-            case PAPER: result = SCISSORS; break;
-            case SCISSORS: result = ROCK; break;
-        }
-        return result;
+  char to_win(char c1) {
+    char result{' '};
+    switch (c1) {
+        case ROCK: result = PAPER; break;
+        case PAPER: result = SCISSORS; break;
+        case SCISSORS: result = ROCK; break;
     }
+    return result;
+  }
 
-    Move decoded_move(Move const& encoded_move) {
-        Move result{encoded_move};
-        switch (encoded_move.second) {
-            case LOOSE: result.second = to_loose(encoded_move.first); break;
-            case DRAW: result.second = to_draw(encoded_move.first);break;
-            case WIN: result.second = to_win(encoded_move.first); break;
-        }
-        return result;
+  Move decoded_move(Move const& encoded_move) {
+    Move result{encoded_move};
+    switch (encoded_move.second) {
+        case LOOSE: result.second = to_loose(encoded_move.first); break;
+        case DRAW: result.second = to_draw(encoded_move.first);break;
+        case WIN: result.second = to_win(encoded_move.first); break;
     }
-    Result score(Move const& encoded_move) {
-        Result result{};
-        auto actual_move = decoded_move(encoded_move);
-        if (SCORE_TABLE.contains(actual_move)) result = SCORE_TABLE.at(actual_move);
-        else std::cerr << "\nERROR: No mapping from " << actual_move << " to a score";
-        return result;
-    }
+    return result;
+  }
+  Result score(Move const& encoded_move) {
+    Result result{};
+    auto actual_move = decoded_move(encoded_move);
+    if (SCORE_TABLE.contains(actual_move)) result = SCORE_TABLE.at(actual_move);
+    else std::cerr << "\nERROR: No mapping from " << actual_move << " to a score";
+    return result;
+  }
 
   Result solve_for(char const* pData) {
-      Result result{};
-      std::stringstream in{ pData };
-      auto data_model = parse(in);
-      for (auto const& move : data_model) {
-          std::cout << "\n" << move << " score:" << score(move);
-          result += score(move);
-      }
-      return result;
+    Result result{};
+    std::stringstream in{ pData };
+    auto data_model = parse(in);
+    for (auto const& move : data_model) {
+        std::cout << "\n" << move << " score:" << score(move);
+        result += score(move);
+    }
+    return result;
   }
 }
 
