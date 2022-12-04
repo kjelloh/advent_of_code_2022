@@ -71,6 +71,19 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      for (auto const& [left_r,right_r] : data_model) {
+        // Check if one of the ranges in the pair overlap with the other
+        // left_r: |      |                 |        |
+        // right_r     |      |         |        |
+        if (left_r.second >= right_r.first and left_r.second <= right_r.second) {
+          std::cout << "\nleft_r intrudes on right_r"; 
+          result += 1;
+        }
+        else if (right_r.second >= left_r.first and right_r.second <= left_r.second) {
+          std::cout << "\nright_r intrudes on left_r"; 
+          result += 1;
+        } 
+      }
       return result;
   }
 }
@@ -78,10 +91,10 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
   }
