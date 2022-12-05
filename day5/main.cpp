@@ -162,6 +162,23 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      for (auto const& move : data_model.second) {
+        // 0: count 1:from 2:to
+        Stack to_move{};
+        for (std::size_t i = 0;i<move[0];++i) {
+          auto crate = data_model.first[move[1]].top();
+          std::cout << "\nmoving '" << crate << "' from " << move[1] << " to " << move[2];
+          data_model.first[move[1]].pop();
+          to_move.push(crate);
+        }
+        while (to_move.size()) {
+          data_model.first[move[2]].push(to_move.top());
+          to_move.pop();
+        }
+      }
+      for (auto const& [index,stack] : data_model.first) {
+        result += stack.top();
+      }
       return result;
   }
 }
@@ -171,8 +188,8 @@ int main(int argc, char *argv[])
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
   }
