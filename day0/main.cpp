@@ -8,6 +8,7 @@
 #include <stack>
 #include <queue>
 #include <deque>
+#include <array>
 #include <ranges> // E.g., std::subrange, std::view 
 #include <utility> // E.g., std::pair,..
 #include <algorithm> // E.g., std::find, std::all_of,...
