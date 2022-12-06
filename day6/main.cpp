@@ -62,6 +62,22 @@ namespace part1 {
 namespace part2 {
   Result solve_for(char const* pData) {
       Result result{};
+      std::string datastream_buffer{pData};
+      std::deque<char> four_char_window{};
+      std::optional<int> found_pos{};
+      int const WINDOW_SIZE = 14;
+      for (int i=0;i<datastream_buffer.size();++i) {
+        // std::cout << " for:" << i << " four_char_window.size:" << four_char_window.size();
+        if (four_char_window.size()==WINDOW_SIZE) four_char_window.pop_front();
+        four_char_window.push_back(datastream_buffer[i]);
+        if (four_char_window.size()==WINDOW_SIZE and all_unique(four_char_window)) {
+          found_pos = i+1;
+          break;
+        }
+      }
+      if (found_pos) {
+        result = *found_pos;
+      }
       return result;
   }
 }
@@ -71,8 +87,8 @@ int main(int argc, char *argv[])
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
   }
