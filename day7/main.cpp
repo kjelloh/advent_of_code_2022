@@ -67,6 +67,7 @@ public:
             current_dir.pop_back();
           }
           else {
+            if (vertex == "/") current_dir.clear(); 
             current_dir.push_back(vertex);
           }
         }
@@ -102,8 +103,10 @@ public:
   }
   static std::string to_string(Path const& path) {
     std::ostringstream os{};
-    for (auto const& vertex : path) {   
-      os << "[" << vertex << "]";
+    int count{0};
+    for (auto const& vertex : path) { 
+      if (++count>2) os << "/"; // first ("/") and second (follows "/") without separator!
+      os << vertex;
     }
     os << " count:" << path.size();
     return os.str();
@@ -183,7 +186,6 @@ namespace part1 {
       auto data_model = parse(in);
       DirTree dir_tree{data_model};
       std::cout << "\n" << dir_tree;
-      std::vector<DirTree::Path> dirs{};
       auto path_to_size = rdfs(dir_tree,DirTree::Path{1,"/"});
       for (auto const& [path,size] : path_to_size) {
         std::cout << "\npath:" << DirTree::to_string(path) << " size:" << size;
@@ -203,7 +205,6 @@ namespace part2 {
       auto data_model = parse(in);
       DirTree dir_tree{data_model};
       std::cout << "\n" << dir_tree;
-      std::vector<DirTree::Path> dirs{};
       auto path_to_size = rdfs(dir_tree,DirTree::Path{1,"/"});
       auto root_size = path_to_size[{"/"}];
       auto free_space = 70000000 - root_size;
@@ -230,8 +231,8 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
