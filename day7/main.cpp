@@ -50,10 +50,10 @@ std::ostream& operator<<(std::ostream& os,Tokens const& tokens) {
 class DirTree {
 public:
   using Vertex = std::string;
-  using Vertices = std::vector<Vertex>;
-  using AdjList = std::map<Vertex,Vertices>;
-  using Size = std::map<Vertex,Result>;
   using Path = std::vector<Vertex>;
+  using Vertices = std::vector<Vertex>;
+  using AdjList = std::map<Path,Vertices>;
+  using Size = std::map<Path,Result>;
   DirTree(Model const& data_model) {
     Path current_dir{};
     for (auto const& tokens : data_model) {
@@ -87,32 +87,20 @@ public:
         add_edge(current_dir,vertex,size);
       }
     }
-  }
+  }  
   friend std::ostream& operator<<(std::ostream& os,DirTree const& dir_tree);
-  Vertices adj(Vertex const& vertex) const {
+  Vertices adj(Path const& path) const {
     Vertices result{};
-    if (m_adj.contains(vertex)) result = m_adj.at(vertex);
+    if (m_adj.contains(path)) result = m_adj.at(path);
     else {
-      std::cerr << "\nIs leaf vertex:" << std::quoted(vertex);
+      std::cerr << "\nIs leaf path:" << DirTree::to_string(path);
     }
     return result;
   }
-  int size(Vertex const& vertex) const {return (
-    m_size.contains(vertex)?m_size.at(vertex):0);
+  int size(Path const& path) const {return (
+    m_size.contains(path)?m_size.at(path):0);
   }
-private:
-  AdjList m_adj{};
-  Size m_size{};
-  void add_edge(Path const& path,Vertex const& vertex,int size) {
-    auto from = path.back();
-    m_adj[from].push_back(vertex);
-    if (size>0) m_size[vertex] = size;
-    std::cout << "\n\tadd_edge: " << std::quoted(from) << " - " << std::quoted(vertex);
-  }
-};
-
-namespace path {
-  std::string to_string(DirTree::Path const& path) {
+  static std::string to_string(Path const& path) {
     std::ostringstream os{};
     for (auto const& vertex : path) {   
       os << "[" << vertex << "]";
@@ -120,61 +108,71 @@ namespace path {
     os << " count:" << path.size();
     return os.str();
   }
-}
+private:
+  AdjList m_adj{};
+  Size m_size{};
+  void add_edge(Path const& from,Vertex const& vertex,int size) {
+    Path path{from}; path.push_back(vertex);
+    m_adj[from].push_back(vertex);
+    if (size>0) m_size[path] = size;
+    std::cout << "\n\tadd_edge: " << DirTree::to_string(path) << " - " << std::quoted(vertex) << " size:" << size;
+  }
+};
 
 class DFS {
 public:
   DFS(DirTree const& dir_tree) : m_dir_tree{dir_tree} {}
-  void visit(DirTree::Vertex const& vertex,auto& f) {
-    if (m_marked[vertex]) return;
-    m_marked[vertex] = true;
-    f(vertex);
-    for (auto const& connected : m_dir_tree.adj(vertex)) {
-      visit(connected,f);
+  void visit(DirTree::Path const& path,auto& f) {
+    if (m_marked[path]) return;
+    m_marked[path] = true;
+    f(path);
+    for (auto const& connected : m_dir_tree.adj(path)) {
+      auto sub_path = path; sub_path.push_back(connected);
+      visit(sub_path,f);
     }
   }
 private:
   DirTree const& m_dir_tree;
-  std::map<DirTree::Vertex,bool> m_marked{};
+  std::map<DirTree::Path,bool> m_marked{};
 };
 
 std::ostream& operator<<(std::ostream& os,DirTree const& dir_tree) {
-  auto print_vertex = [&os,&dir_tree](DirTree::Vertex const& vertex) {
-    os << "\nvisit:" << std::quoted(vertex);
-    auto size = dir_tree.size(vertex);
+  auto print_vertex = [&os,&dir_tree](DirTree::Path const& path) {
+    os << "\nvisit:" << DirTree::to_string(path);
+    auto size = dir_tree.size(path);
     if (size >=0) os << " size:" << size;
   };
   DFS dfs{dir_tree};
-  dfs.visit("/",print_vertex);
+  dfs.visit({"/"},print_vertex);
   return os;
 }
 
 using PathToSize = std::map<DirTree::Path,int>;     
 
 PathToSize rdfs(DirTree const& dir_tree,DirTree::Path const& source) {
-  std::cout << "\nrdfs(" << path::to_string(source) << ")";
+  std::cout << "\nrdfs(" << DirTree::to_string(source) << ")";
   PathToSize result{};
-  if (dir_tree.adj(source.back()).size()==0) {
+  if (dir_tree.adj(source).size()==0) {
     // std::cout << " LEAF";
-    result[source] = dir_tree.size(source.back());
+    result[source] = dir_tree.size(source);
   }
   else {
     // Visit all connected
-    for (auto const& connected : dir_tree.adj(source.back())) {
+    for (auto const& connected : dir_tree.adj(source)) {
       auto sub_path = source; sub_path.push_back(connected);
       auto x = rdfs(dir_tree,sub_path);
       int acc_size{};
       for (auto const& entry : x) {
         result.insert(entry);
-        acc_size += dir_tree.size(entry.first.back());
+        acc_size += dir_tree.size(entry.first);
       }
       result[source] += acc_size;
     }
   }
-  // std::cout << "\nrdfs(" << path::to_string(source) << ") RETURN:";
-  // for (auto const& [path,size] : result) {
-  //   std::cout << "\n\tpath:" << path::to_string(path) << " size:" << size;
-  // }
+  std::cout << "\nrdfs(" << DirTree::to_string(source) << ") RETURN:";
+  for (auto const& [path,size] : result) {
+    std::cout << "\n\tpath:" << DirTree::to_string(path) << " size:" << size;
+  }
   return result;
 }
 
@@ -188,8 +186,8 @@ namespace part1 {
       std::vector<DirTree::Path> dirs{};
       auto path_to_size = rdfs(dir_tree,DirTree::Path{1,"/"});
       for (auto const& [path,size] : path_to_size) {
-        std::cout << "\npath:" << path::to_string(path) << " size:" << size;
-        if (dir_tree.adj(path.back()).size()>0 and size <= 100000) {
+        std::cout << "\npath:" << DirTree::to_string(path) << " size:" << size;
+        if (dir_tree.adj(path).size()>0 and size <= 100000) {
           result += size;
           std::cout << " COUNTED result=" << result;
         }
