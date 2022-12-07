@@ -201,6 +201,28 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      DirTree dir_tree{data_model};
+      std::cout << "\n" << dir_tree;
+      std::vector<DirTree::Path> dirs{};
+      auto path_to_size = rdfs(dir_tree,DirTree::Path{1,"/"});
+      auto root_size = path_to_size[{"/"}];
+      auto free_space = 70000000 - root_size;
+      std::cout << "\nroot size:"<< root_size << " gives free space:" << free_space;
+      auto size_to_recover = 30000000 - free_space;
+      std::cout << "\nWe need to recover at least size:" << size_to_recover;
+      PathToSize candidates{};
+      std::copy_if(path_to_size.begin(),path_to_size.end(),std::inserter(candidates,candidates.begin())
+        ,[&dir_tree,&size_to_recover](auto const& entry){
+          return (dir_tree.adj(entry.first).size()>0 and entry.second >= size_to_recover);
+        });
+      for (auto const& [path,size] : candidates) {
+        std::cout << "\ncandidate:" << DirTree::to_string(path) << " size:" << size;
+      }
+      auto iter = std::min_element(candidates.begin(),candidates.end(),[](auto const& entry1,auto const& entry2){
+        return (entry1.second < entry2.second);
+
+      });
+      if (iter != candidates.end()) result = iter->second;
       return result;
   }
 }
@@ -208,10 +230,10 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
   }
