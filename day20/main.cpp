@@ -18,11 +18,11 @@
 extern char const* pTest;
 extern char const* pData;
 
-using Result = int;
+using Result = long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 struct Node {
-  int value;
+  Result value;
   Node* prev;
   Node* next;
 };
@@ -36,10 +36,10 @@ public:
       m_head->prev = m_head;
     }
     else {
-      m_head->prev->next = node;
       node->next = m_head;
       node->prev = m_head->prev;
-      m_head->prev = node;      
+      m_head->prev->next = node;
+      m_head->prev = node;  
     }
     if (node->value == 0) {
       m_z = node;
@@ -50,8 +50,11 @@ public:
   void shift(Node* node) {
     auto offset = node->value;
     auto iter = node;
-    if (offset < 0) {
-      for (int i = 0;i>offset;--i) {
+    if (offset == 0) {
+      // NOP
+    }
+    else if (offset < 0) {
+      for (Result i = 0;i>offset;--i) {
         iter = iter->prev;
       }
       if (iter != node) {
@@ -66,7 +69,7 @@ public:
       }
     }
     else {
-      for (int i=0;i<offset;++i) {
+      for (Result i=0;i<offset;++i) {
         iter = iter->next;
       }
       if (iter != node) {
@@ -88,9 +91,9 @@ public:
       iter = iter->next;
     } while (iter != m_head);
   }
-  int operator[](int index) {
+  Result operator[](Result index) {
     auto iter = m_z;
-    for (int i=0;i<index;++i) {
+    for (Result i=0;i<index;++i) {
       iter = iter->next;
     }
     return iter->value;
@@ -106,7 +109,7 @@ using Model = List;
 
 Model parse(auto& in) {
     Model result{};
-    int i;
+    Result i;
     while (in >> i) {
       // std::cout << "\nparsed:" << i;
       result.push_back(new Node{i});
@@ -128,10 +131,10 @@ void print(List& list) {
 }
 
 void mix(File const& file,List& list) {
-  // print(list);
+  print(list);
   for (auto node : file) {
     list.shift(node);
-    // print(list);
+    print(list);
   }
 }
 
@@ -164,7 +167,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
