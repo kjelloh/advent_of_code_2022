@@ -18,7 +18,7 @@
 extern char const* pTest;
 extern char const* pData;
 
-using Result = size_t;
+using Result = int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 struct Node {
@@ -41,7 +41,45 @@ public:
       node->prev = m_head->prev;
       m_head->prev = node;      
     }
+    if (node->value == 0) {
+      m_z = node;
+      std::cout << "\nm_z OK";
+    }
     return node;
+  }
+  void shift(Node* node) {
+    auto offset = node->value;
+    auto iter = node;
+    if (offset < 0) {
+      for (int i = 0;i>offset;--i) {
+        iter = iter->prev;
+      }
+      if (iter != node) {
+        // Unlink node
+        node->prev->next = node->next;
+        node->next->prev = node->prev;
+        // Insert node before iter
+        node->next=iter;
+        node->prev=iter->prev;
+        iter->prev->next=node;
+        iter->prev=node;
+      }
+    }
+    else {
+      for (int i=0;i<offset;++i) {
+        iter = iter->next;
+      }
+      if (iter != node) {
+        // Unlink node
+        node->prev->next = node->next;
+        node->next->prev = node->prev;
+        // Insert node after iter
+        node->next = iter->next;
+        node->prev = iter;
+        iter->next->prev = node;
+        iter->next = node;
+      }
+    }
   }
   void for_each(auto f) {
     auto iter = m_head;
@@ -50,8 +88,16 @@ public:
       iter = iter->next;
     } while (iter != m_head);
   }
+  int operator[](int index) {
+    auto iter = m_z;
+    for (int i=0;i<index;++i) {
+      iter = iter->next;
+    }
+    return iter->value;
+  }
 private:
   Node* m_head{nullptr};
+  Node* m_z{nullptr};
 };
 
 using File = std::vector<Node*>;
@@ -62,10 +108,31 @@ Model parse(auto& in) {
     Model result{};
     int i;
     while (in >> i) {
-      std::cout << "\nparsed:" << i;
-        result.push_back(new Node{i});
+      // std::cout << "\nparsed:" << i;
+      result.push_back(new Node{i});
     }
     return result;
+}
+
+File to_file(List list) {
+  File result{};
+  list.for_each([&result](Node* node){
+    result.push_back(node);
+  });
+  return result;
+}
+
+void print(List& list) {
+  std::cout << "\nlist:";
+  list.for_each([](Node* node){std::cout << " " << node->value;});
+}
+
+void mix(File const& file,List& list) {
+  // print(list);
+  for (auto node : file) {
+    list.shift(node);
+    // print(list);
+  }
 }
 
 namespace part1 {
@@ -73,7 +140,13 @@ namespace part1 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
-      data_model.for_each([](Node* node){std::cout << "\nnode:" << node->value;});
+      // print(data_model);
+      auto file = to_file(data_model);
+      mix(file,data_model);
+      auto r1000 = data_model[1000]; std::cout << "\nr1000:" << r1000;
+      auto r2000 = data_model[2000]; std::cout << "\nr2000:" << r2000;
+      auto r3000 = data_model[3000]; std::cout << "\nr3000:" << r3000;
+      result =  r1000 + r2000 + r3000;
       return result;
   }
 }
@@ -91,7 +164,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
