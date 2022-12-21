@@ -18,7 +18,7 @@
 extern char const* pTest;
 extern char const* pData;
 
-using Result = size_t;
+using Result = long long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 using Op = char;
@@ -39,6 +39,7 @@ public:
   Op op() const {return m_op;}
   std::string r_term() const {return m_r_term;}
   Result value() const {return m_value;}
+  void set_value(Result value) {m_value = value;};
 private:
   std::string m_label;
   std::string m_l_term;
@@ -92,28 +93,29 @@ Model parse(auto& in) {
     return result;
 }
 
-Result eval(Model const& model,std::string const& label) {
-  std::cout << "\neval(" << std::quoted(label) << ")";
-  Result result{};
-  if (auto iter = model.find(label);iter != model.end()) {
-    std::cout << " op:" << iter->second.op(); 
-    switch (iter->second.op()) {
-      case ' ': result = iter->second.value(); break;
-      case '+': result = (eval(model,iter->second.l_term()) + eval(model,iter->second.r_term())); break;
-      case '-': result = (eval(model,iter->second.l_term()) - eval(model,iter->second.r_term())); break;
-      case '*': result = (eval(model,iter->second.l_term()) * eval(model,iter->second.r_term())); break;
-      case '/': result = (eval(model,iter->second.l_term()) / eval(model,iter->second.r_term())); break;
-      default: std::cerr << "\nERROR, can't eval unknown op:" << iter->second.op();
-    }
-  }
-  else {
-    std::cerr << "\nERROR, eval failed to find label " << std::quoted(label);
-  }
-  std::cout << " result:" << result;
-  return result;
-}
 
 namespace part1 {
+  Result eval(Model const& model,std::string const& label) {
+    std::cout << "\neval(" << std::quoted(label) << ")";
+    Result result{};
+    if (auto iter = model.find(label);iter != model.end()) {
+      std::cout << " op:" << iter->second.op(); 
+      switch (iter->second.op()) {
+        case ' ': result = iter->second.value(); break;
+        case '+': result = (eval(model,iter->second.l_term()) + eval(model,iter->second.r_term())); break;
+        case '-': result = (eval(model,iter->second.l_term()) - eval(model,iter->second.r_term())); break;
+        case '*': result = (eval(model,iter->second.l_term()) * eval(model,iter->second.r_term())); break;
+        case '/': result = (eval(model,iter->second.l_term()) / eval(model,iter->second.r_term())); break;
+        default: std::cerr << "\nERROR, can't eval unknown op:" << iter->second.op();
+      }
+    }
+    else {
+      std::cerr << "\nERROR, eval failed to find label " << std::quoted(label);
+    }
+    std::cout << " result:" << result;
+    return result;
+  }
+
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
@@ -124,10 +126,66 @@ namespace part1 {
 }
 
 namespace part2 {
+  Result eval(Model const& model,std::string const& label) {
+    // std::cout << "\neval(" << std::quoted(label) << ")";
+    Result result{};
+    if (auto iter = model.find(label);iter != model.end()) {
+      // std::cout << " op:" << iter->second.op();
+      if (label == "root") {
+        result = (eval(model,iter->second.l_term()) - eval(model,iter->second.r_term()));
+      }
+      else {
+        switch (iter->second.op()) {
+          case ' ': result = iter->second.value(); break;
+          case '+': result = (eval(model,iter->second.l_term()) + eval(model,iter->second.r_term())); break;
+          case '-': result = (eval(model,iter->second.l_term()) - eval(model,iter->second.r_term())); break;
+          case '*': result = (eval(model,iter->second.l_term()) * eval(model,iter->second.r_term())); break;
+          case '/': result = (eval(model,iter->second.l_term()) / eval(model,iter->second.r_term())); break;
+          default: std::cerr << "\nERROR, can't eval unknown op:" << iter->second.op();
+        }
+      }
+    }
+    else {
+      std::cerr << "\nERROR, eval failed to find label " << std::quoted(label);
+    }
+    // std::cout << " result:" << result;
+    return result;
+  }
+
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+
+      // Newton Raphson
+      auto x0 = Result{1000};
+      auto delta_x = Result{10};
+      for (int i=0;i<100;++i) {
+        std::cout << "\niter:" << i;
+        data_model.at("humn").set_value(x0);
+        auto f_0 = eval(data_model,"root");
+        if (f_0 == 0) {
+          std::cout << "\nf_0 = 0 for x0=" << x0;
+          result = x0;
+          break;
+        }
+        data_model.at("humn").set_value(x0+delta_x);
+        auto f_0_delta = eval(data_model,"root");
+        auto x1 = x0 - (delta_x * f_0) / (f_0_delta - f_0);
+        std::cout << " x1 = " << x0 << " - (" <<  (delta_x * f_0) << ") / " << (f_0_delta - f_0) << " = " << x1;
+        x0 = x1;
+      }
+
+      // Home in on the lowest x that evaluates to zero
+      // NOTE: I am not sure why the expression evaluates to zero for several guesses?
+      for (int i=0;i<10;++i) {
+        auto x = x0-i;
+        data_model.at("humn").set_value(x);
+        auto f_0 = eval(data_model,"root");
+        if (std::abs(f_0) > 0) break;
+        else result = x;
+      }
+
       return result;
   }
 }
@@ -137,8 +195,8 @@ int main(int argc, char *argv[])
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
   }
