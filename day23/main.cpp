@@ -136,6 +136,8 @@ namespace part1 {
         directions_to_consider.push_back(directions_to_consider[0]);
         directions_to_consider.erase(directions_to_consider.begin());
       }
+      // The number of unoccupied positions on the bounded map are the size of the map minus the elf count
+      result = (map.bounds().east - map.bounds().west + 1) * (map.bounds().south - map.bounds().north + 1) - map.elves().size();
       return result;
   }
 }
