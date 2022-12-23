@@ -30,7 +30,16 @@ struct Vector {
   bool operator==(Vector const& other) const {
     return (col == other.col and row == other.row);
   }
+  bool operator<(Vector const& other) const {
+    if (col == other.col) return row < other.row;
+    else return (col < other.col);
+  }
 };
+
+std::ostream& operator<<(std::ostream& os,Vector const& pos) {
+  os << "[col:" << pos.col << ",row:" << pos.row << "]"; 
+  return os;
+}
 
 struct Elf {
   Vector pos;
@@ -48,28 +57,90 @@ public:
   using Elves = std::vector<Elf>;
   void push_back(Elf const& elf) {
     m_elves.push_back(elf);
-    m_bounds.west = std::min(elf.pos.col,m_bounds.west);
-    m_bounds.east = std::max(elf.pos.col,m_bounds.east);
-    m_bounds.north = std::min(elf.pos.row,m_bounds.north);
-    m_bounds.south = std::max(elf.pos.row,m_bounds.south);
+    this->set_pos(m_elves.size()-1,elf.pos);
   }
+
+  void set_pos(int index,Vector const& new_pos) {
+    std::cout << "\nmove index:" << index << " new_pos:" << new_pos;
+    auto& elf = m_elves[index];
+    elf.pos = new_pos;
+    m_pos_count[new_pos] += 1; // Count elves at the same position
+  }
+
   Elves const& elves() const {return m_elves;}
-MapBounds const& bounds() const {return m_bounds;}
+
+  void move(int index,Vector const& delta) {
+    this->set_pos(index,m_elves[index].pos + delta);
+  }
+
+  int elf_count(Vector const& pos) const {
+    if (m_pos_count.contains(pos)) return m_pos_count.at(pos);
+    else return 0;
+  }
+
+  bool is_alone(int index) const {
+    std::cout << "\nis_alone index:" << index << " pos:" << m_elves[index].pos;
+    if (m_pos_count.contains(m_elves[index].pos)) return (m_pos_count.at(m_elves[index].pos) == 1);
+    else {
+      std::cerr << "\nERROR, no count recorded";
+      return true;
+    }
+  }
+
+  Map& update_to(Map const& other) {    
+    m_pos_count.clear();
+    for (int i=0;i<other.elves().size();++i) {
+      if (other.is_alone(i)) {
+        this->set_pos(i,other.elves()[i].pos);
+      }
+      else {
+        // Don't move
+      }
+      m_pos_count[m_elves[i].pos] = 1; // All elves are now alone
+    }
+    return *this;
+  }
+
+MapBounds bounds() const {
+  MapBounds result{
+    .west = m_elves[0].pos.col
+    ,.east = m_elves[0].pos.col
+    ,.north = m_elves[0].pos.row
+    ,.south = m_elves[0].pos.row};
+  for (auto const& elf : m_elves) {
+    result.west = std::min(elf.pos.col,result.west);
+    result.east = std::max(elf.pos.col,result.east);
+    result.north = std::min(elf.pos.row,result.north);
+    result.south = std::max(elf.pos.row,result.south);
+  }
+  return result;
+}
 private:
   Elves m_elves;
-  MapBounds m_bounds{};
+  std::map<Vector,int> m_pos_count{};
 };
 
 using Model = Map;
 
-std::ostream& operator<<(std::ostream& os,Vector const& pos) {
-  std::cout << "[col:" << pos.col << ",row:" << pos.row << "]"; 
+std::ostream& operator<<(std::ostream& os,MapBounds const& bounds) {
+  os << "west:" << bounds.west << " .. east:" << bounds.east;
+  os << " north:" << bounds.north << " .. south:" << bounds.south;
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os,MapBounds const& bounds) {
-  std::cout << "west:" << bounds.west << " .. east:" << bounds.east;
-  std::cout << " north:" << bounds.north << " .. south:" << bounds.south;
+std::ostream& operator<<(std::ostream& os,Map const& map) {
+  auto bounds = map.bounds();
+  for (int row=bounds.north;row<=bounds.south;++row) {
+    os << "\n";
+    for (int col=bounds.west;col <= bounds.east;++col) {
+      if (map.elf_count({.col=col,.row=row})==1) {
+        os << '#';
+      }
+      else {
+        os << '.';
+      }
+    }
+  }
   return os;
 }
 
@@ -93,27 +164,86 @@ Model parse(auto& in) {
     return result;
 }
 
-bool has_neighbour_elf(Elf const& elf,Map const& map) {
-  bool result{false};
-  Vector delta{};
-  for (int i=0;i<8 and result==false;++i) {
-    switch (i) {
-      case 0: delta = Vector{.col=0,.row=-1}; break; // N
-      case 1: delta = Vector{.col=1,.row=-1}; break; // NE
-      case 2: delta = Vector{.col=1,.row=0};  break; // E
-      case 3: delta = Vector{.col=1,.row=1};  break; // SE
-      case 4: delta = Vector{.col=0,.row=1};  break; // S
-      case 5: delta = Vector{.col=-1,.row=1}; break; // SW
-      case 6: delta = Vector{.col=-1,.row=0}; break; // W
-      case 7: delta = Vector{.col=-1,.row=-1}; break; // NW
-    }
-    auto pos_to_check = elf.pos + delta;
-    result = std::any_of(map.elves().begin(),map.elves().end(),[pos_to_check](Elf const& elf){
-      return (pos_to_check == elf.pos);
-    });
+Vector to_delta(std::string dir_name) {
+  Vector result{};
+  if (dir_name=="NW") result = Vector{.col=-1,.row=-1}; // NW
+  else if (dir_name=="N") result = Vector{.col=0,.row=-1}; // N
+  else if (dir_name=="NE") result = Vector{.col=1,.row=-1}; // NE
+  else if (dir_name=="E") result = Vector{.col=1,.row=0}; // E
+  else if (dir_name=="SE") result = Vector{.col=1,.row=1}; // SE
+  else if (dir_name=="S") result = Vector{.col=0,.row=1}; // S
+  else if (dir_name=="SW") result = Vector{.col=-1,.row=1}; // SW
+  else if (dir_name=="W") result = Vector{.col=-1,.row=0}; // W
+  else {
+    std::cerr << "\nERROR, to_delta for " << std::quoted(dir_name) << " = ??";
   }
   return result;
 }
+
+Vector to_delta(char dir_char) {
+  return to_delta(std::string{dir_char});
+}
+
+using NeighbourCounts = std::vector<int>;
+NeighbourCounts to_neighbour_counts(Elf const& elf,Map const& map) {
+  // result[0] is NW,N,NE
+  // result[1] is NE,E,SE
+  // result[2] is SE,S,SW
+  // result[4] is SW,W,NW
+  NeighbourCounts result(4,0);
+  std::string dir_name{};
+  for (int i=0;i<8;++i) {
+    switch (i) {
+      case 0: dir_name="NW"; break; // NW
+      case 1: dir_name="N"; break; // N
+      case 2: dir_name="NE"; break; // NE
+      case 3: dir_name="E";  break; // E
+      case 4: dir_name="SE"; break; // SE
+      case 5: dir_name="S"; break; // S
+      case 6: dir_name="SW"; break; // SW
+      case 7: dir_name="W"; break; // W
+    }
+    auto pos_to_check = elf.pos + to_delta(dir_name);
+    bool occupied = std::any_of(map.elves().begin(),map.elves().end(),[pos_to_check](Elf const& elf){
+      return (pos_to_check == elf.pos);
+    });
+    if (occupied) {
+      if (dir_name.find('N') != std::string::npos) result[0] += 1;
+      if (dir_name.find('E') != std::string::npos) result[1] += 1;
+      if (dir_name.find('S') != std::string::npos) result[2] += 1;
+      if (dir_name.find('W') != std::string::npos) result[3] += 1;
+    }
+  }
+  return result;
+}
+
+bool is_free(Elf const& elf,char dir,NeighbourCounts const& nc) {
+  bool result{false};
+  switch (dir) {
+    case 'N': result = (nc[0] == 0); break;
+    case 'E': result = (nc[1] == 0); break;
+    case 'S': result = (nc[2] == 0); break;
+    case 'W': result = (nc[3] == 0); break;
+  }
+  return result;
+}
+
+/*
+MAP after round 1
+##
+..
+#.
+.#
+#.
+
+..##.
+.....
+..#..
+...#.
+..#..
+.....
+
+*/
 
 namespace part1 {
   Result solve_for(char const* pData) {
@@ -123,20 +253,32 @@ namespace part1 {
       std::cout << "\nbounds:" << data_model.bounds();
       auto map = data_model;
       std::vector<char> directions_to_consider{'N','S','W','E'};
-      for (int i=0;i<10;++i) {
+      std::cout << "\n<initial map>";
+      std::cout << "\n" << map;
+      for (int i=0;i<1;++i) {
         std::cout << "\nround:" << i+1;
-        for (Elf const& elf : map.elves()) {
-          if (has_neighbour_elf(elf,map)) {
+        auto proposed_map = map;
+        for (int index = 0;index < map.elves().size();++index) {
+          auto const& elf = map.elves()[index];
+          auto neighbour_counts = to_neighbour_counts(elf,map);
+          if (std::any_of(neighbour_counts.begin(),neighbour_counts.end(),[](int count){return count>0;})) {
             std::cout << "\n\thas neighbour elf:" << elf.pos;
             for (char dir : directions_to_consider) {
-              std::cout << "\n\tconsider:" << dir;
+              if (is_free(elf,dir,neighbour_counts)) {
+                std::cout << "\n\telf at " << elf.pos << " propeses:" << dir;
+                proposed_map.move(index,to_delta(dir));
+                break;
+              }
             }
           }
         }
         directions_to_consider.push_back(directions_to_consider[0]);
         directions_to_consider.erase(directions_to_consider.begin());
+        map.update_to(proposed_map);
+        std::cout << "\nMAP after round " << i+1 << map;
       }
       // The number of unoccupied positions on the bounded map are the size of the map minus the elf count
+      std::cout << "\nfinal bounds " << map.bounds();
       result = (map.bounds().east - map.bounds().west + 1) * (map.bounds().south - map.bounds().north + 1) - map.elves().size();
       return result;
   }
