@@ -61,7 +61,7 @@ public:
   }
 
   void set_pos(int index,Vector const& new_pos) {
-    std::cout << "\nmove index:" << index << " new_pos:" << new_pos;
+    // std::cout << "\nmove index:" << index << " new_pos:" << new_pos;
     auto& elf = m_elves[index];
     elf.pos = new_pos;
     m_pos_count[new_pos] += 1; // Count elves at the same position
@@ -79,7 +79,7 @@ public:
   }
 
   bool is_alone(int index) const {
-    std::cout << "\nis_alone index:" << index << " pos:" << m_elves[index].pos;
+    // std::cout << "\nis_alone index:" << index << " pos:" << m_elves[index].pos;
     if (m_pos_count.contains(m_elves[index].pos)) return (m_pos_count.at(m_elves[index].pos) == 1);
     else {
       std::cerr << "\nERROR, no count recorded";
@@ -228,23 +228,6 @@ bool is_free(Elf const& elf,char dir,NeighbourCounts const& nc) {
   return result;
 }
 
-/*
-MAP after round 10
-..#..
-....#
-#....
-....#
-.....
-..#..
-
-..#..
-....#
-#....
-....#
-.....
-..#..
-*/
-
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
@@ -289,6 +272,45 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      // std::cout << "\nbounds:" << data_model.bounds();
+      auto map = data_model;
+      std::vector<char> directions_to_consider{'N','S','W','E'};
+      // std::cout << "\n<initial map>";
+      // std::cout << "\n" << map;
+      bool loop_again{true};
+      int i=0;
+      while (loop_again) {
+        bool none_moved{true};
+        std::cout << "\nround:" << i+1 << " bounds " << map.bounds();
+        auto proposed_map = map;
+        for (int index = 0;index < map.elves().size();++index) {
+          auto const& elf = map.elves()[index];
+          auto neighbour_counts = to_neighbour_counts(elf,map);
+          if (std::any_of(neighbour_counts.begin(),neighbour_counts.end(),[](int count){return count>0;})) {
+            none_moved = false;
+            // std::cout << "\n\thas neighbour elf:" << elf.pos;
+            for (char dir : directions_to_consider) {
+              if (is_free(elf,dir,neighbour_counts)) {
+                // std::cout << "\n\telf at " << elf.pos << " propeses:" << dir;
+                proposed_map.move(index,to_delta(dir));
+                break;
+              }
+            }
+          }
+        }
+        if (none_moved) {          
+          std::cout << "\nNONE MOVED for round:" << i+1;
+          result = i+1;
+          loop_again = false;
+        }
+        else {
+          directions_to_consider.push_back(directions_to_consider[0]);
+          directions_to_consider.erase(directions_to_consider.begin());
+          map.update_to(proposed_map);
+          // std::cout << "\nMAP after round " << i+1 << map;
+          ++i;
+        }
+      }
       return result;
   }
 }
@@ -296,10 +318,10 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
   }
