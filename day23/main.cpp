@@ -23,12 +23,12 @@ using Answers = std::vector<std::pair<std::string,Result>>;
 
 class Vector {
 public:
-  Vector(int row,int col) : m_row{row},m_col{col} {}
-  int row() const {return m_row;} 
+  Vector(int col,int row) : m_col{col},m_row{row} {}
   int col() const {return m_col;} 
+  int row() const {return m_row;} 
 private:
-  int m_row;
   int m_col;
+  int m_row;
 };
 
 class Elf {
@@ -39,7 +39,40 @@ private:
   Vector m_pos;
 };
 
-using Model = std::vector<Elf>;
+struct MapBounds {
+  int m_west_bound{1000};
+  int m_east_bound{0};
+  int m_north_bound{1000};
+  int m_south_bound{0};
+};
+
+class Map {
+public:
+  void push_back(Elf const& elf) {
+    m_elves.push_back(elf);
+    m_bounds.m_west_bound = std::min(elf.pos().col(),m_bounds.m_west_bound);
+    m_bounds.m_east_bound = std::max(elf.pos().col(),m_bounds.m_east_bound);
+    m_bounds.m_north_bound = std::min(elf.pos().row(),m_bounds.m_north_bound);
+    m_bounds.m_south_bound = std::max(elf.pos().row(),m_bounds.m_south_bound);
+  }
+MapBounds const& bounds() const {return m_bounds;}
+private:
+  std::vector<Elf> m_elves;
+  MapBounds m_bounds{};
+};
+
+using Model = Map;
+
+std::ostream& operator<<(std::ostream& os,Vector const& pos) {
+  std::cout << "[col:" << pos.col() << ",row:" << pos.row() << "]"; 
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os,MapBounds const& bounds) {
+  std::cout << "west:" << bounds.m_west_bound << " .. east:" << bounds.m_east_bound;
+  std::cout << " north:" << bounds.m_north_bound << " .. south:" << bounds.m_south_bound;
+  return os;
+}
 
 Model parse(auto& in) {
     Model result{};
@@ -49,10 +82,10 @@ Model parse(auto& in) {
       int col{0};
       for (char ch : line) {
         if (ch == '#') {
-          Vector pos{row,col};
+          Vector pos{col,row};
           Elf elf{pos};
           result.push_back(elf);
-          std::cout << "\nelf at [row:" << pos.row() << ",col:" << pos.col() << "]"; 
+          std::cout << "\nelf at " << elf.pos();
         }
         ++col;
       }
@@ -66,6 +99,7 @@ namespace part1 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      std::cout << "\nbounds:" << data_model.bounds();
       return result;
   }
 }
