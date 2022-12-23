@@ -14,6 +14,7 @@
 #include <algorithm> // E.g., std::find, std::all_of,...
 #include <numeric> // E.g., std::accumulate
 #include <limits> // E.g., std::numeric_limits
+#include <chrono>
 
 extern char const* pTest;
 extern char const* pData;
@@ -317,14 +318,29 @@ namespace part2 {
 
 int main(int argc, char *argv[])
 {
+  std::chrono::time_point<std::chrono::system_clock> start_time{};
   Answers answers{};
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
+  exec_times.push_back(std::chrono::system_clock::now());
+  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  exec_times.push_back(std::chrono::system_clock::now());
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  exec_times.push_back(std::chrono::system_clock::now());
   answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  exec_times.push_back(std::chrono::system_clock::now());
   answers.push_back({"Part 2     ",part2::solve_for(pData)});
-  for (auto const& answer : answers) {
-    std::cout << "\nanswer[" << answer.first << "] " << answer.second;
+  exec_times.push_back(std::chrono::system_clock::now());
+  for (int i=0;i<answers.size();++i) {
+    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms"; 
+    std::cout << " answer[" << answers[i].first << "] " << answers[i].second;
   }
+  /*
+  duration:3ms answer[Part 1 Test] 110
+  duration:5850ms answer[Part 1     ] 3871
+  duration:3ms answer[Part 2 Test] 20
+  duration:616069ms answer[Part 2     ] 925  
+  */
+
   // std::cout << "\nPress <enter>...";
   // std::cin.get();
   std::cout << "\n";
