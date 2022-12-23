@@ -21,56 +21,55 @@ extern char const* pData;
 using Result = size_t;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
-class Vector {
-public:
-  Vector(int col,int row) : m_col{col},m_row{row} {}
-  int col() const {return m_col;} 
-  int row() const {return m_row;} 
-private:
-  int m_col;
-  int m_row;
+struct Vector {
+  int col;
+  int row;
+  Vector operator+(Vector const& other) const {
+    return {.col=col+other.col,.row = row + other.row};
+  }
+  bool operator==(Vector const& other) const {
+    return (col == other.col and row == other.row);
+  }
 };
 
-class Elf {
-public:
-  Elf(Vector const& pos) : m_pos{pos} {}
-  Vector const& pos() const {return m_pos;}
-private:
-  Vector m_pos;
+struct Elf {
+  Vector pos;
 };
 
 struct MapBounds {
-  int m_west_bound{1000};
-  int m_east_bound{0};
-  int m_north_bound{1000};
-  int m_south_bound{0};
+  int west{1000};
+  int east{0};
+  int north{1000};
+  int south{0};
 };
 
 class Map {
 public:
+  using Elves = std::vector<Elf>;
   void push_back(Elf const& elf) {
     m_elves.push_back(elf);
-    m_bounds.m_west_bound = std::min(elf.pos().col(),m_bounds.m_west_bound);
-    m_bounds.m_east_bound = std::max(elf.pos().col(),m_bounds.m_east_bound);
-    m_bounds.m_north_bound = std::min(elf.pos().row(),m_bounds.m_north_bound);
-    m_bounds.m_south_bound = std::max(elf.pos().row(),m_bounds.m_south_bound);
+    m_bounds.west = std::min(elf.pos.col,m_bounds.west);
+    m_bounds.east = std::max(elf.pos.col,m_bounds.east);
+    m_bounds.north = std::min(elf.pos.row,m_bounds.north);
+    m_bounds.south = std::max(elf.pos.row,m_bounds.south);
   }
+  Elves const& elves() const {return m_elves;}
 MapBounds const& bounds() const {return m_bounds;}
 private:
-  std::vector<Elf> m_elves;
+  Elves m_elves;
   MapBounds m_bounds{};
 };
 
 using Model = Map;
 
 std::ostream& operator<<(std::ostream& os,Vector const& pos) {
-  std::cout << "[col:" << pos.col() << ",row:" << pos.row() << "]"; 
+  std::cout << "[col:" << pos.col << ",row:" << pos.row << "]"; 
   return os;
 }
 
 std::ostream& operator<<(std::ostream& os,MapBounds const& bounds) {
-  std::cout << "west:" << bounds.m_west_bound << " .. east:" << bounds.m_east_bound;
-  std::cout << " north:" << bounds.m_north_bound << " .. south:" << bounds.m_south_bound;
+  std::cout << "west:" << bounds.west << " .. east:" << bounds.east;
+  std::cout << " north:" << bounds.north << " .. south:" << bounds.south;
   return os;
 }
 
@@ -85,7 +84,7 @@ Model parse(auto& in) {
           Vector pos{col,row};
           Elf elf{pos};
           result.push_back(elf);
-          std::cout << "\nelf at " << elf.pos();
+          std::cout << "\nelf at " << elf.pos;
         }
         ++col;
       }
@@ -94,12 +93,49 @@ Model parse(auto& in) {
     return result;
 }
 
+bool has_neighbour_elf(Elf const& elf,Map const& map) {
+  bool result{false};
+  Vector delta{};
+  for (int i=0;i<8 and result==false;++i) {
+    switch (i) {
+      case 0: delta = Vector{.col=0,.row=-1}; break; // N
+      case 1: delta = Vector{.col=1,.row=-1}; break; // NE
+      case 2: delta = Vector{.col=1,.row=0};  break; // E
+      case 3: delta = Vector{.col=1,.row=1};  break; // SE
+      case 4: delta = Vector{.col=0,.row=1};  break; // S
+      case 5: delta = Vector{.col=-1,.row=1}; break; // SW
+      case 6: delta = Vector{.col=-1,.row=0}; break; // W
+      case 7: delta = Vector{.col=-1,.row=-1}; break; // NW
+    }
+    auto pos_to_check = elf.pos + delta;
+    result = std::any_of(map.elves().begin(),map.elves().end(),[pos_to_check](Elf const& elf){
+      return (pos_to_check == elf.pos);
+    });
+  }
+  return result;
+}
+
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << "\nbounds:" << data_model.bounds();
+      auto map = data_model;
+      std::vector<char> directions_to_consider{'N','S','W','E'};
+      for (int i=0;i<10;++i) {
+        std::cout << "\nround:" << i+1;
+        for (Elf const& elf : map.elves()) {
+          if (has_neighbour_elf(elf,map)) {
+            std::cout << "\n\thas neighbour elf:" << elf.pos;
+            for (char dir : directions_to_consider) {
+              std::cout << "\n\tconsider:" << dir;
+            }
+          }
+        }
+        directions_to_consider.push_back(directions_to_consider[0]);
+        directions_to_consider.erase(directions_to_consider.begin());
+      }
       return result;
   }
 }
