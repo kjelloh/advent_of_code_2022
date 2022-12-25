@@ -100,6 +100,43 @@ std::ostream& operator<<(std::ostream& os,Blizzards const& blizzards) {
   return os;
 }
 
+Map to_map(Map const& initial_map,Blizzards const& blizzards) {
+  Map result{initial_map};
+  for (int row=1;row<initial_map.size()-1;++row) {
+    for (int col=1;col<initial_map[0].size()-1;++col) {
+      result[row][col] = '.';
+    }
+  }
+  for (auto const& blizzard : blizzards) {
+    result[blizzard.pos.row][blizzard.pos.col] = blizzard.dir;
+  }
+  return result;
+}
+
+Vector pos_at_t(Blizzard const& blizzard,int t,int height,int width) {
+  Vector result{blizzard.pos};
+  switch (blizzard.dir) {
+    case '^': result.row = (result.row - t - 1) % (height-2) + 1; break;
+    case '>': result.col = (result.col + t - 1) % (width-2) + 1; break;
+    case 'v': result.row = (result.row + t - 1) % (height-2) + 1; break;
+    case '<': result.col = (result.col + t - 1) % (width-2) + 1; break;
+  }
+  return result;
+}
+
+Blizzards blizzards_at_t(Model const& model,int t) {
+  Blizzards result{model.first};
+  for (int index=0;index<result.size();++index) {
+    result[index].pos = pos_at_t(result[index],t,model.second[0].size(),model.second[0][0].size());
+  }
+  return result;
+}
+
+Map map_at_t(Model const& model,int t) {
+  auto blizzards = blizzards_at_t(model,t);
+  return to_map(model.second[0],blizzards);
+}
+
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
@@ -110,6 +147,11 @@ namespace part1 {
         std::cout << "\nSAME";
       }
       std::cout << "\n" << data_model.first;
+      for (int t=0;t<20;++t) {
+        auto map_t = map_at_t(data_model,t);
+        std::cout << "\nt:" << t;
+        std::cout << "\n" << map_t;
+      }
       return result;
   }
 }
