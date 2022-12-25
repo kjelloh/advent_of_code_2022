@@ -108,19 +108,39 @@ Map to_map(Map const& initial_map,Blizzards const& blizzards) {
     }
   }
   for (auto const& blizzard : blizzards) {
-    result[blizzard.pos.row][blizzard.pos.col] = blizzard.dir;
+    auto& map_ch_ref = result[blizzard.pos.row][blizzard.pos.col];
+    if (map_ch_ref == '.') map_ch_ref = blizzard.dir;
+    else if (map_ch_ref == '^' or map_ch_ref == '>' or map_ch_ref == 'v' or map_ch_ref == '<') {
+      map_ch_ref = '2';
+    }
+    else if (map_ch_ref >= '2' and map_ch_ref <= '8') {
+      map_ch_ref = static_cast<char>(map_ch_ref + 1);
+    }
+    else map_ch_ref = 'X';
   }
   return result;
 }
 
 Vector pos_at_t(Blizzard const& blizzard,int t,int height,int width) {
   Vector result{blizzard.pos};
+  std::cout << "\nt:" << t << " " << blizzard.dir << " pos" << result << " to ";
   switch (blizzard.dir) {
-    case '^': result.row = (result.row - t - 1) % (height-2) + 1; break;
-    case '>': result.col = (result.col + t - 1) % (width-2) + 1; break;
-    case 'v': result.row = (result.row + t - 1) % (height-2) + 1; break;
-    case '<': result.col = (result.col + t - 1) % (width-2) + 1; break;
+    case '^': {
+      result.row = (result.row - t - 1) % (height-2) + 1;
+      if (result.row <= 0) result.row += (height-2);
+     } break; 
+    case '>': {
+      result.col = (result.col + t - 1) % (width-2) + 1;
+     } break;
+    case 'v': { 
+      result.row = (result.row + t - 1) % (height-2) + 1;
+    } break;
+    case '<': {
+      result.col = (result.col - t -1) % (width-2) + 1;
+      if (result.col <= 0) result.col += (width-2);
+     } break;
   }
+  std::cout << result;
   return result;
 }
 
@@ -147,10 +167,24 @@ namespace part1 {
         std::cout << "\nSAME";
       }
       std::cout << "\n" << data_model.first;
-      for (int t=0;t<20;++t) {
+      for (int t=0;t<10;++t) {
         auto map_t = map_at_t(data_model,t);
-        std::cout << "\nt:" << t;
-        std::cout << "\n" << map_t;
+        std::cout << "\nt:" << t << "\n" << map_t;
+      }
+      int t = 18;
+      auto map_t = map_at_t(data_model,t);
+      std::cout << "\nt:" << t;
+      std::cout << "\n" << map_t;
+      if (map_t == to_map(R"(#.######
+#>2.<.<#
+#.2v^2<#
+#>..>2>#
+#<....>#
+######.#)"))  {
+        std::cout << "\nSAME";
+      }
+      else {
+        std::cout << "\nDEVIATES";
       }
       return result;
   }
@@ -167,6 +201,13 @@ namespace part2 {
 
 int main(int argc, char *argv[])
 {
+  if (false) {
+    // Test modulo calculus
+    for (int row=-10;row<10; ++row) {
+      std::cout << "\nrow:" << row << " row%4:" << row%4;
+    }
+    return 0;
+  }
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   // answers.push_back({"Part 1     ",part1::solve_for(pData)});
@@ -181,19 +222,26 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-char const* pTest = R"(#.#####
-#.....#
-#>....#
-#.....#
-#...v.#
-#.....#
-#####.#)";
-// char const* pTest = R"(#.######
-// #>>.<^<#
-// #.<..<<#
-// #>v.><>#
-// #<^v^^>#
-// ######.#)";
+// char const* pTest = R"(#.#####
+// #.....#
+// #>....#
+// #.....#
+// #...v.#
+// #.....#
+// #####.#)";
+// char const* pTest = R"(#.#####
+// #.^..<#
+// #>....#
+// #.....#
+// #...v.#
+// #.....#
+// #####.#)";
+char const* pTest = R"(#.######
+#>>.<^<#
+#.<..<<#
+#>v.><>#
+#<^v^^>#
+######.#)";
 char const* pData = R"(#.####################################################################################################
 #>^v^v>><.>>><>^v<>^v>v<>^<<>>v>>.>><v>^<>^.<>v.>v^>vvvv<<<<>>^v^^^>><><.^^^.<<<>><^v^vv^v<.v.v>>.vv<#
 #>^><>^v^<>.<v><.<.v<v>vv<^<vvvv.^^...<<<^^vv<<v<>>>>v^<>>^^^><.>>>>v<<>^.>.^^<v<.><<.<><.>>>^^^>>.<>#
