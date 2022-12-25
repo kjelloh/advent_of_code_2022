@@ -21,8 +21,14 @@ extern char const* pData;
 using Result = size_t;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
+struct Vector {
+  int row;
+  int col;
+};
+
 struct Blizzard {
   char dir;
+  Vector pos;
 };
 using Blizzards = std::vector<Blizzard>;
 using Map = std::vector<std::vector<char>>;
@@ -53,7 +59,14 @@ Model parse(auto& in) {
       for (int col=0;col<line.size();++col) {
         auto ch = line[col];
         result.second[0].back().push_back(ch);
+        for (auto bch : {'^','>','v','<'}) {
+          if (bch==ch) {
+            result.first.push_back(Blizzard{ch,Vector{.row=row,.col=col}});
+            break;
+          }
+        }
       }
+      ++row;
     }
     return result;
 }
@@ -69,6 +82,24 @@ std::ostream& operator<<(std::ostream& os,Map const& map) {
   return os;
 }
 
+std::ostream& operator<<(std::ostream& os,Vector const& v) {
+  std::cout << "[row:" << v.row << ",col:" << v.col << "]";
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os,Blizzard const& blizzard) {
+  std::cout << blizzard.dir << " at " << blizzard.pos;
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os,Blizzards const& blizzards) {
+  for (int index=0;index<blizzards.size();++index) {
+    if (index>0) os << "\n";
+    os << blizzards[index];
+  }
+  return os;
+}
+
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
@@ -78,6 +109,7 @@ namespace part1 {
       if (data_model.second[0] == to_map(pData)) {
         std::cout << "\nSAME";
       }
+      std::cout << "\n" << data_model.first;
       return result;
   }
 }
@@ -95,7 +127,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
@@ -107,19 +139,19 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-// char const* pTest = R"(#.#####
-// #.....#
-// #>....#
-// #.....#
-// #...v.#
-// #.....#
-// #####.#)";
-char const* pTest = R"(#.######
-#>>.<^<#
-#.<..<<#
-#>v.><>#
-#<^v^^>#
-######.#)";
+char const* pTest = R"(#.#####
+#.....#
+#>....#
+#.....#
+#...v.#
+#.....#
+#####.#)";
+// char const* pTest = R"(#.######
+// #>>.<^<#
+// #.<..<<#
+// #>v.><>#
+// #<^v^^>#
+// ######.#)";
 char const* pData = R"(#.####################################################################################################
 #>^v^v>><.>>><>^v<>^v>v<>^<<>>v>>.>><v>^<>^.<>v.>v^>vvvv<<<<>>^v^^^>><><.^^^.<<<>><^v^vv^v<.v.v>>.vv<#
 #>^><>^v^<>.<v><.<.v<v>vv<^<vvvv.^^...<<<^^vv<<v<>>>>v^<>>^^^><.>>>>v<<>^.>.^^<v<.><<.<><.>>>^^^>>.<>#
