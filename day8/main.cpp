@@ -36,14 +36,26 @@ Model parse(auto& in) {
     return result;
 }
 
-std::ostream& operator<<(std::ostream& os,Model const& model) {
-  for (int row=0;row<model.size();++row) {
-    if (row>0) os << "\n";
-    for (int col=0;col<model[row].size();++col) {
+struct Vector {
+  Result row;
+  Result col;
+};
+
+void for_each(Model const& model,auto f) {
+  for (Result row=0;row<model.size();++row) {
+    for (Result col=0;col<model[row].size();++col) {
       // os << static_cast<char>('0'+model[row][col]);
-      os << model[row][col];
+      f(Vector{.row=row,.col=col},model[row][col]);
     }
-  }
+  }  
+}
+
+std::ostream& operator<<(std::ostream& os,Model const& model) {
+  auto f = [&os](Vector const& pos,Result height) {
+    if (pos.row>0 and pos.col==0) os << "\n";
+    os << height;
+  };
+  for_each(model,f);
   return os;
 }
 
@@ -70,7 +82,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
