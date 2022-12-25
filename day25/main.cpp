@@ -49,6 +49,31 @@ Result to_decimal(SNAFU const& snafu) {
   return result;
 }
 
+SNAFU to_snafu(Result x) {
+  SNAFU result{};
+  do {
+    Result reminder = x % 5;
+    std::cout << "\n\tx:" << x << " reminder:" << reminder;
+    switch (reminder) {
+      case -4: result.s = '1' + result.s; x-=1; break;
+      case -3: result.s = '2' + result.s; x-=2; break;
+      case -2: result.s = '=' + result.s; break; 
+      case -1: result.s = '-' + result.s; break; 
+      case 0: result.s = '0' + result.s; break;
+      case 1: result.s = '1' + result.s; break;
+      case 2: result.s = '2' + result.s; break;
+      case 3: result.s = '=' + result.s; x+=2;break;
+      case 4: result.s = '-' + result.s; x+=1;break;
+      default: {
+        std::cerr << "\nERROR: remainder:" << reminder;
+      }
+    }
+    x = x/5;
+  } while (std::abs(x)>0);
+  std::cout << " ";
+  return result;
+}
+
 /*
 
  SNAFU  Decimal
@@ -87,7 +112,11 @@ namespace part1 {
       std::stringstream in{ pData };
       auto data_model = parse(in);
       for (auto const& snafu : data_model) {
-        std::cout << "\nSNAFU:" << snafu.s << " = decimal:" << to_decimal(snafu);
+        auto x = to_decimal(snafu);
+        auto s = to_snafu(x);
+        std::cout << "\nSNAFU:" << std::quoted(snafu.s) << " = decimal:" << x << " to_snafu:" << s.s;
+        if (snafu.s == s.s) std::cout << " ok";
+        else std::cout << " ERROR";
       }
       return result;
   }
@@ -106,7 +135,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
@@ -118,6 +147,21 @@ int main(int argc, char *argv[])
   return 0;
 }
 
+// char const* pTest = R"(0
+// 1
+// 2
+// -
+// =
+// -0
+// -1
+// -2
+// --
+// -=
+// =0
+// =1
+// =2
+// =-
+// ==)";
 char const* pTest = R"(1=-0-2
 12111
 2=0=
