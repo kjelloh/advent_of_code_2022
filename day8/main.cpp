@@ -21,15 +21,26 @@ extern char const* pData;
 using Result = size_t;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
-using Model = std::vector<std::vector<Result>>;
+using Map = std::vector<std::vector<Result>>;
+struct Model {
+public:
+  Map& map() {return m_map;}
+  Map const& map() const {return m_map;}
+  Result west() const {return 0;}
+  Result east() const {return m_map[0].size()-1;}
+  Result north() const {return 0;}
+  Result south() const {return m_map.size()-1;}
+private:
+  std::vector<std::vector<Result>> m_map{};
+};
 
 Model parse(auto& in) {
     Model result{};
     std::string line{};
     while (std::getline(in,line)) {
-      result.push_back({});
+      result.map().push_back({});
       for (char digit : line) {
-        result.back().push_back(static_cast<Result>(digit - '0'));
+        result.map().back().push_back(static_cast<Result>(digit - '0'));
         // std::cout << "\n\tdigit:" << digit << " value:" << result.back().back(); 
       }
     }
@@ -42,10 +53,10 @@ struct Vector {
 };
 
 void for_each(Model const& model,auto f) {
-  for (Result row=0;row<model.size();++row) {
-    for (Result col=0;col<model[row].size();++col) {
+  for (Result row=0;row<=model.south();++row) {
+    for (Result col=0;col<=model.east();++col) {
       // os << static_cast<char>('0'+model[row][col]);
-      f(Vector{.row=row,.col=col},model[row][col]);
+      f(Vector{.row=row,.col=col},model.map()[row][col]);
     }
   }  
 }
@@ -59,12 +70,51 @@ std::ostream& operator<<(std::ostream& os,Model const& model) {
   return os;
 }
 
+std::ostream& operator<<(std::ostream& os,Vector const& pos) {
+  os << "[row:" << pos.row << ",col:" << pos.col << "]";
+  return os;
+}
+
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << "\n" << data_model;
+      auto f = [&result,&data_model](Vector const& pos,Result height) {
+        std::cout << "\npos " << pos;
+        bool visible = pos.row==data_model.north() or pos.row==data_model.south() or pos.col==data_model.west() or pos.col==data_model.east();
+        if (visible==false) {
+          std::cout << " inner";
+          visible=true;
+          for (Result row=data_model.north();row<pos.row and visible;++row) {
+            visible = visible and (data_model.map()[row][pos.col] < height);
+          }
+          if (visible==false) {
+            visible=true;
+            for (Result row=pos.row+1;row<=data_model.south() and visible;++row) {
+              visible = visible and (data_model.map()[row][pos.col] < height);
+            }
+            if (visible==false) {
+              visible=true;
+              for (Result col=data_model.west();col<pos.col and visible;++col) {
+                visible = visible and (data_model.map()[pos.row][col] < height);
+              }
+              if (visible==false) {
+                visible=true;
+                for (Result col=pos.col+1;col<=data_model.east() and visible;++col) {
+                  visible = visible and (data_model.map()[pos.row][col] < height);
+                }
+              }
+            }
+          }
+        }
+        if (visible) {
+          ++result;
+          std::cout << " visible result:" << result;
+        } 
+      };
+      for_each(data_model,f);
       return result;
   }
 }
