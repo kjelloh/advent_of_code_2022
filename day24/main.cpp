@@ -29,6 +29,20 @@ using Map = std::vector<std::vector<char>>;
 using Maps = std::vector<Map>;
 using Model = std::pair<Blizzards,Maps>;
 
+Map to_map(std::string const& s) {
+  std::istringstream in{s};
+  Map result{};
+  std::string line{};
+  while (std::getline(in,line)) {
+    result.push_back({});
+    for (int col=0;col<line.size();++col) {
+      auto ch = line[col];
+      result.back().push_back(ch);
+    }
+  }
+  return result;  
+}
+
 Model parse(auto& in) {
     Model result{};
     result.second.push_back({});
@@ -61,6 +75,9 @@ namespace part1 {
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << "\n" << data_model.second[0];
+      if (data_model.second[0] == to_map(pData)) {
+        std::cout << "\nSAME";
+      }
       return result;
   }
 }
@@ -78,7 +95,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
@@ -90,19 +107,19 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-char const* pTest = R"(#.#####
-#.....#
-#>....#
-#.....#
-#...v.#
-#.....#
-#####.#)";
-// char const* pTest = R"(#.######
-// #>>.<^<#
-// #.<..<<#
-// #>v.><>#
-// #<^v^^>#
-// ######.#)";
+// char const* pTest = R"(#.#####
+// #.....#
+// #>....#
+// #.....#
+// #...v.#
+// #.....#
+// #####.#)";
+char const* pTest = R"(#.######
+#>>.<^<#
+#.<..<<#
+#>v.><>#
+#<^v^^>#
+######.#)";
 char const* pData = R"(#.####################################################################################################
 #>^v^v>><.>>><>^v<>^v>v<>^<<>>v>>.>><v>^<>^.<>v.>v^>vvvv<<<<>>^v^^^>><><.^^^.<<<>><^v^vv^v<.v.v>>.vv<#
 #>^><>^v^<>.<v><.<.v<v>vv<^<vvvv.^^...<<<^^vv<<v<>>>>v^<>>^^^><.>>>>v<<>^.>.^^<v<.><<.<><.>>>^^^>>.<>#
