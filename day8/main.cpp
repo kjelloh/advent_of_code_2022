@@ -18,7 +18,7 @@
 extern char const* pTest;
 extern char const* pData;
 
-using Result = size_t;
+using Result = long long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 using Map = std::vector<std::vector<Result>>;
@@ -50,6 +50,10 @@ Model parse(auto& in) {
 struct Vector {
   Result row;
   Result col;
+  bool operator<(Vector const& other) const {
+    if (row==other.row) return col < other.col;
+    else return row < other.row;
+  }
 };
 
 void for_each(Model const& model,auto f) {
@@ -124,6 +128,47 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      std::cout << "\n" << data_model;
+      std::map<Vector,Result> scenic_score{};
+      auto f = [&result,&data_model,&scenic_score](Vector const& pos,Result height) {
+        std::vector<Result> view_distance{4,0};
+        std::cout << "\npos " << pos << std::flush;
+        bool visible = pos.row==data_model.north() or pos.row==data_model.south() or pos.col==data_model.west() or pos.col==data_model.east();
+        if (visible==false) {
+          std::cout << " inner" << std::flush;
+          visible=true;
+          for (Result row=pos.row-1;row>=data_model.north() and visible;--row) {
+            std::cout << " row:" << row << std::flush;
+            visible = visible and (data_model.map()[row][pos.col] < height);
+            view_distance[0] = pos.row - row;
+          }
+          visible=true;
+          for (Result row=pos.row+1;row<=data_model.south() and visible;++row) {
+            std::cout << " row:" << row << std::flush;
+            visible = visible and (data_model.map()[row][pos.col] < height);
+            view_distance[2] = row - pos.row;
+          }
+          visible=true;
+          for (Result col=pos.col-1;col>=data_model.west() and visible;--col) {
+            std::cout << " col:" << col << std::flush;
+            visible = visible and (data_model.map()[pos.row][col] < height);
+            view_distance[3] = pos.col - col;
+          }
+          visible=true;
+          for (Result col=pos.col+1;col<=data_model.east() and visible;++col) {
+            std::cout << " col:" << col << std::flush;
+            visible = visible and (data_model.map()[pos.row][col] < height);
+            view_distance[1] = col-pos.col;
+          }
+        }
+        scenic_score[pos] = view_distance[0]*view_distance[1]*view_distance[2]*view_distance[3];
+        std::cout << " scenic_score:" << view_distance[0] << "*" << view_distance[1] << "*" << view_distance[2]<< "*" << view_distance[3] << " = " <<  scenic_score[pos];
+      };
+      for_each(data_model,f);
+      auto iter = std::max_element(scenic_score.begin(),scenic_score.end(),[](auto entry1,auto entry2){
+        return (entry1.second < entry2.second);
+      });
+      result = iter->second;
       return result;
   }
 }
@@ -131,9 +176,9 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
