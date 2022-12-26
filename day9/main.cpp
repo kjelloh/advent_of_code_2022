@@ -62,7 +62,7 @@ std::ostream& operator<<(std::ostream& os,Model const& model) {
 }
 
 Vector to_stepped(Vector pos,char dir) {
-  std::cout << "\nto_stepped pos:" << pos << " dir:" << dir;
+  // std::cout << "\nto_stepped pos:" << pos << " dir:" << dir;
   Vector result{pos};
   switch (dir) {
     case 'U': --result.row; break;
@@ -70,7 +70,7 @@ Vector to_stepped(Vector pos,char dir) {
     case 'D': ++result.row; break;
     case 'L': --result.col; break;
   }
-  std::cout << " result:" << result;
+  // std::cout << " result:" << result;
   return result;
 }
 
@@ -82,7 +82,7 @@ int manhattan_distance(Vector const& v1,Vector const& v2) {
 Vector to_adjacent(Vector const& head,Vector const& tail) {
   Vector result{tail};
   auto diff = head - tail;
-  std::cout << "\nto_adjacent head:" << head << " tail:" << tail << " diff:" << diff;
+  // std::cout << "\nto_adjacent head:" << head << " tail:" << tail << " diff:" << diff;
   // to_adjacent head:[row:-3,col:4] tail:[row:-1,col:4] diff:[row:-2,col:0] adjacent tail:[row:-4,col:4]
   if (diff.row==0 and diff.col>1) result.col = ++result.col;
   else if (diff.row==0 and diff.col<-1) result.col = --result.col;
@@ -106,7 +106,7 @@ Vector to_adjacent(Vector const& head,Vector const& tail) {
       --result.row;
     }
   }
-  std::cout << " adjacent tail:" << result;
+  // std::cout << " adjacent tail:" << result;
   return result;
 }
 
@@ -143,16 +143,18 @@ namespace part1 {
       Vector head{.row=0,.col=0};
       Vector tail = head;
       Map visited{tail};
+      std::cout << "\n";
+      print_HT_on_map(head,tail,visited);
       for (auto const& [dir,steps] : data_model) {
         std::cout << "\nstep: " << dir;
         for (int i=0;i<steps;++i) {
           head = to_stepped(head,dir);
           tail = to_adjacent(head,tail);
           visited.insert(tail);
-          std::cout << "\n";
-          print_HT_on_map(head,tail,visited);
         }
       }
+      std::cout << "\n";
+      print_HT_on_map(head,tail,visited);
       result = visited.size();
       return result;
   }
