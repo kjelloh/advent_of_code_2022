@@ -233,9 +233,13 @@ namespace part1 {
       Result m2{data_model[1].inspect_count};
       for (auto const& entry : data_model) {
         std::cout << "\nmonkey:" << entry.second.id << " inspect_count:" << entry.second.inspect_count;
-        if (entry.second.inspect_count>m1) m1 = entry.second.inspect_count;
+        if (entry.second.inspect_count>m1) {
+          m2 = m1;
+          m1 = entry.second.inspect_count;
+        }
         else if (entry.second.inspect_count>m2) m2 = entry.second.inspect_count;
-      }
+      }      
+      std::cout << "\nm1:" << m1 << " m2:" << m2;
       result = m1*m2;
       return result;
   }
@@ -254,7 +258,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
