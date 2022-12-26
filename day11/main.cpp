@@ -27,10 +27,10 @@ struct NewWlFunc {
   std::string l_term;
   char op;
   std::string r_term;
-  Result operator()(int old) {
-    int result{};
+  Result operator()(Result old) {
+    Result result{};
     std::cout << "\n\tNewWlFunc::operator(" << old << ") l_term:" << std::quoted(l_term) << " op:'" << op << "' r_term:" << std::quoted(r_term);
-    int term2{};
+    Result term2{};
     if (r_term == "old") {
       term2 = old;
     }
@@ -58,6 +58,7 @@ struct IfTrueOrFalseOp {
 
 struct Monkey {
   int id{};
+  Result reduction{3};
   Result inspect_count{};
   WorryLevels worry_levels{};
   NewWlFunc new_wl;
@@ -246,10 +247,37 @@ namespace part1 {
 }
 
 namespace part2 {
+
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      for (auto& [id,monkey] : data_model) monkey.reduction = 1;
+      ToThrow to_trow{};
+      for (int round = 1;round<=10000;++round) {
+        std::cout << "\nBEGIN round:" << round;
+        for (auto& [id,monkey] : data_model) {
+          ToThrow to_throw{};
+          std::cout << "\n\teval monkey:" << monkey << std::flush;
+          monkey.perform_turn(to_throw);
+          for (auto const& entry : to_throw) {
+            std::cout << "\n\twl:" << entry.second << " to monkey:" << entry.first;
+            data_model[entry.first].worry_levels.push_back(entry.second);
+          }
+        }
+      }
+      Result m1{data_model[0].inspect_count};
+      Result m2{data_model[1].inspect_count};
+      for (auto const& entry : data_model) {
+        std::cout << "\nmonkey:" << entry.second.id << " inspect_count:" << entry.second.inspect_count;
+        if (entry.second.inspect_count>m1) {
+          m2 = m1;
+          m1 = entry.second.inspect_count;
+        }
+        else if (entry.second.inspect_count>m2) m2 = entry.second.inspect_count;
+      }      
+      std::cout << "\nm1:" << m1 << " m2:" << m2;
+      result = m1*m2;
       return result;
   }
 }
@@ -259,7 +287,7 @@ int main(int argc, char *argv[])
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
