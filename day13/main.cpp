@@ -28,12 +28,26 @@ enum Type {
   ,Unknown_Type
 };
 
+std::ostream& operator<<(std::ostream& os,Type type) {
+  switch (type) {
+    case Undefined_Type: os << "undefined";break;
+    case Integer_Type: os << "integer";break;
+    case List_Type: os<<"list";break;
+    case Unknown_Type: os<<"unknown";break;
+  }
+  return os;
+}
+
 struct Packet {
+  Packet(Type type) : type{type} {std::cout << "\nPacket{" << type << ")" << std::flush;} 
   Type type;
   virtual std::string to_string() = 0;
 };
 
 struct IntegerPacket : public Packet {
+  IntegerPacket(int i) : Packet{Integer_Type},integer{i} {
+    std::cout << "\nIntegerPacket{" << integer << "," << type << "}" << std::flush;
+  }
   int integer;
   virtual std::string to_string() {
     return std::to_string(integer);
@@ -42,6 +56,9 @@ struct IntegerPacket : public Packet {
 
 struct PacketList : public Packet {
   using Packets = std::vector<Packet*>;
+  PacketList() : Packet{List_Type},packets{} {
+    std::cout << "PacketList{" << type << "}" << std::flush;
+  }
   Packets packets{};
   virtual std::string to_string() {
     std::string result{};
@@ -61,8 +78,74 @@ using PacketPair = std::pair<Packet*,Packet*>;
 
 using Model = std::vector<PacketPair>;
 
+std::string to_trimmed(std::string const& s) {
+  std::string result{};
+  auto begin=s.begin();
+  while  (std::isspace(*begin)) ++begin;
+  auto end = s.end();--end;
+  while (std::isspace(*end)) end--;
+  return std::string{begin,end+1};
+}
+
+std::pair<std::string,std::string> to_splitted(std::string const& s,char delim) {
+  // find delim only on parenthesis level 0
+  int level{0};
+  auto pos = std::string::npos;
+  for (int i=0;i<s.size();++i) {
+    char ch = s[i];
+    if (ch=='[') ++level;
+    else if (ch==']') --level;
+    else if (level==0 and ch==delim) {
+      pos=i;
+      break;
+    }
+  }
+  if (pos != std::string::npos) {
+    return {to_trimmed(s.substr(0,pos)),to_trimmed(s.substr(pos+1))};
+  }
+  else {
+    return {to_trimmed(s),""};
+  }
+}
+
+std::vector<std::string> to_tokens(std::string s,char delim) {
+  std::vector<std::string> result{};
+  while (true) {
+    auto [head,tail] = to_splitted(s,delim);
+    std::cout << "\nhead:" << std::quoted(head) << " tail:" << std::quoted(tail);
+    if (head.size()>0) {
+      result.push_back(head);
+      s = tail;
+    }
+    else break;
+  }
+  for (auto token : result) std::cout << " token:" << token;
+  return result;
+}
+
+Packet* to_packet_ptr(std::string const& line); // forward
+
+PacketList* to_packet_list(std::string line) {
+  std::cout << "\nto_packet_list(" << line << ")" << std::flush;
+  PacketList* result{new PacketList{}};
+  auto slist = line.substr(1,line.size()-2);
+  std::cout << "\nslist:" << std::quoted(slist) << std::flush;
+  auto tokens = to_tokens(slist,',');
+  for (auto token : tokens) {
+    std::cout << "\n\ttoken:" << std::quoted(token) << std::flush;
+    result->packets.push_back(to_packet_ptr(token));
+  }
+  return result;
+}
+
 Packet* to_packet_ptr(std::string const& line) {
+  std::cout << "\nto_packet_ptr(" << line << ")" << std::flush;
   Packet* result{nullptr};
+  if (line[0]=='[') result = to_packet_list(line);
+  else {
+    auto integer = std::stoi(line);
+    result = new IntegerPacket{integer};
+  }
   return result;
 }
 
@@ -83,6 +166,8 @@ Model parse(auto& in) {
         lines.push_back(line);
       }
     }
+    result.push_back(to_packet_pair(lines));
+    lines.clear();
     return result;
 }
 
