@@ -107,22 +107,23 @@ int compare(PacketList* p1,PacketList* p2) {
   std::cout << "\ncompare(list:" << p1->to_string() << ",list:" << p2->to_string() << ")";
   int result{};
   if (p1->packets.size()<=p2->packets.size()) {
-    result = false; // default "right order" if p1 has no packets
+    result = -1; // default "right order" if p1 has no packets
     // loop over p1 packet count <= p2 packet count
     for (int index=0;index<p1->packets.size();++index) {
       // break if p1 packet is less than p2 packet or if p2 packet 
       std::cout << " index:" << index;
       if (result = compare(p1->packets[index],p2->packets[index]);result!=0) break;
     }
+    if (result==0 and p1->packets.size()<p2->packets.size()) result=-1; // Compare was not conclusive but p1 packet count is less so still correct order
   }
   else {
     // loop over p2 packet count of p2 < p1 packet count
     result = 1; // default "wrong order" if p2 has no packets
     for (int index=0;index<p2->packets.size();++index) {
-      // break if p1 packet < p2 packet
-      if (result = compare(p1->packets[index],p2->packets[index]);result<0) break;
+      // break if p1 packet < p2 packet or p2 packet > p1 packet
+      if (result = compare(p1->packets[index],p2->packets[index]);result!=0) break;
     }
-    if (result==0) result=1; // compare was not conclusive for members but p2 packet count is smaller, i.e. p2>p1.
+    if (result==0) result=1; // compare was not conclusive for members but p2 packet count is smaller, i.e. wrong order p2>p1.
   }
   std::cout << " result:" << result;
   return result;
@@ -289,7 +290,6 @@ std::ostream& operator<<(std::ostream& os,Model const& model) {
   return os;
 }
 
-
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
@@ -302,7 +302,7 @@ namespace part1 {
         auto pair = data_model[index];
         if (compare(pair.first,pair.second)<=0) indices.push_back(index+1);
       }
-      for (auto index : indices) std::cout << "\n\tvalid order:" << index;
+      for (auto index : indices) std::cout << "\n\tin valid order:" << index;
       result = std::accumulate(indices.begin(),indices.end(),Result{0});
       return result;
   }
@@ -321,7 +321,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
