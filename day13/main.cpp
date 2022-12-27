@@ -74,6 +74,102 @@ struct PacketList : public Packet {
   }
 };
 
+bool is_right_order(Packet* p1,Packet* p2); // forward
+bool is_right_order(IntegerPacket* p1,IntegerPacket* p2) {
+  bool result{};
+  std::cout << "\nis_right_order(integer:" << p1->to_string() << ",integer:" << p2->to_string() << ")";
+  result = (p1->integer <= p2->integer);
+  if (result) std::cout << " true";
+  else std::cout << " FALSE";
+  return result;
+}
+bool is_right_order(PacketList* p1,PacketList* p2); // forward
+bool is_right_order(IntegerPacket* p1,PacketList* p2) {
+  bool result{};
+  std::cout << "\nis_right_order(integer:" << p1->to_string() << ",list:" << p2->to_string() << ")";
+  PacketList* pp1 = new PacketList{};
+  pp1->packets.push_back(p1);
+  result = is_right_order(pp1,p2);
+  if (result) std::cout << " true";
+  else std::cout << " FALSE";
+  return result;
+}
+bool is_right_order(PacketList* p1,IntegerPacket* p2) {
+  bool result{};
+  std::cout << "\nis_right_order(list:" << p1->to_string() << ",integer:" << p2->to_string() << ")";
+  PacketList* pp2 = new PacketList{};
+  pp2->packets.push_back(p2);
+  result = is_right_order(p1,pp2);
+  if (result) std::cout << " true";
+  else std::cout << " FALSE";
+  return result;
+}
+bool is_right_order(PacketList* p1,PacketList* p2) {
+  std::cout << "\nis_right_order(list:" << p1->to_string() << ",list:" << p2->to_string() << ")";
+  bool result{};
+  if (p1->packets.size()<=p2->packets.size()) {
+    result = true; // default "right order" if p1 has no packets
+    // loop over p1 packet count <= p2 packet count
+    for (int index=0;index<p1->packets.size();++index) {
+      // break if p1 packet > p2 packet
+      std::cout << " index:" << index;
+      if (result = is_right_order(p1->packets[index],p2->packets[index]);result==false) break;
+    }
+  }
+  else {
+    // loop over packet count of p2 < p1 packet count
+    result = false; // default "wrong order" if p2 has no packets
+    for (int index=0;index<p2->packets.size();++index) {
+      // break if p1 packet > p2 packet
+      if (result = is_right_order(p1->packets[index],p2->packets[index]);result==false) break;
+    }
+  }
+  if (result) std::cout << " true";
+  else std::cout << " FALSE";
+  return result;
+}
+
+bool is_right_order(Packet* p1,Packet* p2) {
+  std::cout << "\nis_right_order(packet:" << p1->to_string() << ",packet:" << p2->to_string() << ")";
+  bool result{false};
+  if (p1!=nullptr and p2!=nullptr) {
+    int state{0};
+    if (p1->type==Integer_Type) {
+      state = 10;
+    }
+    else if (p1->type==List_Type) {
+      state = 20;
+    }
+    else {
+      std::cerr << "\nERROR, is_right_order called with invalid p1->type:" << p1->type;
+    }
+    if (p2->type==Integer_Type) {
+      state +=1;
+    }
+    else if (p2->type==List_Type) {
+      state +=2;
+    }
+    else {
+      std::cerr << "\nERROR, is_right_order called with invalid p2->type:" << p1->type;
+    }
+    switch (state) {
+      case 11: result = (is_right_order(dynamic_cast<IntegerPacket*>(p1),dynamic_cast<IntegerPacket*>(p2)));break;
+      case 12: result = (is_right_order(dynamic_cast<IntegerPacket*>(p1),dynamic_cast<PacketList*>(p2)));break;
+      case 21: result = (is_right_order(dynamic_cast<PacketList*>(p1),dynamic_cast<IntegerPacket*>(p2)));break;
+      case 22: result = (is_right_order(dynamic_cast<PacketList*>(p1),dynamic_cast<PacketList*>(p2)));break;
+      default: {
+        std::cerr << "\nERROR, invalid state:" << state;
+      }
+    }
+  }
+  else {
+    std::cerr << "\nERROR, is_right_order called with nullptr";
+  }
+  if (result) std::cout << " true";
+  else std::cout << " FALSE";
+  return result;
+}
+
 using PacketPair = std::pair<Packet*,Packet*>;
 
 using Model = std::vector<PacketPair>;
@@ -202,6 +298,13 @@ namespace part1 {
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << "\n" << data_model;
+      std::vector<int> indices{};
+      for (int index = 0; index < data_model.size();++index) {
+        auto pair = data_model[index];
+        if (is_right_order(pair.first,pair.second)) indices.push_back(index+1);
+      }
+      for (auto index : indices) std::cout << "\n\tvalid order:" << index;
+      result = std::accumulate(indices.begin(),indices.end(),Result{0});
       return result;
   }
 }
