@@ -107,6 +107,7 @@ public:
       }
     }
   }
+  Graph const& graph() const {return m_graph;}
 private:
   friend std::ostream& operator<<(std::ostream& os,Model const& model);
   Graph m_graph;
@@ -152,12 +153,97 @@ Model parse(auto& in) {
     return Model{graph};
 }
 
+struct Gain {
+  std::string from;
+  Result value;
+};
+
+class Dijkstra {
+public:
+  Dijkstra(Model const& model) : m_model{model} {}
+  void visit(std::string const& from,std::string const& to,int t) {
+    std::cout << "\n\tvisit(from:" << from << ",to:" << to << ")"; 
+    auto& gain_at_from = this->gains[from];
+    auto& gain_at_to = this->gains[to];
+    auto candidate_gain = gain_at_from + m_model.graph().valves().at(to).flow_rate;
+    if (candidate_gain > gain_at_to) {
+      std::cout << " candidate_gain:" << candidate_gain << " > gain_at_to:" << gain_at_to;
+      edge_to[to] = from;
+      gain_at_to = candidate_gain;
+      std::cout << "\n\tedge_to[" << to << "] = " << from;
+    }
+  }
+  Result solve(int minutes) {
+    std::cout << "\nsolve(" << minutes << ")";
+    Result result{};
+    queue.push_back("AA");
+    marked["AA"] = true;
+    std::string last_visited{};
+    std::string current{};
+    for (int t = -2;t<minutes and queue.size()>0;++t) {
+      std::cout << "\n\tt:" << t;
+      if (t%2==0) {
+        // move
+        std::cout << " from:" << std::quoted(last_visited);
+        last_visited = current;
+        current = dequeue();
+        for (auto adj : m_model.graph().adj(current)) {
+          if (marked[adj]==false) {
+            edge_to[adj] = current;
+            enqueue(adj);
+            marked[adj] = true;
+          }
+        }
+      }
+      else {
+        // open valve
+        visit(last_visited,current,t);
+        last_visited = current;
+      }
+    }
+    std::vector<std::string> best_path{};
+    auto v = last_visited;
+    while (edge_to[v].size()>0) {
+      best_path.push_back(v);
+      v = edge_to[v];
+    }
+    std::cout << "\n\tbest_path:";
+    for (int i=best_path.size()-1;i>=0;--i) {
+      if (i<best_path.size()-1) std::cout << "->";
+      std::cout << best_path[i];
+    }
+    return result;
+  }
+private:
+  Model m_model;
+  std::vector<std::string> queue{};
+  std::map<std::string,Result> gains{};
+  std::map<std::string,bool> marked{};
+  std::map<std::string,std::string> edge_to{};
+  void enqueue(std::string const& name) {
+    std::cout << "\n\tenqueue() name:" << name;
+    queue.push_back(name);
+  }
+  std::string dequeue() {
+    std::cout << "\n\tdequeue()";
+    auto iter = std::max_element(queue.begin(),queue.end(),[this](std::string const& n1,std::string const& n2){
+      return (this->gains[n1] < this->gains[n2]);
+    });
+    auto result = *iter;
+    queue.erase(iter);
+    std::cout << " name:" << result << " gain:" << gains[result];
+    return result;
+  }
+};
+
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << "\n" << data_model;
+      Dijkstra dijkstra{data_model};
+      result = dijkstra.solve(30);
       return result;
   }
 }
@@ -175,7 +261,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
