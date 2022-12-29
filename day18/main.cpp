@@ -63,22 +63,29 @@ struct Vector {
 
 using Vectors = std::vector<Vector>;
 
+std::ostream& operator<<(std::ostream& os,Vector const& v) {
+  os << "[x:" << v.x << ",y:" << v.y << ",z:" << v.z << "]";
+  return os;
+}
+
 Vectors to_adjacent_dirs() {
+  std::cout << "\nto_adjacent_dirs()";
   Vectors result{};
   for (int x : {-1,0,1}) {
     for (int y : {-1,0,1}) {
       for (int z : {-1,0,1}) {
-        if (x==0 and y==0 and z==0) continue;
-        result.push_back({.x=x,.y=y,.z=z});
+        if (x==0 and y==0 and z==0) continue; // exclude "same"
+        if (std::abs(x)==1 and std::abs(y)==1 and std::abs(z)==1) continue; // exclude diagonals
+        if (std::abs(x)==1 and std::abs(y)==1 and std::abs(z)==0) continue; // exclude diagonals
+        if (std::abs(x)==1 and std::abs(y)==0 and std::abs(z)==1) continue; // exclude diagonals
+        if (std::abs(x)==0 and std::abs(y)==1 and std::abs(z)==1) continue; // exclude diagonals
+        Vector delta{.x=x,.y=y,.z=z};
+        result.push_back(delta);
+        std::cout << " delta:" << delta;
       }
     }
   }
   return result;
-}
-
-std::ostream& operator<<(std::ostream& os,Vector const& v) {
-  os << "[x:" << v.x << ",y:" << v.y << ",z:" << v.z << "]";
-  return os;
 }
 
 namespace did_not_use {
@@ -186,6 +193,14 @@ public:
     return result;
   }
 
+  Result unconnected_faces(Vertex v) {
+    Result result{};
+    result = (6-adj(v).size());
+    std::cout << "\nunconnected_faces(" << v << ")";
+    std::cout << " :result:" << result;
+    return result;
+  } 
+
 private:
   using Map = std::vector<std::pair<Vector,Vertex>>;
   Map m_map{};
@@ -279,12 +294,20 @@ namespace part1 {
       for (auto const& droplet : data_model) grid.insert(droplet);
       CC cc{grid};
       std::cout << "\n cc.count:" << cc.count();
+      Result unconnected_faces{0};
       for (int id=0;id<cc.count();++id) {
         if (id>0) std::cout << "\n";
         for (auto const& v : grid.vertices()) {
           if (id == cc.id(v)) std::cout << " " << v << ":" << *grid.to_pos(v);
         }
+        for (auto const& v : grid.vertices()) {
+          if (id == cc.id(v)) {
+            unconnected_faces += grid.unconnected_faces(v);
+            std::cout << "\n\tunconnected_faces:" << unconnected_faces; 
+          } 
+        }
       }
+      result = unconnected_faces;
       return result;
   }
 }
@@ -314,6 +337,9 @@ int main(int argc, char *argv[])
   return 0;
 }
 
+// char const* pTest = R"(0,0,0
+// 1,0,0
+// 2,0,0)";
 char const* pTest = R"(2,2,2
 1,2,2
 3,2,2
