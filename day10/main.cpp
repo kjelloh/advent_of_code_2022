@@ -18,11 +18,12 @@
 extern char const* pTest;
 extern char const* pData;
 
-using Result = size_t;
+using Result = long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 using Instruction = std::pair<std::string,std::optional<int>>;
-using Model = std::vector<Instruction>;
+using Program = std::vector<Instruction>;
+using Model = Program;
 
 std::ostream& operator<<(std::ostream& os,Instruction const& instruction) {
   os << "op:" << instruction.first << " arg:";
@@ -54,6 +55,38 @@ Instruction to_instruction(std::string const& entry) {
   return result;
 }
 
+struct CPU {
+  CPU(Program const& program) : m_program{program} {
+    count_down=to_count_down(program[0].first);
+  }
+  int to_count_down(std::string const& op) {
+    int result{};
+    if (op=="noop") result=1;
+    else if (op=="addx") result=2;
+    return result;
+  }
+  Program m_program;
+  int count_down{0};
+  int ix{0};
+  int call_count{0};
+  Result x{1};
+  CPU& operator++() {
+    std::cout << "\n\toperator++() call_count:" << call_count << " ix:" << ix << " count_down:" << count_down;
+    if (count_down==0) {
+      auto [op,arg] = m_program[ix];
+      if (op=="addx") {
+        x += *arg;
+        std::cout << " x:" << x;
+      }
+      ++ix;
+      count_down = to_count_down(m_program[ix].first);
+    }
+    --count_down;
+    ++call_count;
+    return *this;
+  }
+};
+
 Model parse(auto& in) {
     Model result{};
     std::string line{};
@@ -69,6 +102,22 @@ namespace part1 {
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << "\n" << data_model;
+      CPU cpu{data_model};
+      /*
+      Find the signal strength during the 20th, 60th, 100th, 140th, 180th, and 220th cycles. 
+      What is the sum of these six signal strengths?
+      */
+      const std::vector<int> STOPS{20,60,100,140,180,220};
+      for (int cycle=1;cycle<=STOPS.back();++cycle) {
+        ++cpu;
+        Result delta{0};
+        if (std::any_of(STOPS.begin(),STOPS.end(),[&cycle](int i){ return i == cycle;})) {
+            delta = cycle*cpu.x;
+            std::cout << "\ncycle:" << cycle << " delta:" << delta;
+        }
+        result += delta;
+        if (delta>0) std::cout << " result:" << result;
+      }
       return result;
   }
 }
@@ -98,155 +147,155 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-char const* pTest = R"(noop
+// char const* pTest = R"(noop
+// addx 3
+// addx -5)";
+char const* pTest = R"(addx 15
+addx -11
+addx 6
+addx -3
+addx 5
+addx -1
+addx -8
+addx 13
+addx 4
+noop
+addx -1
+addx 5
+addx -1
+addx 5
+addx -1
+addx 5
+addx -1
+addx 5
+addx -1
+addx -35
+addx 1
+addx 24
+addx -19
+addx 1
+addx 16
+addx -11
+noop
+noop
+addx 21
+addx -15
+noop
+noop
+addx -3
+addx 9
+addx 1
+addx -3
+addx 8
+addx 1
+addx 5
+noop
+noop
+noop
+noop
+noop
+addx -36
+noop
+addx 1
+addx 7
+noop
+noop
+noop
+addx 2
+addx 6
+noop
+noop
+noop
+noop
+noop
+addx 1
+noop
+noop
+addx 7
+addx 1
+noop
+addx -13
+addx 13
+addx 7
+noop
+addx 1
+addx -33
+noop
+noop
+noop
+addx 2
+noop
+noop
+noop
+addx 8
+noop
+addx -1
+addx 2
+addx 1
+noop
+addx 17
+addx -9
+addx 1
+addx 1
+addx -3
+addx 11
+noop
+noop
+addx 1
+noop
+addx 1
+noop
+noop
+addx -13
+addx -19
+addx 1
 addx 3
-addx -5)";
-// char const* pTest = R"(addx 15
-// addx -11
-// addx 6
-// addx -3
-// addx 5
-// addx -1
-// addx -8
-// addx 13
-// addx 4
-// noop
-// addx -1
-// addx 5
-// addx -1
-// addx 5
-// addx -1
-// addx 5
-// addx -1
-// addx 5
-// addx -1
-// addx -35
-// addx 1
-// addx 24
-// addx -19
-// addx 1
-// addx 16
-// addx -11
-// noop
-// noop
-// addx 21
-// addx -15
-// noop
-// noop
-// addx -3
-// addx 9
-// addx 1
-// addx -3
-// addx 8
-// addx 1
-// addx 5
-// noop
-// noop
-// noop
-// noop
-// noop
-// addx -36
-// noop
-// addx 1
-// addx 7
-// noop
-// noop
-// noop
-// addx 2
-// addx 6
-// noop
-// noop
-// noop
-// noop
-// noop
-// addx 1
-// noop
-// noop
-// addx 7
-// addx 1
-// noop
-// addx -13
-// addx 13
-// addx 7
-// noop
-// addx 1
-// addx -33
-// noop
-// noop
-// noop
-// addx 2
-// noop
-// noop
-// noop
-// addx 8
-// noop
-// addx -1
-// addx 2
-// addx 1
-// noop
-// addx 17
-// addx -9
-// addx 1
-// addx 1
-// addx -3
-// addx 11
-// noop
-// noop
-// addx 1
-// noop
-// addx 1
-// noop
-// noop
-// addx -13
-// addx -19
-// addx 1
-// addx 3
-// addx 26
-// addx -30
-// addx 12
-// addx -1
-// addx 3
-// addx 1
-// noop
-// noop
-// noop
-// addx -9
-// addx 18
-// addx 1
-// addx 2
-// noop
-// noop
-// addx 9
-// noop
-// noop
-// noop
-// addx -1
-// addx 2
-// addx -37
-// addx 1
-// addx 3
-// noop
-// addx 15
-// addx -21
-// addx 22
-// addx -6
-// addx 1
-// noop
-// addx 2
-// addx 1
-// noop
-// addx -10
-// noop
-// noop
-// addx 20
-// addx 1
-// addx 2
-// addx 2
-// addx -6
-// addx -11
-// noop
-// noop
-// noop)";
+addx 26
+addx -30
+addx 12
+addx -1
+addx 3
+addx 1
+noop
+noop
+noop
+addx -9
+addx 18
+addx 1
+addx 2
+noop
+noop
+addx 9
+noop
+noop
+noop
+addx -1
+addx 2
+addx -37
+addx 1
+addx 3
+noop
+addx 15
+addx -21
+addx 22
+addx -6
+addx 1
+noop
+addx 2
+addx 1
+noop
+addx -10
+noop
+noop
+addx 20
+addx 1
+addx 2
+addx 2
+addx -6
+addx -11
+noop
+noop
+noop)";
 
 char const* pData = R"(addx 1
 addx 4
