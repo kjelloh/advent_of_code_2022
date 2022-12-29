@@ -185,8 +185,10 @@ Model parse(auto& in) {
         }
       }
     }
-    result.push_back(to_blueprint(row));
-    row.clear();
+    if (has_empty_lines == true) {
+      result.push_back(to_blueprint(row));
+      row.clear();
+    }
     return result;
 }
 
@@ -213,7 +215,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
