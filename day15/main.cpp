@@ -92,7 +92,6 @@ struct Model {
 std::ostream& operator<<(std::ostream& os,Model const& model) {
   const Result frame=3;
   os << "\n<map> top_left:" << model.top_left << " bottom_right:" << model.bottom_right;
-  return os;
   for (auto row=model.top_left.row-frame;row<=model.bottom_right.row+frame;++row) {
     os << "\n";
     for (auto col=model.top_left.col-frame;col<=model.bottom_right.col+frame;++col) {
@@ -177,7 +176,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {

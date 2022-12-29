@@ -317,6 +317,7 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      // TODO: Part 2 is probably a flood-fill of water from the "outside" of the grid?
       return result;
   }
 }
