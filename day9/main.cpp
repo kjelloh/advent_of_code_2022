@@ -16,6 +16,7 @@
 #include <limits> // E.g., std::numeric_limits
 
 extern char const* pTest;
+extern char const* pTest2Larger;
 extern char const* pData;
 
 using Result = int;
@@ -161,10 +162,42 @@ namespace part1 {
 }
 
 namespace part2 {
+  using Rope = std::vector<Vector>;
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      std::cout << "\n" << data_model;
+      Rope rope{};
+      Vector head{.row=0,.col=0};
+      Vector tail = head;
+      rope.push_back(head);
+      for (int i=0;i<9;++i) {
+        rope.push_back(tail);
+      }
+      Map visited{tail};
+      std::cout << "\n";
+      print_HT_on_map(rope[0],rope[9],visited);
+      for (auto const& [dir,steps] : data_model) {
+        std::cout << "\nstep: " << dir << " steps:" << steps;
+        for (int i=0;i<steps;++i) {
+          std::cout << "\nstep:" << i+1; 
+          rope[0] = to_stepped(rope[0],dir);
+          int head_ix{0};
+          std::cout << "\n\thead_ix:" << head_ix << " pos:" << rope[head_ix];
+          int tail_ix = head_ix+1;
+          while (tail_ix<rope.size()) {            
+            rope[tail_ix] = to_adjacent(rope[head_ix],rope[tail_ix]);
+            std::cout << "\n\ttail_ix:" << tail_ix << " pos:" << rope[tail_ix];
+            visited.insert(rope[9]);
+            ++head_ix;
+            ++tail_ix;
+          }
+        }
+      }
+      std::cout << "\n";
+      print_HT_on_map(rope[0],rope[9],visited);
+      result = visited.size();
       return result;
   }
 }
@@ -172,9 +205,10 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest2Larger)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
@@ -193,6 +227,14 @@ R 4
 D 1
 L 5
 R 2)";
+char const* pTest2Larger = R"(R 5
+U 8
+L 8
+D 3
+R 17
+D 10
+L 25
+U 20)";
 char const* pData = R"(R 1
 D 1
 L 1
