@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
@@ -242,24 +242,6 @@ int main(int argc, char *argv[])
   std::cout << "\n";
   return 0;
 }
-
-/*
-        ...#    
-        .#..    
-        #...    
-        ....    
-...#.......#    
-........#...    
-..#....#....    
-..........#.    
-        ...#....
-        .....#..
-        .#......
-        ......#.
-
-path:10R5L5R10L4R5L5
-
-*/
 
 char const* pTest = R"(        ...#
         .#..
