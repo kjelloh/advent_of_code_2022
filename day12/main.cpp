@@ -243,6 +243,7 @@ public:
   Path pathTo(Vertex v) {
     Path result{};
     if (hasPathTo(v)==true) {
+      result.push_back(v);
       for (auto w = edgeTo[v];hasPathTo(w) and w!=start;w=edgeTo[w]) {
         result.push_back(w);
       }
@@ -321,7 +322,7 @@ namespace part1 {
       if (s and z) {
         DijkstraSP sp(data_model.G,*s);
         auto path = sp.pathTo(*z);
-        result = path.size();
+        result = path.size()-1; // steps one less than visited vertices
         std::string s_path{};
         for (auto const& v : path) {
           s_path += *data_model.G.to_value(v);
@@ -344,8 +345,8 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
