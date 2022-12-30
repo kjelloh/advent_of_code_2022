@@ -18,7 +18,7 @@
 extern char const* pTest;
 extern char const* pData;
 
-using Result = long long int;
+using Result = int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 struct Vector {
@@ -43,36 +43,243 @@ std::ostream& operator<<(std::ostream& os,Vector const& v) {
 
 using Vectors = std::vector<Vector>;
 
-const Vectors dirs{
-  {-1,0}    // N
-  ,{0,1}    // E
-  ,{1,0}    // S
-  ,{0,-1}   // W
+const Vectors DELTAS {
+  {-1,0} 
+  ,{0,1} 
+  ,{1,0} 
+  ,{0,-1}
 };
 
-using Map = std::vector<std::vector<char>>;
+std::ostream& operator<<(std::ostream& os,std::vector<std::string> rows) {
+  for (int row=0;row<rows.size();++row) {
+    if (row>0) os << "\n";
+    os << rows[row];
+  }
+  return os;
+}
+
+class Grid {
+public:
+  using Vertex = int;
+  using Vertices = std::vector<Vertex>;
+  using Value = char;
+  auto V() {return m_dict.size();}
+  void insert(Vector const& pos,Value ch) {
+    std::cout << "\nGrid::insert(" << pos << ",value:" << ch << ")";
+    auto iter = std::find_if(m_dict.begin(),m_dict.end(),[&pos](auto const& entry){
+      return entry.first == pos;
+    });
+    if (iter == m_dict.end()) {
+      iter = m_dict.insert(iter,{pos,m_dict.size()});
+      m_values[iter->second] = ch;
+      top_left.row = std::min(top_left.row,pos.row);
+      top_left.col = std::min(top_left.col,pos.col);
+      bottom_right.row = std::max(bottom_right.row,pos.row);
+      bottom_right.col = std::max(bottom_right.col,pos.col);
+    }
+    std::cout << " V:" << V(); 
+  }
+  Vertices adj(Vertex v) const {
+    Vertices result{};
+    if (auto pos = to_pos(v)) {
+      for (auto const& delta : DELTAS) {
+        if (auto w = to_vertex(*pos+delta)) {
+          if (m_values.at(*w)>m_values.at(v)+1) continue;
+          result.push_back(*w);
+        }
+      }
+    }
+    return result;
+  }
+
+  Vertices vertices() const {
+    Vertices result{};
+    for (auto const& [pos,v] : m_dict) {
+      result.push_back(v);
+    }
+    return result;
+  }
+
+  std::optional<Vector> to_pos(Vertex v) const {
+    std::optional<Vector> result{};
+    auto iter = std::find_if(m_dict.begin(),m_dict.end(),[&v](auto const& entry){
+      return entry.second == v;
+    });
+    if (iter != m_dict.end()) result = iter->first;
+    return result;
+  }
+
+  std::optional<Vertex> to_vertex(Vector pos) const {
+    std::cout << "\nto_vertex(" << pos << ")";
+    std::optional<Vertex> result{};
+    auto iter = std::find_if(m_dict.begin(),m_dict.end(),[&pos](auto const& entry){
+      return entry.first == pos;
+    });
+    if (iter != m_dict.end()) {
+      result = iter->second;
+    }
+    if (result) std::cout << " result:" << *result;
+    else std::cout << "null";
+    return result;
+  }
+
+  std::optional<char> to_value(Vertex v) const {
+    std::optional<char> result{};
+    if (m_values.contains(v)) result = m_values.at(v);
+    return result;
+  }
+
+  auto row_range() const {
+    std::vector<Result> result{};
+    for (auto row=top_left.row;row<=bottom_right.row;++row) result.push_back(row);
+    return result;
+  }
+
+  auto col_range() const {
+    std::vector<Result> result{};
+    for (auto col=top_left.col;col<=bottom_right.col;++col) result.push_back(col);
+    return result;
+  }
+
+private:
+  Vector top_left{};
+  Vector bottom_right{};
+  using Dict = std::vector<std::pair<Vector,Vertex>>;
+  Dict m_dict{};
+  using Values = std::map<Vertex,char>;
+  Values m_values{};
+};
+
+std::ostream& operator<<(std::ostream& os,Grid const& grid) {
+  std::vector<std::string> map{};
+  for (auto row : grid.row_range()) {
+    map.push_back("");
+    for (auto col : grid.col_range()) {
+      Vector pos{.row=row,.col=col};
+      if (auto v = grid.to_vertex(pos)) {
+        map.back() += *grid.to_value(*v);
+      }
+      else {
+        map.back() += ' ';
+      }
+    }
+  }
+  os << "\n" << map;
+  return os;
+}
+
+namespace not_used {
+  class DepthFirstSearch {
+  public:
+    DepthFirstSearch(Grid const& grid,Grid::Vertex s) {
+      m_marked[s] = true;
+      dfs(grid,s);
+    }
+  private:
+    std::vector<bool> m_marked{};
+    int m_count{};
+    void dfs(Grid const& grid,Grid::Vertex const& v) {
+      m_marked[v] = true;
+      ++m_count;
+      for (auto const& w : grid.adj(v)) {
+        if (m_marked[w] == false) {
+          dfs(grid,w);
+        }
+      }
+    }
+  };
+}
+
+template <typename T>
+class IndexMinPQ {
+public:
+  using Index = Grid::Vertex;
+  IndexMinPQ& insert(Index const& v,T dist) {
+    m_map[v] = dist;
+    return *this;
+  }
+  bool isEmpty() const {
+    return (m_map.size()==0);
+  }
+  Index delMin() {
+    auto iter = std::min_element(m_map.begin(),m_map.end(),[](auto const& e1,auto const& e2){
+      return e1.second < e2.second;
+    });
+    auto result = iter->first;
+    m_map.erase(iter);
+    std::cout << "\ndelMin() m_map.size:" << m_map.size();
+    return result;
+  }
+  bool contains(Index const& v) const {
+    return m_map.contains(v);
+  }
+  void change(Index const& v,T const& val) {
+    m_map[v] = val;
+  }
+  
+private:
+  std::map<Index,T> m_map{};
+};
+
+class DijkstraSP {
+public:
+  const Result INFINITY_RESULT{std::numeric_limits<Result>::max()};
+  using Vertex = Grid::Vertex;
+  using Path = std::vector<Vertex>;
+  using Graph = Grid;
+  DijkstraSP(Graph const& G,Grid::Vertex const& s) : start{s} {
+    for (auto v : G.vertices()) {
+      distTo[v] = INFINITY_RESULT;
+    }
+    distTo[s] = Result{0};
+    pq.insert(s,Result{0});
+    while (pq.isEmpty()==false) {
+      relax(G,pq.delMin());
+    }
+  }
+  bool hasPathTo(Vertex v) {
+    return (distTo[v] < INFINITY_RESULT);
+  }
+  Path pathTo(Vertex v) {
+    Path result{};
+    if (hasPathTo(v)==true) {
+      for (auto w = edgeTo[v];hasPathTo(w) and w!=start;w=edgeTo[w]) {
+        result.push_back(w);
+      }
+      result.push_back(start);
+    }
+    return result;
+  }
+private:
+  Vertex start;
+  std::map<Vertex,bool> marked{};
+  std::map<Vertex,Vertex> edgeTo{}; // best parent to a vertex (to track shortest path)
+  std::map<Vertex,Result> distTo{};
+  IndexMinPQ<Result> pq{};
+  void relax(Graph const& G,Vertex v) {
+    if (marked[v] == false) {
+      marked[v] = true; // used as basis for relaxation
+      for (auto const& w : G.adj(v)) {
+        if (distTo[w] > distTo[v] + 1) {
+          distTo[w] = distTo[v] + 1;
+          edgeTo[w] = v;
+          if (pq.contains(w)) {
+            pq.change(w,distTo[w]);
+          }
+          else {
+            pq.insert(w,distTo[w]);
+          }
+        }
+      }
+    }
+  }
+};
 
 struct Model {
-  Map map;
+  Grid G;
   Vector start;
   Vector end;
 };
-
-bool on_map(Vector const& pos,Map const& map) {
-  return (pos.row>=0 and pos.row<map.size() and pos.col>=0 and pos.col<map[0].size());
-}
-
-Vectors to_neighbours(Vector const& pos,Map const& map) {
-  Vectors result{};
-  for (auto const& delta : dirs) {
-    auto neighbour = pos+delta;
-    if (on_map(neighbour,map)) {
-      std::cout << "\n\ton_map:" << neighbour;
-      result.push_back(neighbour);
-    }
-  }
-  return result;
-}
 
 Model parse(auto& in) {
     Model result{};
@@ -80,22 +287,22 @@ Model parse(auto& in) {
     int row{0};
     Vector start{},end{};
     while (std::getline(in,line)) {
-      result.map.push_back({});
       int col{0};
       for (char ch : line) {
         if (ch=='S') {
           start.row = row;
           start.col = col;
-          result.map.back().push_back('a');
           result.start = start;
+          ch = 'a';
         }
         else if (ch=='E') {
           end.row=row;
           end.col=col;
-          result.map.back().push_back('z');
           result.end = end;
+          ch = 'z';
         }
-        else result.map.back().push_back(ch);
+        Vector pos{.row=row,.col=col};
+        result.G.insert(pos,ch);
         ++col;
       }
       ++row;
@@ -103,58 +310,24 @@ Model parse(auto& in) {
     return result;
 }
 
-std::ostream& operator<<(std::ostream& os,Map const& map) {
-  for (int row=0;row<map.size();++row) {
-    if (row>0) os << "\n";
-    for (int col=0;col<map[0].size();++col) {
-      os << map[row][col];
-    }
-  }
-  return os;
-}
-
-std::pair<Result,std::string> dfs(Vector const& start,Vector const& end,Map const& map,Map& marked) {
-  std::pair<Result,std::string> result{};
-  std::cout << "\ndfs(" << start << ") ch:" << map[start.row][start.col];
-  marked[start.row][start.col] = 'X';
-  auto neighbours = to_neighbours(start,map);
-  std::vector<std::pair<Result,std::string>> candidates{};
-  for (auto const& next : neighbours) {
-    std::cout << "\n\tnext:" << next;
-    if (marked[next.row][next.col] == 'X') continue;
-    if (map[next.row][next.col] >= map[start.row][start.col] + 2) continue;
-    if (next==end) {
-      std::cout << " END!";
-      candidates.push_back({0,"E"}); // dfs(next) is 0
-    }
-    candidates.push_back(dfs(next,end,map,marked));
-  }
-  if (candidates.size()>0) {
-    auto iter = std::min_element(candidates.begin(),candidates.end(),[](auto const& e1,auto const& e2){
-      return e1.first < e2.first;
-    });
-    result.first = iter->first + 1;
-    result.second = iter->second + map[start.row][start.col];
-
-  }
-  else {
-    result.first = 240000000; // Eternity
-  }
-  std::cout << " dfs_result start:" << start;
-  std::cout << " path:";
-  for (auto const& ch : result.second) std::cout << ch;
-  return result;
-}
-
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
-      std::cout << "\n" << data_model.map;
-      Map marked(data_model.map.size(),std::vector(data_model.map[0].size(),' '));
-      auto [steps,path] = dfs(data_model.start,data_model.end,data_model.map,marked);
-      result = steps;
+      std::cout << "\n" << data_model.G;
+      auto s = data_model.G.to_vertex(data_model.start);
+      auto z = data_model.G.to_vertex(data_model.end);
+      if (s and z) {
+        DijkstraSP sp(data_model.G,*s);
+        auto path = sp.pathTo(*z);
+        result = path.size();
+        std::string s_path{};
+        for (auto const& v : path) {
+          s_path += *data_model.G.to_value(v);
+        }
+        std::cout << " result:" << result << " path:" << s_path;
+      }
       return result;
   }
 }
@@ -172,7 +345,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
