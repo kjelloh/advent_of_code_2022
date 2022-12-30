@@ -113,26 +113,37 @@ std::ostream& operator<<(std::ostream& os,Map const& map) {
   return os;
 }
 
-Result dfs(bool& found,Vector const& start,Vector const& end,Map const& map,Map& marked) {
-  if (found) return 0;
-  std::cout << "\ndfs(" << start << ")";
+std::pair<Result,std::string> dfs(Vector const& start,Vector const& end,Map const& map,Map& marked) {
+  std::pair<Result,std::string> result{};
+  std::cout << "\ndfs(" << start << ") ch:" << map[start.row][start.col];
   marked[start.row][start.col] = 'X';
   auto neighbours = to_neighbours(start,map);
-  std::vector<Result> candidates{};
-  for (auto const& pos : neighbours) {
-    std::cout << "\n\tpos:" << pos;
-    if (marked[pos.row][pos.col] == 'X') continue;
-    if (pos==end) {
+  std::vector<std::pair<Result,std::string>> candidates{};
+  for (auto const& next : neighbours) {
+    std::cout << "\n\tnext:" << next;
+    if (marked[next.row][next.col] == 'X') continue;
+    if (map[next.row][next.col] >= map[start.row][start.col] + 2) continue;
+    if (next==end) {
       std::cout << " END!";
-      found = true;
-      return 0;
+      candidates.push_back({0,"E"}); // dfs(next) is 0
     }
-    if (map[pos.row][pos.col] <= map[start.row][start.col] + 1) candidates.push_back(1+dfs(found,pos,end,map,marked));
+    candidates.push_back(dfs(next,end,map,marked));
   }
   if (candidates.size()>0) {
-    return  *std::min_element(candidates.begin(),candidates.end());
+    auto iter = std::min_element(candidates.begin(),candidates.end(),[](auto const& e1,auto const& e2){
+      return e1.first < e2.first;
+    });
+    result.first = iter->first + 1;
+    result.second = iter->second + map[start.row][start.col];
+
   }
-  else return 240000000; // Eternity
+  else {
+    result.first = 240000000; // Eternity
+  }
+  std::cout << " dfs_result start:" << start;
+  std::cout << " path:";
+  for (auto const& ch : result.second) std::cout << ch;
+  return result;
 }
 
 namespace part1 {
@@ -142,8 +153,8 @@ namespace part1 {
       auto data_model = parse(in);
       std::cout << "\n" << data_model.map;
       Map marked(data_model.map.size(),std::vector(data_model.map[0].size(),' '));
-      bool found{false};
-      result = dfs(found,data_model.start,data_model.end,data_model.map,marked);
+      auto [steps,path] = dfs(data_model.start,data_model.end,data_model.map,marked);
+      result = steps;
       return result;
   }
 }
