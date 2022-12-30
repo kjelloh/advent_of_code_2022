@@ -110,7 +110,7 @@ public:
   }
 
   std::optional<Vertex> to_vertex(Vector pos) const {
-    std::cout << "\nto_vertex(" << pos << ")";
+    // std::cout << "\nto_vertex(" << pos << ")";
     std::optional<Vertex> result{};
     auto iter = std::find_if(m_dict.begin(),m_dict.end(),[&pos](auto const& entry){
       return entry.first == pos;
@@ -118,8 +118,8 @@ public:
     if (iter != m_dict.end()) {
       result = iter->second;
     }
-    if (result) std::cout << " result:" << *result;
-    else std::cout << "null";
+    // if (result) std::cout << " result:" << *result;
+    // else std::cout << "null";
     return result;
   }
 
@@ -207,7 +207,7 @@ public:
     });
     auto result = iter->first;
     m_map.erase(iter);
-    std::cout << "\ndelMin() m_map.size:" << m_map.size();
+    // std::cout << "\ndelMin() m_map.size:" << m_map.size();
     return result;
   }
   bool contains(Index const& v) const {
@@ -345,10 +345,14 @@ namespace part2 {
           start_candidates.push_back(v);
         }
       }
+      auto z = *data_model.G.to_vertex(data_model.end);
       std::vector<DijkstraSP::Path> paths{};
       for (auto const& v : start_candidates) {
         DijkstraSP sp(data_model.G,v);
-        paths.push_back(sp.pathTo(*data_model.G.to_vertex(data_model.end)));
+        if (sp.hasPathTo(z)) {
+          std::cout << "\nhas path to:" << z << std::flush;
+          paths.push_back(sp.pathTo(z));
+        }
       }
       auto iter = std::min_element(paths.begin(),paths.end(),[](auto const&  p1,auto const& p2){
         return p1.size() < p2.size();

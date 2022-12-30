@@ -58,6 +58,14 @@ Vectors to_adjacent_dirs() {
   return result;
 }
 
+std::ostream& operator<<(std::ostream& os,std::vector<std::string> rows) {
+  for (int row=0;row<rows.size();++row) {
+    if (row>0) os << "\n";
+    os << rows[row];
+  }
+  return os;
+}
+
 class Grid {
 public:
   using Vertex = int;
@@ -149,6 +157,24 @@ private:
   Value m_value{};
 };
 
+std::ostream& operator<<(std::ostream& os,Grid const& grid) {
+  std::vector<std::string> map{};
+  for (auto row : grid.row_range()) {
+    map.push_back("");
+    for (auto col : grid.col_range()) {
+      Vector pos{.row=row,.col=col};
+      if (auto v = grid.to_vertex(pos)) {
+        map.back() += *grid.to_value(*v);
+      }
+      else {
+        map.back() += ' ';
+      }
+    }
+  }
+  os << "\n" << map;
+  return os;
+}
+
 using Path = std::string;
 
 using Model = std::pair<Grid,Path>;
@@ -174,32 +200,6 @@ Model parse(auto& in) {
       }
     }
     return result;
-}
-
-std::ostream& operator<<(std::ostream& os,std::vector<std::string> rows) {
-  for (int row=0;row<rows.size();++row) {
-    if (row>0) os << "\n";
-    os << rows[row];
-  }
-  return os;
-}
-
-std::ostream& operator<<(std::ostream& os,Grid const& grid) {
-  std::vector<std::string> map{};
-  for (auto row : grid.row_range()) {
-    map.push_back("");
-    for (auto col : grid.col_range()) {
-      Vector pos{.row=row,.col=col};
-      if (auto v = grid.to_vertex(pos)) {
-        map.back() += *grid.to_value(*v);
-      }
-      else {
-        map.back() += ' ';
-      }
-    }
-  }
-  os << "\n" << map;
-  return os;
 }
 
 std::ostream& operator<<(std::ostream& os,Model const& model) {
