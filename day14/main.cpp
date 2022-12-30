@@ -56,6 +56,9 @@ std::vector<std::string> to_tokens(std::string s,std::string const& delim) {
 struct Vector {
   int row;
   int col;
+  bool operator!=(Vector const& other) {
+    return row != other.row or col != other.col;
+  }
   bool operator<(Vector const& other) const {
     if (row == other.row) return col < other.col;
     else return row < other.row;
@@ -64,7 +67,12 @@ struct Vector {
     if (row == other.row) return col <= other.col;
     else return row <= other.row;
   }
+  Vector operator+(Vector const& other) const {
+    return {.row = row+other.row,.col=col+other.col};
+  }
 };
+
+using Vectors = std::vector<Vector>;
 
 std::ostream& operator<<(std::ostream& os,Vector const& v) {
   os << "[row:" << v.row << ",col:" << v.col << "]";
@@ -74,12 +82,13 @@ std::ostream& operator<<(std::ostream& os,Vector const& v) {
 using Map = std::map<Vector,char>;
 
 Vector to_top_left(Vector const& v1,Vector const& v2) {
+  // std::cout << "\nto_top_left(" << v1 << "," << v2 << ")";
   Vector result{.row = std::min(v1.row,v2.row),.col=std::min(v1.col,v2.col)};
   return result;
 }
 
 Vector to_bottom_right(Vector const& v1,Vector const& v2) {
-  std::cout << "\nto_bottom_right(" << v1 << "," << v2 << ")";
+  // std::cout << "\nto_bottom_right(" << v1 << "," << v2 << ")";
   Vector result{.row = std::max(v1.row,v2.row),.col=std::max(v1.col,v2.col)};
   return result;
 }
@@ -93,6 +102,15 @@ struct Model {
       bottom_right = to_bottom_right(bottom_right,entry.first);
     }
   }
+  void insert(Vector const& pos,char ch) {
+    std::cout << "\ninsert(pos:" << pos << ",ch:" << ch << ")";
+    map[pos] = ch;
+    top_left = to_top_left(top_left,pos);
+    bottom_right = to_bottom_right(bottom_right,pos);
+  }
+  void erase(Vector const& pos) {
+    if (map.contains(pos)) map.erase(pos);
+  }
   Map map;
   Vector top_left;
   Vector bottom_right;
@@ -101,7 +119,7 @@ struct Model {
 std::ostream& operator<<(std::ostream& os,Model const& model) {
   const int frame=3;
   os << "\n<map> top_left:" << model.top_left << " bottom_right:" << model.bottom_right;
-  for (auto row=model.top_left.row-frame;row<=model.bottom_right.row+frame;++row) {
+  for (auto row=model.top_left.row;row<=model.bottom_right.row+frame;++row) {
     os << "\n";
     for (auto col=model.top_left.col-frame;col<=model.bottom_right.col+frame;++col) {
       Vector pos{.row=row,.col=col};
@@ -181,12 +199,75 @@ Model parse(auto& in) {
     return Model{map};
 }
 
+struct Grain {
+  Vector pos;
+};
+
+bool is_free(Map const& map,Vector const& pos) {
+  if (map.contains(pos)) return (map.at(pos)=='.');
+  else return true;
+}
+
+const Vectors DELTAS {
+   {1,0}
+  ,{1,-1}
+  ,{1,1}
+};
+
+Vector to_moved_grain(Map const& map,Grain const& grain) {
+  Vector result{grain.pos};
+  for (auto const& delta : DELTAS) {
+    auto pos = grain.pos + delta;
+    if (is_free(map,pos)) {
+      result = pos;
+      break;
+    }
+  }
+  return result;
+}
+
+struct GrainEngine {
+  GrainEngine(Model const& model) : m_grains(1,Grain{Vector{.row=0,.col=500}}),m_model{model} {
+      m_model.insert(m_grains.back().pos,'O');
+  }
+  std::vector<Grain> m_grains{};
+  std::pair<bool,Result> operator++() {
+    std::pair<bool,Result> result{false,m_grains.size()};
+    m_model.erase(m_grains.back().pos);
+    auto pos = to_moved_grain(m_model.map,m_grains.back());
+    if (pos != m_grains.back().pos) {
+      // moved :)
+      if (pos.row == m_model.bottom_right.row) {
+        // overflow :)
+        result.first = true;
+      }
+      else {
+        m_grains.back().pos = pos;
+        result.second = m_grains.size();
+      }
+      m_model.insert(m_grains.back().pos,'O');
+    }
+    else {
+      // at rest
+      m_model.insert(m_grains.back().pos,'O');
+    }
+    return result;
+  }
+  Model m_model;
+};
+
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << "\n" << data_model;
+      GrainEngine ge{data_model};
+      std::cout << "\n" << ge.m_model.map;
+      for (int i=0;i<10;++i) {
+        ++ge;
+        std::cout << "\n" << ge.m_model.map;
+      }
       return result;
   }
 }
@@ -204,7 +285,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
