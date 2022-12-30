@@ -76,63 +76,96 @@ struct PacketList : public Packet {
 
 int compare(Packet* p1,Packet* p2); // forward
 int compare(IntegerPacket* p1,IntegerPacket* p2) {
+  /*
+  If both values are integers, the lower integer should come first.
+  If the left integer is lower than the right integer, the inputs are in the right order. 
+  If the left integer is higher than the right integer, the inputs are not in the right order. 
+  Otherwise, the inputs are the same integer; continue checking the next part of the input.
+  */  
   int result{};
-  std::cout << "\ncompare(integer:" << p1->to_string() << ",integer:" << p2->to_string() << ")";
-  if (p1->integer<p2->integer) result = -1;
-  else if (p1->integer==p2->integer) result = 0;
-  else result = 1;
-  std::cout << " result:" << result;
+  if (p1!=nullptr and p2!=nullptr) {
+    std::cout << "\ncompare(integer:" << p1->to_string() << ",integer:" << p2->to_string() << ")";
+    if (p1->integer<p2->integer) result = -1;
+    else if (p1->integer==p2->integer) result = 0;
+    else result = 1;
+    std::cout << " result:" << result;
+  }
+  else {
+    std::cout << "\ncompare(integer,integer) called with nullptr(s)" << std::flush;
+  }
   return result;
 }
 int compare(PacketList* p1,PacketList* p2); // forward
 int compare(IntegerPacket* p1,PacketList* p2) {
   int result{};
-  std::cout << "\ncompare(integer:" << p1->to_string() << ",list:" << p2->to_string() << ")";
-  PacketList* pp1 = new PacketList{};
-  pp1->packets.push_back(p1);
-  result = compare(pp1,p2);
-  std::cout << " result:" << result;
+  if (p1!=nullptr and p2!=nullptr) {
+    std::cout << "\ncompare(integer:" << p1->to_string() << ",list:" << p2->to_string() << ")";
+    PacketList* pp1 = new PacketList{};
+    pp1->packets.push_back(p1);
+    result = compare(pp1,p2);
+    std::cout << " result:" << result;
+  }
+  else {
+    std::cout << "\ncompare(integer,list) called with nullptr(s)" << std::flush;
+  }
   return result;
 }
 int compare(PacketList* p1,IntegerPacket* p2) {
   int result{};
-  std::cout << "\ncompare(list:" << p1->to_string() << ",integer:" << p2->to_string() << ")";
-  PacketList* pp2 = new PacketList{};
-  pp2->packets.push_back(p2);
-  result = compare(p1,pp2);
-  std::cout << " result:" << result;
+  if (p1!=nullptr and p2!=nullptr) {
+    std::cout << "\ncompare(list:" << p1->to_string() << ",integer:" << p2->to_string() << ")" << std::flush;
+    PacketList* pp2 = new PacketList{};
+    pp2->packets.push_back(p2);
+    result = compare(p1,pp2);
+    std::cout << " result:" << result;
+  }
+  else {
+    std::cout << "\ncompare(list,integer) called with nullptr(s)" << std::flush;
+  }
   return result;
 }
 int compare(PacketList* p1,PacketList* p2) {
+  /*
+  If both values are lists, compare the first value of each list, then the second value, and so on. 
+  If the left list runs out of items first, the inputs are in the right order. 
+  If the right list runs out of items first, the inputs are not in the right order. 
+  If the lists are the same length and no comparison makes a decision about the order, continue checking the next part of the input.
+  */
   std::cout << "\ncompare(list:" << p1->to_string() << ",list:" << p2->to_string() << ")";
-  int result{};
-  if (p1->packets.size()<=p2->packets.size()) {
-    result = -1; // default "right order" if p1 has no packets
-    // loop over p1 packet count <= p2 packet count
-    for (int index=0;index<p1->packets.size();++index) {
-      // break if p1 packet is less than p2 packet or if p2 packet 
-      std::cout << " index:" << index;
-      if (result = compare(p1->packets[index],p2->packets[index]);result!=0) break;
+  int result{0};
+  auto p1_iter = p1->packets.begin();
+  auto p1_end = p1->packets.end();
+  auto p2_iter = p2->packets.begin();
+  auto p2_end = p2->packets.end();
+  while (result == 0) {
+    auto p1 = (p1_iter != p1_end)?*p1_iter:nullptr;
+    auto p2 = (p2_iter != p2_end)?*p2_iter:nullptr;
+    result = compare(p1,p2); // compare handles nullptr
+    if (p1_iter != p1_end and p2_iter != p2_end) {
+      ++p1_iter;
+      ++p2_iter;
     }
-    if (result==0 and p1->packets.size()<p2->packets.size()) result=-1; // Compare was not conclusive but p1 packet count is less so still correct order
-  }
-  else {
-    // loop over p2 packet count of p2 < p1 packet count
-    result = 1; // default "wrong order" if p2 has no packets
-    for (int index=0;index<p2->packets.size();++index) {
-      // break if p1 packet < p2 packet or p2 packet > p1 packet
-      if (result = compare(p1->packets[index],p2->packets[index]);result!=0) break;
+    else {
+      break;
     }
-    if (result==0) result=1; // compare was not conclusive for members but p2 packet count is smaller, i.e. wrong order p2>p1.
   }
   std::cout << " result:" << result;
   return result;
 }
 
 int compare(Packet* p1,Packet* p2) {
-  std::cout << "\ncompare(packet:" << p1->to_string() << ",packet:" << p2->to_string() << ")";
+  std::cout << "\ncompare(p1:";
+  if (p1!=nullptr) std::cout << p1->to_string();
+  else std::cout << "null";
+  std::cout << ",p2:";
+  if (p2!=nullptr) std::cout << p2->to_string();
+  else std::cout << "null";
+  std::cout << ")" << std::flush;
   int result{};
-  if (p1!=nullptr and p2!=nullptr) {
+  if (p1==nullptr and p2==nullptr) result= 0; // left and right ran out at the same time = inconclusive
+  else if (p1==nullptr and p2!=nullptr) result = -1; // left ran out of elements before right = right order
+  else if (p1!=nullptr and p2==nullptr) result = 1; // right ran out of elements before left = wrong order
+  else if (p1!=nullptr and p2!=nullptr) {
     int state{0};
     if (p1->type==Integer_Type) {
       state = 10;
@@ -163,7 +196,7 @@ int compare(Packet* p1,Packet* p2) {
     }
   }
   else {
-    std::cerr << "\nERROR, compare called with nullptr";
+    std::cerr << "\nERROR, s t r a n g e ...";
   }
   std::cout << " result:" << result;
   return result;
@@ -281,7 +314,6 @@ std::ostream& operator<<(std::ostream& os,PacketPair const& pp) {
 }
 
 std::ostream& operator<<(std::ostream& os,Model const& model) {
-
   for (int index=0;index<model.size();++index) {
     auto pp = model[index];
     if (index>0) os << "\n------------\n";
@@ -302,7 +334,12 @@ namespace part1 {
         auto pair = data_model[index];
         if (compare(pair.first,pair.second)<=0) indices.push_back(index+1);
       }
-      for (auto index : indices) std::cout << "\n\tin valid order:" << index;
+      for (auto index : indices) {
+        std::cout << "\n\tin valid order:" << index;
+        auto pair = data_model[index-1];
+        std::cout << "\n\t  left:" << pair.first;
+        std::cout << "\n\t  right:" << pair.second;
+      }
       result = std::accumulate(indices.begin(),indices.end(),Result{0});
       return result;
   }
@@ -320,7 +357,7 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
@@ -332,6 +369,14 @@ int main(int argc, char *argv[])
   std::cout << "\n";
   return 0;
 }
+
+  /*
+  If both values are lists, compare the first value of each list, then the second value, and so on. 
+  If the left list runs out of items first, the inputs are in the right order. 
+  If the right list runs out of items first, the inputs are not in the right order. 
+  If the lists are the same length and no comparison makes a decision about the order, continue checking the next part of the input.
+  */
+
 
 char const* pTest = R"([1,1,3,1,1]
 [1,1,5,1,1]
@@ -356,6 +401,8 @@ char const* pTest = R"([1,1,3,1,1]
 
 [1,[2,[3,[4,[5,6,7]]]],8,9]
 [1,[2,[3,[4,[5,6,0]]]],8,9])";
+
+
 char const* pData = R"([[],[[[0],[8,10,2,8],[4]],[[7,7,2,2],10,1,2,[]]],[[[6,1,6,8,10],[8,6,4],[],[],2]]]
 [[[[]],9],[]]
 
