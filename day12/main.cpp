@@ -338,6 +338,27 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      // find all 'a' vertices
+      std::vector<Grid::Vertex> start_candidates{};
+      for (auto const& v : data_model.G.vertices()) {
+        if (*data_model.G.to_value(v) == 'a') {
+          start_candidates.push_back(v);
+        }
+      }
+      std::vector<DijkstraSP::Path> paths{};
+      for (auto const& v : start_candidates) {
+        DijkstraSP sp(data_model.G,v);
+        paths.push_back(sp.pathTo(*data_model.G.to_vertex(data_model.end)));
+      }
+      auto iter = std::min_element(paths.begin(),paths.end(),[](auto const&  p1,auto const& p2){
+        return p1.size() < p2.size();
+      });
+      result = iter->size()-1; // steps one less than visited vertices
+      std::string s_path{};
+      for (auto const& v : *iter) {
+        s_path += *data_model.G.to_value(v);
+      }
+      std::cout << " result:" << result << " path:" << s_path;
       return result;
   }
 }
@@ -346,8 +367,8 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
