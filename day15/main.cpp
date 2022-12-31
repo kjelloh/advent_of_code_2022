@@ -109,7 +109,7 @@ public:
   using Vertices = std::vector<Vertex>;
   auto V() {return m_dict.size();}
   void insert(Vector const& pos,char ch) {
-    std::cout << "\nGrid::insert(" << pos << ")";
+    // std::cout << "\nGrid::insert(" << pos << ")";
     auto iter = std::find_if(m_dict.begin(),m_dict.end(),[&pos](auto const& entry){
       return entry.first == pos;
     });
@@ -124,7 +124,7 @@ public:
     else {
       m_value[iter->second] = ch;      
     }
-    std::cout << " V:" << V(); 
+    // std::cout << " V:" << V(); 
   }
   Vertices adj(Vertex v) const {
     Vertices result{};
@@ -156,7 +156,7 @@ public:
   }
 
   std::optional<Vertex> to_vertex(Vector pos) const {
-    std::cout << "\nto_vertex(" << pos << ")";
+    // std::cout << "\nto_vertex(" << pos << ")";
     std::optional<Vertex> result{};
     auto iter = std::find_if(m_dict.begin(),m_dict.end(),[&pos](auto const& entry){
       return entry.first == pos;
@@ -164,8 +164,8 @@ public:
     if (iter != m_dict.end()) {
       result = iter->second;
     }
-    if (result) std::cout << " result:" << *result;
-    else std::cout << "null";
+    // if (result) std::cout << " result:" << *result;
+    // else std::cout << "null";
     return result;
   }
 
@@ -281,7 +281,7 @@ std::ostream& operator<<(std::ostream& os,Model const& model) {
 }
 
 Vector to_vertex(std::string const& s) {
-  std::cout << "\nto_vertex(" << s << ")";
+  // std::cout << "\nto_vertex(" << s << ")";
   auto [l_expr,r_expr] = to_splitted(s,", ");
   auto [s_x,s_col] = to_splitted(l_expr,"="); 
   auto [s_y,s_row] = to_splitted(r_expr,"="); 
@@ -324,11 +324,12 @@ void mark_covarage(Model& model,SensorBeaconPair const& sb_pair) {
   Vector lower_right{.row=sb_pair.first.row+manhattan_distance,.col=sb_pair.first.col+manhattan_distance};
   std::cout << "\n\tupper_left:" << upper_left << " lower_right:" << lower_right;
   for (auto row=upper_left.row;row<=lower_right.row;++row) {
+    if (row++ % 10000 == 0) std::cout << "\nmark_coverage row:" << row;
     for (auto col=upper_left.col;col<=lower_right.col;++col) {
       Vector pos{.row=row,.col=col};
-      std::cout << "\n\tpos:" << pos;
+      // std::cout << "\n\tpos:" << pos;
       auto pos_manhattan_distance = (std::abs(sb_pair.first.row - pos.row) + std::abs(sb_pair.first.col - pos.col));
-      std::cout << " pos_manhattan_distance:" << pos_manhattan_distance;
+      // std::cout << " pos_manhattan_distance:" << pos_manhattan_distance;
       if ((pos!=sb_pair.first and (pos_manhattan_distance <= manhattan_distance) and pos!=sb_pair.second)) {
         model.grid.insert(pos,'#'); // covered by sensor
       }
@@ -349,20 +350,20 @@ namespace part1 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
-      std::cout << "\n" << data_model;
+      // std::cout << "\n" << data_model;
       for (auto const& sb_pair : data_model.sb_pairs) {
         mark_covarage(data_model,sb_pair);
       }
-      CC cc{data_model.grid};
-      std::cout << "\n" << data_model;
-      std::cout << "\n";
-      for (int id=0;id<cc.count();++id) {
-        if (id>0) std::cout << "\n";
-        std::cout << " id:" << id;
-        for (auto const& v : data_model.grid.vertices()) {
-          if (id == cc.id(v)) std::cout << " v:" << v << " pos:" << *data_model.grid.to_pos(v) << " value:" << *data_model.grid.to_value(v);
-        }
-      }
+      // CC cc{data_model.grid};
+      // std::cout << "\n" << data_model;
+      // std::cout << "\n";
+      // for (int id=0;id<cc.count();++id) {
+      //   if (id>0) std::cout << "\n";
+      //   std::cout << " id:" << id;
+      //   for (auto const& v : data_model.grid.vertices()) {
+      //     if (id == cc.id(v)) std::cout << " v:" << v << " pos:" << *data_model.grid.to_pos(v) << " value:" << *data_model.grid.to_value(v);
+      //   }
+      // }
       Result covered_count{};
       int row = 10;
       if (data_model.grid.bottom_right().row >= 2000000) row = 2000000;
@@ -393,8 +394,8 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
