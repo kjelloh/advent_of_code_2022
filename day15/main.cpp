@@ -376,16 +376,16 @@ namespace part1 {
           // Will affect coverage on target_row
           for (int col=sb_pair.first.col-over_shoot;col<=sb_pair.first.col+over_shoot;++col) {
             Vector pos{.row=target_row,.col=col};
-            std::cout << "\n\tpos:" << pos;
+            // std::cout << "\n\tpos:" << pos;
             auto manhattan_distance_to_target = std::abs(sb_pair.first.row - pos.row) + std::abs(sb_pair.first.col - pos.col);
-            std::cout << " manhattan_distance_to_target:" << manhattan_distance_to_target;
+            // std::cout << " manhattan_distance_to_target:" << manhattan_distance_to_target;
             if (auto v = data_model.grid.to_vertex(pos)) {
               // do not count S or B
             }
             else {
               if (manhattan_distance_to_target <= manhattan_distance) {
                 covered_pos_on_target_row.insert(pos);
-                std::cout << " COVERED";
+                // std::cout << " COVERED";
               }
             }
           }
@@ -408,7 +408,7 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
