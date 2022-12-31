@@ -231,22 +231,20 @@ struct GrainEngine {
       m_model.insert(m_grains.back().pos,'O');
   }
   std::vector<Grain> m_grains{};
-  std::pair<bool,Result> operator++() {
-    std::pair<bool,Result> result{false,m_grains.size()};
+  bool operator++() {
+    bool result{true};
     m_model.erase(m_grains.back().pos);
     auto pos = to_moved_grain(m_model.map,m_grains.back());
     if (pos != m_grains.back().pos) {
       // moved :)
       if (pos.row == m_model.bottom_right.row) {
         // overflow :)
-        std::cout << "\nOVERFLOWED grain:" << m_grains.back().pos;
+        std::cout << "\nOVERFLOWED grain:" << pos;
         m_grains.pop_back();
-        result.first = true;
-        result.second = m_grains.size();
+        result = false;
       }
       else {
         m_grains.back().pos = pos;
-        result.second = m_grains.size();
         m_model.insert(m_grains.back().pos,'O');
       }
     }
@@ -269,10 +267,10 @@ namespace part1 {
       std::cout << "\n" << data_model;
       GrainEngine ge{data_model};
       std::cout << "\n" << ge.m_model.map;
-      for (int i=0;i<500;++i) {
-        ++ge;
-        std::cout << "\n" << ge.m_model.map;
+      while (++ge) {
+        // std::cout << "\n" << ge.m_model.map;
       }
+      std::cout << "\n" << ge.m_model.map;
       result = ge.m_grains.size();
       return result;
   }
@@ -290,8 +288,8 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
