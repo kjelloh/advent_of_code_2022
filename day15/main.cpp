@@ -43,6 +43,9 @@ using Answers = std::vector<std::pair<std::string,Result>>;
 struct Vector {
   Result row;
   Result col;
+  bool operator!=(Vector const& other) {
+    return row!=other.row or col != other.col;
+  }
   bool operator<(Vector const& other) const {
     if (row == other.row) return col < other.col;
     else return row < other.row;
@@ -75,7 +78,7 @@ Vector to_bottom_right(Vector const& v1,Vector const& v2) {
 }
 
 struct Model {
-  Model(Map const& map = Map{}) : map{map} {
+  Model(SensorBeaconPairs const& sb_pairs) : sb_pairs{sb_pairs}, map{to_map(sb_pairs)} {
     top_left=map.begin()->first;
     bottom_right=map.begin()->first;
     for (auto const& entry : map) {
@@ -83,10 +86,24 @@ struct Model {
       bottom_right = to_bottom_right(bottom_right,entry.first);
     }
   }
+  void insert(Vector const& pos,char ch) {
+    map[pos] = ch;
+    top_left = to_top_left(top_left,pos);
+    bottom_right = to_bottom_right(bottom_right,pos);
+  }
   SensorBeaconPairs sb_pairs;
   Map map;
   Vector top_left;
   Vector bottom_right;
+  Map to_map(SensorBeaconPairs const& sb_pairs) {
+    std::cout << "\nto_map(sb_pairs.size():" << sb_pairs.size() << ")";
+    Map result{};
+    for (auto const& sb_pair : sb_pairs) {
+      insert(sb_pair.first,'S');
+      insert(sb_pair.second,'B');
+    }
+    return result;
+  }
 };
 
 std::ostream& operator<<(std::ostream& os,Model const& model) {
@@ -130,17 +147,6 @@ SensorBeaconPair to_sb_pair(std::string const& s) {
   return SensorBeaconPair{sensor,beacon};
 }
 
-Map to_map(SensorBeaconPairs const& sb_pairs) {
-  std::cout << "\nto_map(sb_pairs.size():" << sb_pairs.size() << ")";
-  Map result{};
-  for (auto const& sb_pair : sb_pairs) {
-    std::cout << "\n\t" << sb_pair.first << " S";
-    std::cout << "\n\t" << sb_pair.second << " B";
-    result[sb_pair.first] = 'S';
-    result[sb_pair.second] = 'B';
-  }
-  return result;
-}
 
 Model parse(auto& in) {
     SensorBeaconPairs sb_pairs{};
@@ -149,8 +155,27 @@ Model parse(auto& in) {
       auto sb_pair = to_sb_pair(line);
       sb_pairs.push_back(sb_pair);
     }
-    auto map = to_map(sb_pairs);
-    return Model(map);
+    return Model{sb_pairs};
+}
+
+void mark_covarage(Model& model,SensorBeaconPair const& sb_pair) {
+  std::cout << "\nmark_covarage(S:" << sb_pair.first << " B:" << sb_pair.second << ")"; 
+  Result manhattan_distance = std::abs(sb_pair.first.row - sb_pair.second.row) + std::abs(sb_pair.first.col - sb_pair.second.col);
+  std::cout << "\n\tmanhattan_distance:" << manhattan_distance;
+  Vector upper_left{.row=sb_pair.first.row-manhattan_distance,.col=sb_pair.first.col-manhattan_distance};
+  Vector lower_right{.row=sb_pair.first.row+manhattan_distance,.col=sb_pair.first.col+manhattan_distance};
+  std::cout << "\n\tupper_left:" << upper_left << " lower_right:" << lower_right;
+  for (auto row=upper_left.row;row<=lower_right.row;++row) {
+    for (auto col=upper_left.col;col<=lower_right.col;++col) {
+      Vector pos{.row=row,.col=col};
+      std::cout << "\n\tpos:" << pos;
+      auto pos_manhattan_distance = (std::abs(sb_pair.first.row - pos.row) + std::abs(sb_pair.first.col - pos.col));
+      std::cout << " pos_manhattan_distance:" << pos_manhattan_distance;
+      if ((pos!=sb_pair.first and (pos_manhattan_distance <= manhattan_distance) and pos!=sb_pair.second)) {
+        model.insert(pos,'!'); // covered by sensor
+      }
+    }
+  }
 }
 
 namespace part1 {
@@ -158,6 +183,10 @@ namespace part1 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      std::cout << "\n" << data_model;
+      for (auto const& sb_pair : data_model.sb_pairs) {
+        mark_covarage(data_model,sb_pair);
+      }
       std::cout << "\n" << data_model;
       return result;
   }
