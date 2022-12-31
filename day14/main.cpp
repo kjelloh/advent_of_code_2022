@@ -239,16 +239,21 @@ struct GrainEngine {
       // moved :)
       if (pos.row == m_model.bottom_right.row) {
         // overflow :)
+        std::cout << "\nOVERFLOWED grain:" << m_grains.back().pos;
+        m_grains.pop_back();
         result.first = true;
+        result.second = m_grains.size();
       }
       else {
         m_grains.back().pos = pos;
         result.second = m_grains.size();
+        m_model.insert(m_grains.back().pos,'O');
       }
-      m_model.insert(m_grains.back().pos,'O');
     }
     else {
       // at rest
+      m_model.insert(m_grains.back().pos,'O');
+      m_grains.push_back(Grain{Vector{.row=0,.col=500}});
       m_model.insert(m_grains.back().pos,'O');
     }
     return result;
@@ -264,10 +269,11 @@ namespace part1 {
       std::cout << "\n" << data_model;
       GrainEngine ge{data_model};
       std::cout << "\n" << ge.m_model.map;
-      for (int i=0;i<10;++i) {
+      for (int i=0;i<500;++i) {
         ++ge;
         std::cout << "\n" << ge.m_model.map;
       }
+      result = ge.m_grains.size();
       return result;
   }
 }
