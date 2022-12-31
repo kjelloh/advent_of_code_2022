@@ -43,8 +43,11 @@ using Answers = std::vector<std::pair<std::string,Result>>;
 struct Vector {
   Result row;
   Result col;
-  bool operator!=(Vector const& other) {
+  bool operator!=(Vector const& other) const {
     return row!=other.row or col != other.col;
+  }
+  bool operator==(Vector const& other) const {
+    return (*this!=other) == false;
   }
   bool operator<(Vector const& other) const {
     if (row == other.row) return col < other.col;
@@ -53,6 +56,9 @@ struct Vector {
   bool operator<=(Vector const& other) const {
     if (row == other.row) return col <= other.col;
     else return row <= other.row;
+  }
+  Vector operator+(Vector const& other) const {
+    return Vector{.row=row+other.row,.col=col+other.col};
   }
 };
 
@@ -77,30 +83,189 @@ Vector to_bottom_right(Vector const& v1,Vector const& v2) {
   return result;
 }
 
-struct Model {
-  Model(SensorBeaconPairs const& sb_pairs) : sb_pairs{sb_pairs}, map{to_map(sb_pairs)} {
-    top_left=map.begin()->first;
-    bottom_right=map.begin()->first;
-    for (auto const& entry : map) {
-      top_left = to_top_left(top_left,entry.first);
-      bottom_right = to_bottom_right(bottom_right,entry.first);
+using Vectors = std::vector<Vector>;
+const Vectors DIRS{
+   {-1,0}
+  ,{-1,1}
+  ,{0,1}
+  ,{1,1}
+  ,{1,0}
+  ,{1,-1}
+  ,{0,-1}
+  ,{-1,-1}
+};
+
+std::ostream& operator<<(std::ostream& os,std::vector<std::string> rows) {
+  for (int row=0;row<rows.size();++row) {
+    if (row>0) os << "\n";
+    os << rows[row];
+  }
+  return os;
+}
+
+class Grid {
+public:
+  using Vertex = int;
+  using Vertices = std::vector<Vertex>;
+  auto V() {return m_dict.size();}
+  void insert(Vector const& pos,char ch) {
+    std::cout << "\nGrid::insert(" << pos << ")";
+    auto iter = std::find_if(m_dict.begin(),m_dict.end(),[&pos](auto const& entry){
+      return entry.first == pos;
+    });
+    if (iter == m_dict.end()) {
+      iter = m_dict.insert(iter,{pos,m_dict.size()});
+      m_value[iter->second] = ch;
+      m_top_left.row = std::min(m_top_left.row,pos.row);
+      m_top_left.col = std::min(m_top_left.col,pos.col);
+      m_bottom_right.row = std::max(m_bottom_right.row,pos.row);
+      m_bottom_right.col = std::max(m_bottom_right.col,pos.col);
+    }
+    else {
+      m_value[iter->second] = ch;      
+    }
+    std::cout << " V:" << V(); 
+  }
+  Vertices adj(Vertex v) const {
+    Vertices result{};
+    if (auto pos = to_pos(v)) {
+      auto value = *to_value(v);
+      for (auto const& delta : DIRS) {
+        if (auto w = to_vertex(*pos+delta)) {
+          if ((*to_value(*w)) == value) result.push_back(*w); // adjacent if same value on grid
+        }
+      }
+    }
+    return result;
+  }
+  Vertices vertices() const {
+    Vertices result{};
+    for (auto const& [pos,v] : m_dict) {
+      result.push_back(v);
+    }
+    return result;
+  }
+
+  std::optional<Vector> to_pos(Vertex v) const {
+    std::optional<Vector> result{};
+    auto iter = std::find_if(m_dict.begin(),m_dict.end(),[&v](auto const& entry){
+      return entry.second == v;
+    });
+    if (iter != m_dict.end()) result = iter->first;
+    return result;
+  }
+
+  std::optional<Vertex> to_vertex(Vector pos) const {
+    std::cout << "\nto_vertex(" << pos << ")";
+    std::optional<Vertex> result{};
+    auto iter = std::find_if(m_dict.begin(),m_dict.end(),[&pos](auto const& entry){
+      return entry.first == pos;
+    });
+    if (iter != m_dict.end()) {
+      result = iter->second;
+    }
+    if (result) std::cout << " result:" << *result;
+    else std::cout << "null";
+    return result;
+  }
+
+  std::optional<char> to_value(Vertex v) const {
+    std::optional<char> result{};
+    if (m_value.contains(v)) result = m_value.at(v);
+    return result;
+  }
+
+  auto row_range() const {
+    std::vector<Result> result{};
+    for (auto row=m_top_left.row;row<=m_bottom_right.row;++row) result.push_back(row);
+    return result;
+  }
+
+  auto col_range() const {
+    std::vector<Result> result{};
+    for (auto col=m_top_left.col;col<=m_bottom_right.col;++col) result.push_back(col);
+    return result;
+  }
+
+  Vector top_left() const {return m_top_left;}
+  Vector bottom_right() const {return m_bottom_right;}
+
+private:
+  Vector m_top_left{};
+  Vector m_bottom_right{};
+  using Dict = std::vector<std::pair<Vector,Vertex>>;
+  Dict m_dict{};
+  using Value = std::map<Vertex,char>;
+  Value m_value{};
+};
+
+std::ostream& operator<<(std::ostream& os,Grid const& grid) {
+  std::vector<std::string> map{};
+  for (auto row : grid.row_range()) {
+    map.push_back("");
+    for (auto col : grid.col_range()) {
+      Vector pos{.row=row,.col=col};
+      if (auto v = grid.to_vertex(pos)) {
+        map.back() += *grid.to_value(*v);
+      }
+      else {
+        map.back() += ' ';
+      }
     }
   }
-  void insert(Vector const& pos,char ch) {
-    map[pos] = ch;
-    top_left = to_top_left(top_left,pos);
-    bottom_right = to_bottom_right(bottom_right,pos);
+  os << "\n" << map;
+  return os;
+}
+
+class CC {
+public:
+  using Vertex = int;
+  CC(Grid const& grid) : m_grid{grid} {
+    auto V = m_grid.V();
+    for (int s=0;s<V;++s) {
+      if (m_marked[s]==false) {
+        dfs(m_grid,s);
+        ++m_count;
+      }
+    }
+  }
+  bool connected(Vertex v,Vertex w) {
+    return (m_id[v] == m_id[w]);
+  }
+  int count() {
+    return m_count;
+  }
+  int id(Vertex v) {
+    return m_id[v];
+  }
+private:
+  std::map<Vertex,bool> m_marked{};
+  std::map<Vertex,int> m_id{};
+  int m_count{};
+  Grid m_grid{};
+  void dfs(Grid const& grid,Vertex v) {
+    std::cout << "\n\tdfs(v:" << v << " pos:" << *m_grid.to_pos(v) << ")"; 
+    m_marked[v] = true;
+    m_id[v] = m_count;
+    for (auto w : m_grid.adj(v)) {
+      if (m_marked[w]==false) {
+        dfs(grid,w);
+      }
+    } 
+  }  
+};
+
+struct Model {
+  Model(SensorBeaconPairs const& sb_pairs) : sb_pairs{sb_pairs}, grid{to_grid(sb_pairs)} {
   }
   SensorBeaconPairs sb_pairs;
-  Map map;
-  Vector top_left;
-  Vector bottom_right;
-  Map to_map(SensorBeaconPairs const& sb_pairs) {
+  Grid grid;
+  Grid to_grid(SensorBeaconPairs const& sb_pairs) {
     std::cout << "\nto_map(sb_pairs.size():" << sb_pairs.size() << ")";
-    Map result{};
+    Grid result{};
     for (auto const& sb_pair : sb_pairs) {
-      insert(sb_pair.first,'S');
-      insert(sb_pair.second,'B');
+      result.insert(sb_pair.first,'S');
+      result.insert(sb_pair.second,'B');
     }
     return result;
   }
@@ -108,17 +273,10 @@ struct Model {
 
 std::ostream& operator<<(std::ostream& os,Model const& model) {
   const Result frame=3;
-  os << "\n<map> top_left:" << model.top_left << " bottom_right:" << model.bottom_right;
-  for (auto row=model.top_left.row-frame;row<=model.bottom_right.row+frame;++row) {
-    os << "\n";
-    for (auto col=model.top_left.col-frame;col<=model.bottom_right.col+frame;++col) {
-      Vector pos{.row=row,.col=col};
-      if (model.map.contains(pos)) {
-        os << model.map.at(pos);
-      }
-      else os << '.';
-    }
-  }
+  auto top_left = model.grid.top_left();
+  auto bottom_right = model.grid.bottom_right();
+  os << "\n<map> top_left:" << top_left << " bottom_right:" << bottom_right;
+  os << model.grid;
   return os;
 }
 
@@ -172,7 +330,15 @@ void mark_covarage(Model& model,SensorBeaconPair const& sb_pair) {
       auto pos_manhattan_distance = (std::abs(sb_pair.first.row - pos.row) + std::abs(sb_pair.first.col - pos.col));
       std::cout << " pos_manhattan_distance:" << pos_manhattan_distance;
       if ((pos!=sb_pair.first and (pos_manhattan_distance <= manhattan_distance) and pos!=sb_pair.second)) {
-        model.insert(pos,'!'); // covered by sensor
+        model.grid.insert(pos,'#'); // covered by sensor
+      }
+      else {
+        if (auto v = model.grid.to_vertex(pos)) {
+          // already occupied
+        }
+        else {
+          model.grid.insert(pos,'.'); // add as not-yet-covered grid pos
+        }
       }
     }
   }
@@ -187,7 +353,30 @@ namespace part1 {
       for (auto const& sb_pair : data_model.sb_pairs) {
         mark_covarage(data_model,sb_pair);
       }
+      CC cc{data_model.grid};
       std::cout << "\n" << data_model;
+      std::cout << "\n";
+      for (int id=0;id<cc.count();++id) {
+        if (id>0) std::cout << "\n";
+        std::cout << " id:" << id;
+        for (auto const& v : data_model.grid.vertices()) {
+          if (id == cc.id(v)) std::cout << " v:" << v << " pos:" << *data_model.grid.to_pos(v) << " value:" << *data_model.grid.to_value(v);
+        }
+      }
+      Result covered_count{};
+      int row = 10;
+      if (data_model.grid.bottom_right().row >= 2000000) row = 2000000;
+      if (data_model.grid.bottom_right().row >= row) {
+        for (int col=data_model.grid.top_left().col;col<=data_model.grid.bottom_right().col;++col) {
+          Vector pos{.row=row,.col=col};
+          if (auto v = data_model.grid.to_vertex(pos)) {
+            if (auto value = data_model.grid.to_value(*v)) {
+              if (*value=='#') ++covered_count;
+            }
+          }
+        }
+      }
+      result = covered_count;
       return result;
   }
 }
