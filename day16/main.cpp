@@ -69,13 +69,14 @@ using Connection = std::pair<Valve,std::vector<std::string>>;
 
 class Graph {
 public:
-  using Names = std::set<std::string>;
-  using AdjList = std::map<std::string,Names>;
-  Names const& adj(std::string const& name) const {return m_adj.at(name);}
+  using Vertex = std::string;
+  using Vertices = std::vector<std::string>;
+  using AdjList = std::map<Vertex,Vertices>;
+  Vertices const& adj(std::string const& name) const {return m_adj.at(name);}
   Graph& insert(Connection const& connection) {
     m_valves[connection.first.name] = connection.first;
     for (auto const& name : connection.second) {
-      m_adj[connection.first.name].insert(name);
+      m_adj[connection.first.name].push_back(name);
     }     
     return *this;
   }
@@ -131,15 +132,32 @@ Model parse(auto& in) {
     return result;
 }
 
+struct Flow {
+  int flow_t;
+  Valve on_valve;
+  Result to_gain() { return flow_t * on_valve.flow_rate;}
+};
+using Flows = std::set<Flow>;
+
 class MaxFlow {
 public:
   MaxFlow(Graph const& graph) : m_graph{graph} {}
-  Result operator()(int minutes) {
+  Result operator()(int flow_t) {
     Result result{};
+    dfs("AA",flow_t);
     return result;
   }
 private:
   Graph m_graph;
+  Result dfs_count{};
+  void dfs(Graph::Vertex const& v,int flow_t) {
+    ++dfs_count;
+    std::cout << "\ndfs(" << v << " flow_t:" << flow_t << ") dfs_count:" << dfs_count;
+    if (flow_t==0) return;
+    for (auto const& w : m_graph.adj(v)) {
+      dfs(w,flow_t-1);
+    }
+  }
 };
 
 namespace part1 {
@@ -149,7 +167,7 @@ namespace part1 {
       auto data_model = parse(in);
       std::cout << "\n" << data_model;
       MaxFlow max_flow{data_model};
-      result = max_flow(30);
+      result = max_flow(10);
       return result;
   }
 }
