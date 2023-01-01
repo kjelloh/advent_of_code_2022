@@ -142,43 +142,67 @@ struct Flow {
 };
 using Flows = std::set<Flow>;
 
+struct State {
+  using Vertex = Graph::Vertex;
+  using Path = std::vector<Vertex>;
+  Result gained;
+  Graph::Vertex v;
+  int flow_t;
+  Path const& path;
+  bool operator<(State const& other) const {
+    return (gained < other.gained);
+  }
+};
+
 class MaxFlow {
 private:
+  using Vertex = State::Vertex;
+  using Path = State::Path; 
   Graph m_graph;
   Valves m_working_valves{};
   Result dfs_count{};
-  using Vertex = std::pair<Graph::Vertex,int>; // {Open Valve,flow_t}
-  using Path = std::vector<Vertex>;
-  std::map<Path,bool> m_marked{};
-  void dfs(Graph::Vertex const& v,int flow_t,Path const& path) {
+  std::map<State,Result> m_cache{};
+  Result dfs(State const& state) {
+    Result result{};
+    auto gained = state.gained;
+    auto const& v = state.v;
+    auto flow_t = state.flow_t;
+    auto const& path = state.path;
     ++dfs_count;
-    std::cout << "\ndfs(" << v << " flow_t:" << flow_t << ") dfs_count:" << dfs_count;
-    m_marked[path] = true;
-    if (flow_t==0) {
-      std::cout << "\n\tpath:";
-      for (auto const& vx : path) {
-        std::cout << " " << std::quoted(vx.first) << "*" << vx.second;
-      }
-      return;
+    std::cout << "\ndfs(gained:" << gained << " v:" << v << " flow_t:" << flow_t << " open_count:" << path.size()  << ") dfs_count:" << dfs_count;
+    for (auto const& v : path) std::cout << "\n\topen:" << v;
+    if (auto best = m_cache[state];best>0) return best; // already calculated
+    if (path.size() == m_working_valves.size()) {
+      std::cout << " all is open, RETURN:" << state.gained;
+      return state.gained; // no more valves to open
     }
-    if (path.size() == m_working_valves.size()) return;
+    if (flow_t==0) {
+      std::cout << " times up, RETURN:" << state.gained;
+      return state.gained; // No more time to open valves
+    }
     for (auto const& w : m_graph.adj(v)) {
-      auto iter = std::find_if(path.begin(),path.end(),[&w](Vertex const& vx){
-        return vx.first == w; // We can open a valve only once
+      auto iter = std::find_if(path.begin(),path.end(),[&w](Vertex const& v){
+        return v == w; // Valve v is already open (in path)
       });
-      auto wx = m_graph.valve(w);
-      if (iter == path.end() and wx.flow_rate>0) {
+      if (iter == path.end() and m_graph.valve(w).flow_rate>0) {
         // try open valve at w
-        Vertex wx{w,flow_t-1};
-        auto path1 = path; path1.push_back(wx);
-        if (m_marked[path1] == false) dfs(w,flow_t-1,path1);
+        std::cout << " try open " << w;
+        auto path1 = path; path1.push_back(w);
+        auto valve_w = m_graph.valve(w);
+        // new gain at t-1 is previous gain + the gain of opening valve at w
+        State next{.gained=gained+valve_w.flow_rate*(flow_t-1),.v=w,.flow_t=flow_t-1,.path=path1};
+        result = std::max(result,dfs(next));
       }
       {
-        // try next without opening the valve
-        auto path2 = path; path2.push_back(Vertex{"",flow_t-1});
-        if (m_marked[path2] == false) dfs(w,flow_t-1,path2);
+        // try next without opening the valve at w
+        std::cout << " try next ";
+        State next{.gained=gained,.v=w,.flow_t=flow_t-1,.path=path};
+        result = std::max(result,dfs(next));
       }
     }
+    m_cache[state] = result;
+    std::cout << "\ndfs(gained:" << gained << " v:" << v << " flow_t:" << flow_t << " open_count:" << path.size()  << ") = " << result;
+    return result;
   }
 public:
   MaxFlow(Graph const& graph) : m_graph{graph} {
@@ -190,8 +214,7 @@ public:
   }
   Result operator()(int flow_t) {
     Result result{};
-    dfs("AA",flow_t,Path{});
-    return result;
+    return dfs(State{.v="AA",.flow_t=flow_t,.path=Path{}});
   }
 };
 
@@ -202,7 +225,7 @@ namespace part1 {
       auto data_model = parse(in);
       std::cout << "\n" << data_model;
       MaxFlow max_flow{data_model};
-      result = max_flow(5);
+      result = max_flow(30);
       return result;
   }
 }
