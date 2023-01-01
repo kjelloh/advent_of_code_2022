@@ -5,6 +5,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <unordered_map>
 #include <stack>
 #include <queue>
 #include <deque>
@@ -18,7 +19,7 @@
 extern char const* pTest;
 extern char const* pData;
 
-using Result = size_t;
+using Result = long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 std::string to_trimmed(std::string const& s) {
@@ -145,13 +146,26 @@ using Flows = std::set<Flow>;
 struct State {
   using Vertex = Graph::Vertex;
   using Path = std::vector<Vertex>;
-  Result gained;
-  Graph::Vertex v;
-  int flow_t;
-  Path const& path;
-  bool operator<(State const& other) const {
-    return (gained < other.gained);
+  Result gained_for_visting_v; // gained for visiting v
+  Graph::Vertex v; // vertex to visit
+  int flow_t_when_visit_v;
+  Path const& already_open; // already open when visiting v (including v if so chosen)
+  bool operator==(State const& other) const {
+    return gained_for_visting_v == other.gained_for_visting_v and v==other.v and flow_t_when_visit_v==other.flow_t_when_visit_v and already_open==other.already_open;
   }
+};
+
+// custom hash can be a standalone function object:
+struct StateHash
+{
+    std::size_t operator()(State const& state) const noexcept {
+        std::size_t result = std::hash<std::string>{}(state.v);
+        result ^= std::hash<int>{}(state.flow_t_when_visit_v);
+        for (auto const& p : state.already_open) {
+          result ^= std::hash<std::string>{}(p);
+        }
+        return result;
+    }
 };
 
 class MaxFlow {
@@ -160,49 +174,64 @@ private:
   using Path = State::Path; 
   Graph m_graph;
   Valves m_working_valves{};
-  Result dfs_count{};
-  std::map<State,Result> m_cache{};
+  std::unordered_map<State,Result,StateHash> m_cache{};
   Result dfs(State const& state) {
+    auto dfs_id = StateHash{}(state);
     Result result{};
-    auto gained = state.gained;
+    auto gained_for_visting_v = state.gained_for_visting_v;
     auto const& v = state.v;
-    auto flow_t = state.flow_t;
-    auto const& path = state.path;
-    ++dfs_count;
-    std::cout << "\ndfs(gained:" << gained << " v:" << v << " flow_t:" << flow_t << " open_count:" << path.size()  << ") dfs_count:" << dfs_count;
-    for (auto const& v : path) std::cout << "\n\topen:" << v;
-    if (auto best = m_cache[state];best>0) return best; // already calculated
-    if (path.size() == m_working_valves.size()) {
-      std::cout << " all is open, RETURN:" << state.gained;
-      return state.gained; // no more valves to open
+    auto flow_t_when_visit_v = state.flow_t_when_visit_v;
+    auto const& already_open = state.already_open;
+    std::cout << "\ndfs_id:" << dfs_id << "dfs(gained_for_visting_v:" << gained_for_visting_v << " v:" << v << " flow_t_when_visit_v:" << flow_t_when_visit_v << " already_open_count:" << already_open.size()  << ")"; 
+    for (auto const& p : already_open) std::cout<< "\ndfs_id:" << dfs_id << "\talready open:" << p;
+    if (result = m_cache[state];result>0) {
+      std::cout << "\ndfs_id:" << dfs_id << "\talready known, RETURN gained_for_visting_v:" << result;
+      return result; // We already know the result coming to v with this state
     }
-    if (flow_t==0) {
-      std::cout << " times up, RETURN:" << state.gained;
-      return state.gained; // No more time to open valves
+    else if (already_open.size() == m_working_valves.size()) {
+      // no more valves to open
+      result = gained_for_visting_v; 
+      std::cout << "\ndfs_id:" << dfs_id << "\tall is open, RETURN gained_for_visting_v:" << result;
+      return result;
     }
-    for (auto const& w : m_graph.adj(v)) {
-      auto iter = std::find_if(path.begin(),path.end(),[&w](Vertex const& v){
-        return v == w; // Valve v is already open (in path)
-      });
-      if (iter == path.end() and m_graph.valve(w).flow_rate>0) {
-        // try open valve at w
-        std::cout << " try open " << w;
-        auto path1 = path; path1.push_back(w);
-        auto valve_w = m_graph.valve(w);
-        // new gain at t-1 is previous gain + the gain of opening valve at w
-        State next{.gained=gained+valve_w.flow_rate*(flow_t-1),.v=w,.flow_t=flow_t-1,.path=path1};
-        result = std::max(result,dfs(next));
+    else if (flow_t_when_visit_v<=0) {
+      // No more time to open valves
+      result = gained_for_visting_v; 
+      std::cout << "\ndfs_id:" << dfs_id << "\ttimes up, RETURN gained_for_visting_v:" << result;
+      return result; 
+    }
+    else {
+      std::cout << "\ndfs_id:" << dfs_id << "\tadjacent_to:" << v;
+      for (auto const& adj_v : m_graph.adj(v)) {
+        std::cout  << "\ndfs_id:" << dfs_id << "\t\tadj_v:" << adj_v;
+        auto valve_adj = m_graph.valve(adj_v);
+        auto iter = std::find_if(already_open.begin(),already_open.end(),[&adj_v](Vertex const& p){
+          return p == adj_v; // Adjacent valve is already open (in path)
+        });
+        if (iter == already_open.end() and valve_adj.flow_rate>0) {
+          // adj_v is NOT open and has a flow rate (not broke) -> try open adjacent valve
+          std::cout  << "\ndfs_id:" << dfs_id  << "\ttry open adjacent:" << adj_v;
+          auto new_open = already_open; new_open.push_back(adj_v);
+          // new gain for opening adjacent valve = flow_rate of adjacent valve * flow_t left to flow when we open it
+          // We will open adjacent valve at flow_t_when_visit_v - 2 (one minute to step there and one minute to open it)
+          auto gain_for_opening_adj_v = valve_adj.flow_rate*(std::max(flow_t_when_visit_v-2,0));
+          State state_adj_v{.gained_for_visting_v=gained_for_visting_v+gain_for_opening_adj_v,.v=adj_v,.flow_t_when_visit_v=flow_t_when_visit_v-2,.already_open=new_open};
+          result = std::max(result,dfs(state_adj_v)); // update result if better
+        }
+        {
+          // try next without opening the valve at adj_v
+          std::cout  << "\ndfs_id:" << dfs_id  << "\tmove to adjacent:" << adj_v;
+          auto gain_for_not_opening_adj_v = gained_for_visting_v;
+          auto state_adj_v = state;
+          state_adj_v.v = adj_v;
+          state_adj_v.flow_t_when_visit_v = flow_t_when_visit_v-1;
+          result = std::max(result,dfs(state_adj_v)); // update result if better
+        }
       }
-      {
-        // try next without opening the valve at w
-        std::cout << " try next ";
-        State next{.gained=gained,.v=w,.flow_t=flow_t-1,.path=path};
-        result = std::max(result,dfs(next));
-      }
+      std::cout  << "\ndfs_id:" << dfs_id  << " RETURN from dfs(gained_for_visting_v:" << gained_for_visting_v << " v:" << v << " flow_t_when_visit_v:" << flow_t_when_visit_v << " already_open_count:" << already_open.size()  << ") = " << result;
+      m_cache[state] = result; // cache this result
+      return result;
     }
-    m_cache[state] = result;
-    std::cout << "\ndfs(gained:" << gained << " v:" << v << " flow_t:" << flow_t << " open_count:" << path.size()  << ") = " << result;
-    return result;
   }
 public:
   MaxFlow(Graph const& graph) : m_graph{graph} {
@@ -212,9 +241,9 @@ public:
       }
     }
   }
-  Result operator()(int flow_t) {
+  Result operator()(int start_t) {
     Result result{};
-    return dfs(State{.v="AA",.flow_t=flow_t,.path=Path{}});
+    return dfs(State{.gained_for_visting_v=0,.v="AA",.flow_t_when_visit_v=start_t,.already_open=Path{}});
   }
 };
 
