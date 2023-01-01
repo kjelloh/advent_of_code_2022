@@ -83,6 +83,9 @@ public:
   Valves const& valves() const {
     return m_valves;
   }
+  Valve const& valve(Vertex const& v) const {
+    return m_valves.at(v);
+  }
 private:
   AdjList m_adj;
   Valves m_valves;
@@ -140,23 +143,55 @@ struct Flow {
 using Flows = std::set<Flow>;
 
 class MaxFlow {
-public:
-  MaxFlow(Graph const& graph) : m_graph{graph} {}
-  Result operator()(int flow_t) {
-    Result result{};
-    dfs("AA",flow_t);
-    return result;
-  }
 private:
   Graph m_graph;
+  Valves m_working_valves{};
   Result dfs_count{};
-  void dfs(Graph::Vertex const& v,int flow_t) {
+  using Vertex = std::pair<Graph::Vertex,int>; // {Open Valve,flow_t}
+  using Path = std::vector<Vertex>;
+  std::map<Path,bool> m_marked{};
+  void dfs(Graph::Vertex const& v,int flow_t,Path const& path) {
     ++dfs_count;
     std::cout << "\ndfs(" << v << " flow_t:" << flow_t << ") dfs_count:" << dfs_count;
-    if (flow_t==0) return;
-    for (auto const& w : m_graph.adj(v)) {
-      dfs(w,flow_t-1);
+    m_marked[path] = true;
+    if (flow_t==0) {
+      std::cout << "\n\tpath:";
+      for (auto const& vx : path) {
+        std::cout << " " << std::quoted(vx.first) << "*" << vx.second;
+      }
+      return;
     }
+    if (path.size() == m_working_valves.size()) return;
+    for (auto const& w : m_graph.adj(v)) {
+      auto iter = std::find_if(path.begin(),path.end(),[&w](Vertex const& vx){
+        return vx.first == w; // We can open a valve only once
+      });
+      auto wx = m_graph.valve(w);
+      if (iter == path.end() and wx.flow_rate>0) {
+        // try open valve at w
+        Vertex wx{w,flow_t-1};
+        auto path1 = path; path1.push_back(wx);
+        if (m_marked[path1] == false) dfs(w,flow_t-1,path1);
+      }
+      {
+        // try next without opening the valve
+        auto path2 = path; path2.push_back(Vertex{"",flow_t-1});
+        if (m_marked[path2] == false) dfs(w,flow_t-1,path2);
+      }
+    }
+  }
+public:
+  MaxFlow(Graph const& graph) : m_graph{graph} {
+    for (auto const& [v,valve] : graph.valves()) {
+      if (valve.flow_rate>0) {
+        m_working_valves[v] = valve;
+      }
+    }
+  }
+  Result operator()(int flow_t) {
+    Result result{};
+    dfs("AA",flow_t,Path{});
+    return result;
   }
 };
 
@@ -167,7 +202,7 @@ namespace part1 {
       auto data_model = parse(in);
       std::cout << "\n" << data_model;
       MaxFlow max_flow{data_model};
-      result = max_flow(10);
+      result = max_flow(5);
       return result;
   }
 }
