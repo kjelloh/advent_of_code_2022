@@ -160,8 +160,7 @@ struct State {
 struct StateHash
 {
     std::size_t operator()(State const& state) const noexcept {
-        std::size_t result = std::hash<std::string>{}(state.v);
-        result ^= std::hash<int>{}(state.flow_t_when_visit_v);
+        std::size_t result = std::hash<Result>{}(state.gained_for_visting_v);
         for (auto const& p : state.already_open) {
           result ^= std::hash<std::string>{}(p);
         }
@@ -183,35 +182,39 @@ private:
     auto const& v = state.v;
     auto flow_t_when_visit_v = state.flow_t_when_visit_v;
     auto const& already_open = state.already_open;
-    std::cout << "\ndfs_id:" << dfs_id << "dfs(gained_for_visting_v:" << gained_for_visting_v << " v:" << v << " flow_t_when_visit_v:" << flow_t_when_visit_v << " already_open_count:" << already_open.size()  << ")"; 
-    for (auto const& p : already_open) std::cout<< "\ndfs_id:" << dfs_id << "\talready open:" << p;
+    // std::cout << "\ndfs_id:" << dfs_id << "dfs(gained_for_visting_v:" << gained_for_visting_v << " v:" << v << " flow_t_when_visit_v:" << flow_t_when_visit_v << " already_open_count:" << already_open.size()  << ")"; 
+    // for (auto const& p : already_open) std::cout<< "\ndfs_id:" << dfs_id << "\talready open:" << p;
     if (result = m_cache[state];result>0) {
-      std::cout << "\ndfs_id:" << dfs_id << "\talready known, RETURN gained_for_visting_v:" << result;
+      // std::cout << "\ndfs_id:" << dfs_id << "\talready known, RETURN gained_for_visting_v:" << result;
+      std::cout << '.';
       return result; // We already know the result coming to v with this state
     }
     else if (already_open.size() == m_working_valves.size()) {
       // no more valves to open
       result = gained_for_visting_v; 
-      std::cout << "\ndfs_id:" << dfs_id << "\tall is open, RETURN gained_for_visting_v:" << result;
+      // std::cout << "\ndfs_id:" << dfs_id << "\tall is open, RETURN gained_for_visting_v:" << result;
+      std::cout << "\n";
       return result;
     }
     else if (flow_t_when_visit_v<=0) {
       // No more time to open valves
       result = gained_for_visting_v; 
-      std::cout << "\ndfs_id:" << dfs_id << "\ttimes up, RETURN gained_for_visting_v:" << result;
+      // std::cout << "\ndfs_id:" << dfs_id << "\ttimes up, RETURN gained_for_visting_v:" << result;
+      std::cout << "\n";
       return result; 
     }
     else {
-      std::cout << "\ndfs_id:" << dfs_id << "\tadjacent_to:" << v;
+      // std::cout << "\ndfs_id:" << dfs_id << "\tadjacent_to:" << v;
+      std::cout << "\n!";
       for (auto const& adj_v : m_graph.adj(v)) {
-        std::cout  << "\ndfs_id:" << dfs_id << "\t\tadj_v:" << adj_v;
+        // std::cout  << "\ndfs_id:" << dfs_id << "\t\tadj_v:" << adj_v;
         auto valve_adj = m_graph.valve(adj_v);
         auto iter = std::find_if(already_open.begin(),already_open.end(),[&adj_v](Vertex const& p){
           return p == adj_v; // Adjacent valve is already open (in path)
         });
         if (iter == already_open.end() and valve_adj.flow_rate>0) {
           // adj_v is NOT open and has a flow rate (not broke) -> try open adjacent valve
-          std::cout  << "\ndfs_id:" << dfs_id  << "\ttry open adjacent:" << adj_v;
+          // std::cout  << "\ndfs_id:" << dfs_id  << "\ttry open adjacent:" << adj_v;
           auto new_open = already_open; new_open.push_back(adj_v);
           // new gain for opening adjacent valve = flow_rate of adjacent valve * flow_t left to flow when we open it
           // We will open adjacent valve at flow_t_when_visit_v - 2 (one minute to step there and one minute to open it)
@@ -221,7 +224,7 @@ private:
         }
         {
           // try next without opening the valve at adj_v
-          std::cout  << "\ndfs_id:" << dfs_id  << "\tmove to adjacent:" << adj_v;
+          // std::cout  << "\ndfs_id:" << dfs_id  << "\tmove to adjacent:" << adj_v;
           auto gain_for_not_opening_adj_v = gained_for_visting_v;
           auto state_adj_v = state;
           state_adj_v.v = adj_v;
@@ -229,7 +232,7 @@ private:
           result = std::max(result,dfs(state_adj_v)); // update result if better
         }
       }
-      std::cout  << "\ndfs_id:" << dfs_id  << " RETURN from dfs(gained_for_visting_v:" << gained_for_visting_v << " v:" << v << " flow_t_when_visit_v:" << flow_t_when_visit_v << " already_open_count:" << already_open.size()  << ") = " << result;
+      // std::cout  << "\ndfs_id:" << dfs_id  << " RETURN from dfs(gained_for_visting_v:" << gained_for_visting_v << " v:" << v << " flow_t_when_visit_v:" << flow_t_when_visit_v << " already_open_count:" << already_open.size()  << ") = " << result;
       m_cache[state] = result; // cache this result
       return result;
     }
@@ -366,11 +369,11 @@ namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
-      // auto data_model = parse(in);
-      // std::cout << "\n" << data_model;
-      // MaxFlow max_flow{data_model};
-      // result = max_flow(30);
-      jonathanpaulsson::main(in);
+      auto data_model = parse(in);
+      std::cout << "\n" << data_model;
+      MaxFlow max_flow{data_model};
+      result = max_flow(30);
+      // jonathanpaulsson::main(in);
       return result;
   }
 }
