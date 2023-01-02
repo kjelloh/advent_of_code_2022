@@ -55,6 +55,7 @@ struct Sprite {
   static constexpr Vector LEFT{.row=0,.col=-1};
   static constexpr Vector DOWN{.row=-1,.col=0};
   static constexpr Vector RIGHT{.row=0,.col=1}; 
+  static constexpr Vector UP{.row=1,.col=0}; 
   Sprite(Vector const& pixel_top_left, Rows const& rows) 
     :  m_frame_top_left{pixel_top_left}
       ,m_frame_bottom_right{.row=static_cast<Result>(pixel_top_left.row-rows.size()+1),.col=static_cast<Result>(pixel_top_left.col + rows[0].size()-1)}
@@ -62,8 +63,6 @@ struct Sprite {
     for (auto iter=rows.rbegin();iter!=rows.rend();++iter) {
       m_rows.push_back(*iter);
     }
-    auto pos = m_rows[0].find_first_not_of(' ');
-    m_frame_top_left.col -= pos; // adjust frame so actual pixel is at top_left
     std::cout << "\nSprite(pixel_top_left:" << pixel_top_left << " row[0]:" << m_rows[0] << ") frame_top_left:" << m_frame_top_left << " m_frame_bottom_right:" << m_frame_bottom_right;
   }
   bool in_frame(Vector const& pos) const {
@@ -104,7 +103,7 @@ struct Sprite {
   Sprite& operator+=(Sprite const& other) {
     std::cout << "\nSprite::operator+=(Sprite const& other)";
     // merge other with us
-    const std::string empty_row(m_frame_bottom_right.col - m_frame_top_left.col+1,' ');
+    const std::string empty_row(m_frame_bottom_right.col - m_frame_top_left.col+1,'.');
     while (other.m_frame_top_left.row > m_frame_top_left.row) push_row(empty_row);
     for (auto row=other.m_frame_top_left.row;row>=other.m_frame_bottom_right.row;--row) {
       for (auto col=other.m_frame_top_left.col;col<=other.m_frame_bottom_right.col;++col) {
@@ -122,10 +121,10 @@ struct Sprite {
     for (auto row=m_frame_top_left.row;row>=m_frame_bottom_right.row and !result;--row) {
       for (auto col=m_frame_top_left.col;col<=m_frame_bottom_right.col and !result;++col) {
         Vector pos{.row=row,.col=col};
-        if (this->at(pos)!=' ') {
+        if (this->at(pos)!='.') {
           if (other.in_frame(pos)) {
             std::cout << "\nother.in_frame TRUE";
-            result = result or other.at(pos)!=' ';
+            result = result or other.at(pos)!='.';
             std::cout << "\npos:" << pos << " this:" << this->at(pos) << " other:" << other.at(pos) << " does_collide:" << result << std::flush;
           }
         } 
@@ -142,7 +141,7 @@ std::ostream& operator<<(std::ostream& os,Sprite const& sprite) {
   int row = sprite.m_rows.size()-1;
   for (auto iter=sprite.m_rows.rbegin();iter != sprite.m_rows.rend();++iter) {
     if (iter!=sprite.m_rows.rbegin()) std::cout << "\n";
-    std::string indent(sprite.m_frame_top_left.col,' ');
+    std::string indent(sprite.m_frame_top_left.col,'.');
     os << indent << *iter << " : " << row--;
   }
   return os;
@@ -157,11 +156,11 @@ struct Rock {
 
 const std::vector<Sprite::Rows> ROCKS {
    { "####"}
-  ,{ " # "
+  ,{ ".#."
     ,"###"
-    ," # "}
-  ,{ "  #"
-    ,"  #"
+    ,".#."}
+  ,{ "..#"
+    ,"..#"
     ,"###"}
   ,{ "#"
     ,"#"
@@ -176,11 +175,14 @@ public:
   auto const& top_left() const {return m_sprite.m_frame_top_left;}
   auto const& bottom_right() const {return m_sprite.m_frame_bottom_right;}
   Chamber(Jets const& jets) : m_jets{jets} {}
-  bool can_move_left(Rock const& rock) {
-    return (top_left().col < rock.top_left().col);
+  bool can_move_left(Rock rock) {
+    rock.m_sprite += Sprite::LEFT;
+    return (top_left().col < rock.top_left().col) and !rock.m_sprite.does_collide_with(this->m_sprite);
   }
-  bool can_move_right(Rock const& rock) {
-    return (rock.top_left().col + rock.bottom_right().col < bottom_right().col);
+  bool can_move_right(Rock rock) {
+    std::cout << "\ncan_move_right(rock::bottom_right:" << rock.bottom_right() << ") this->bottom_right:" << bottom_right(); 
+    rock.m_sprite += Sprite::RIGHT;
+    return (rock.bottom_right().col < bottom_right().col) and !rock.m_sprite.does_collide_with(this->m_sprite);
   }
   bool can_move_down(Rock rock) {
     bool result{};
@@ -208,11 +210,11 @@ public:
     return *this;
   }
   Chamber& drop() {
-    auto rock_index = (drop_count++ % 4);
-    Vector top_left{.row=static_cast<Result>(m_sprite.m_frame_top_left.row + 4),.col=3}; // col:0 is left boundry
-    Rock rock(top_left,ROCKS[rock_index]);
+    auto rock_index = (drop_count++ % ROCKS.size());
+    auto rows = ROCKS[rock_index];
+    Vector top_left{.row=static_cast<Result>(m_sprite.m_frame_top_left.row + rows.size() -1 + 4),.col=3}; // col:0 is left boundary
+    Rock rock(top_left,rows);
     std::cout << "\n" << rock.m_sprite << std::flush;
-    auto jet_index{0};
     bool is_falling{true};
     while (is_falling) {
       rock = to_moved_rock(rock,m_jets[jet_index]);
@@ -235,6 +237,7 @@ private:
   Sprite m_sprite{Vector{.row=0,.col=0},Sprite::Rows{1,"|-------|"}};
   Result drop_count{};
   Jets m_jets{};
+  int jet_index{0};
 };
 
 Model parse(auto& in) {
@@ -251,6 +254,33 @@ std::ostream& operator<<(std::ostream& os,Chamber const& chamber) {
   return os;
 }
 
+/*
+
+|.####..|
+|....##.|
+|....##.|
+|....#..|
+|..#.#..|
+|..#.#..|
+|#####..|
+|..###..|
+|...#...|
+|..####.|
++-------+
+
+|.####..| : 10
+|....##.| : 9
+|....##.| : 8
+|....#..| : 7
+|..#.#..| : 6
+|..#.#..| : 5
+|#####..| : 4
+|..###..| : 3
+|...#...| : 2
+|..####.| : 1
+|-------| : 0
+*/
+
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
@@ -262,10 +292,11 @@ namespace part1 {
       //   Rock rock{Vector{0,0},rows};
       //   std::cout << "\n" << rock.m_sprite;
       // }
-      for (int i=1;i<=4;++i) {
+      for (int i=1;i<=2022;++i) {
         chamber.drop();
+        // std::cout << "\n" << chamber;
       }
-      std::cout << "\n" << chamber;
+      std::cout << "\n\n" << chamber;
       std::cout << "\nchamber.top_left:" << chamber.top_left();
       return result;
   }
