@@ -15,6 +15,7 @@
 #include <algorithm> // E.g., std::find, std::all_of,...
 #include <numeric> // E.g., std::accumulate
 #include <limits> // E.g., std::numeric_limits
+#include <chrono>
 #include <cassert>
 
 extern char const* pTest;
@@ -156,7 +157,6 @@ struct State {
   }
 };
 
-// custom hash can be a standalone function object:
 struct StateHash
 {
     std::size_t operator()(State const& state) const noexcept {
@@ -176,6 +176,8 @@ private:
   Valves m_working_valves{};
   std::unordered_map<State,Result,StateHash> m_cache{};
   Result dfs(State const& state) {
+    static Result call_counter{};
+    if (call_counter++ % 100000 == 0) std::cout << "\n" << call_counter;
     auto dfs_id = StateHash{}(state);
     Result result{};
     auto gained_for_visting_v = state.gained_for_visting_v;
@@ -186,26 +188,22 @@ private:
     // for (auto const& p : already_open) std::cout<< "\ndfs_id:" << dfs_id << "\talready open:" << p;
     if (result = m_cache[state];result>0) {
       // std::cout << "\ndfs_id:" << dfs_id << "\talready known, RETURN gained_for_visting_v:" << result;
-      std::cout << '.';
       return result; // We already know the result coming to v with this state
     }
     else if (already_open.size() == m_working_valves.size()) {
       // no more valves to open
       result = gained_for_visting_v; 
       // std::cout << "\ndfs_id:" << dfs_id << "\tall is open, RETURN gained_for_visting_v:" << result;
-      std::cout << "\n";
       return result;
     }
     else if (flow_t_when_visit_v<=0) {
       // No more time to open valves
       result = gained_for_visting_v; 
       // std::cout << "\ndfs_id:" << dfs_id << "\ttimes up, RETURN gained_for_visting_v:" << result;
-      std::cout << "\n";
       return result; 
     }
     else {
       // std::cout << "\ndfs_id:" << dfs_id << "\tadjacent_to:" << v;
-      std::cout << "\n!";
       for (auto const& adj_v : m_graph.adj(v)) {
         // std::cout  << "\ndfs_id:" << dfs_id << "\t\tadj_v:" << adj_v;
         auto valve_adj = m_graph.valve(adj_v);
@@ -216,6 +214,7 @@ private:
           // adj_v is NOT open and has a flow rate (not broke) -> try open adjacent valve
           // std::cout  << "\ndfs_id:" << dfs_id  << "\ttry open adjacent:" << adj_v;
           auto new_open = already_open; new_open.push_back(adj_v);
+          // std::sort(new_open.begin(),new_open.end());
           // new gain for opening adjacent valve = flow_rate of adjacent valve * flow_t left to flow when we open it
           // We will open adjacent valve at flow_t_when_visit_v - 2 (one minute to step there and one minute to open it)
           auto gain_for_opening_adj_v = valve_adj.flow_rate*(std::max(flow_t_when_visit_v-2,0));
@@ -373,6 +372,8 @@ namespace part1 {
       std::cout << "\n" << data_model;
       MaxFlow max_flow{data_model};
       result = max_flow(30);
+      // duration:4703374ms answer[Part 1     ] 1991
+
       // jonathanpaulsson::main(in);
       return result;
   }
@@ -390,15 +391,22 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+
+  std::chrono::time_point<std::chrono::system_clock> start_time{};
+  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
+  exec_times.push_back(std::chrono::system_clock::now());
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // exec_times.push_back(std::chrono::system_clock::now());
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
-  for (auto const& answer : answers) {
-    std::cout << "\nanswer[" << answer.first << "] " << answer.second;
+  exec_times.push_back(std::chrono::system_clock::now());
+  for (int i=0;i<answers.size();++i) {
+    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms"; 
+    std::cout << " answer[" << answers[i].first << "] " << answers[i].second;
   }
-  // std::cout << "\nPress <enter>...";
-  // std::cin.get();
   std::cout << "\n";
   return 0;
 }
