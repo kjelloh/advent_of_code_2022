@@ -59,9 +59,8 @@ struct Sprite {
     :  m_frame_top_left{pixel_top_left}
       ,m_frame_bottom_right{.row=static_cast<Result>(pixel_top_left.row-rows.size()+1),.col=static_cast<Result>(pixel_top_left.col + rows[0].size()-1)}
       ,m_rows{} {
-    // push provided rows to get them into row range max..0 (i.e., row:0 is the bottom one)
-    for (auto const& entry : rows) {
-      m_rows.push_back(entry);
+    for (auto iter=rows.rbegin();iter!=rows.rend();++iter) {
+      m_rows.push_back(*iter);
     }
     auto pos = m_rows[0].find_first_not_of(' ');
     m_frame_top_left.col -= pos; // adjust frame so actual pixel is at top_left
@@ -132,7 +131,6 @@ struct Sprite {
         } 
       }
     }
-    if (++call_count > 5) exit(0);
     return result;
   }
   Vector m_frame_top_left;
@@ -141,10 +139,11 @@ struct Sprite {
 };
 
 std::ostream& operator<<(std::ostream& os,Sprite const& sprite) {
+  int row = sprite.m_rows.size()-1;
   for (auto iter=sprite.m_rows.rbegin();iter != sprite.m_rows.rend();++iter) {
     if (iter!=sprite.m_rows.rbegin()) std::cout << "\n";
     std::string indent(sprite.m_frame_top_left.col,' ');
-    os << indent << *iter;
+    os << indent << *iter << " : " << row--;
   }
   return os;
 }
@@ -157,19 +156,19 @@ struct Rock {
 };
 
 const std::vector<Sprite::Rows> ROCKS {
-{"####"}
-,{ ".#."
-  ,"###"
-  ,".#."}
-,{ "..#"
-  ,"..#"
-  ,"###"}
-,{ "#"
-  ,"#"
-  ,"#"
-  ,"#"}
-,{ "##"
-  ,"##"}
+   { "####"}
+  ,{ " # "
+    ,"###"
+    ," # "}
+  ,{ "  #"
+    ,"  #"
+    ,"###"}
+  ,{ "#"
+    ,"#"
+    ,"#"
+    ,"#"}
+  ,{ "##"
+    ,"##"}
 };
 
 class Chamber {
@@ -263,10 +262,11 @@ namespace part1 {
       //   Rock rock{Vector{0,0},rows};
       //   std::cout << "\n" << rock.m_sprite;
       // }
-      for (int i=1;i<=1;++i) {
+      for (int i=1;i<=4;++i) {
         chamber.drop();
       }
       std::cout << "\n" << chamber;
+      std::cout << "\nchamber.top_left:" << chamber.top_left();
       return result;
   }
 }
