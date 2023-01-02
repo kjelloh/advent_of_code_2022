@@ -108,7 +108,7 @@ struct Sprite {
     for (auto row=other.m_frame_top_left.row;row>=other.m_frame_bottom_right.row;--row) {
       for (auto col=other.m_frame_top_left.col;col<=other.m_frame_bottom_right.col;++col) {
         Vector pos{.row=row,.col=col};
-        this->at(pos) = other.at(pos);
+        if (auto other_ch = other.at(pos);other_ch!='.') this->at(pos) = other_ch;
       }
     }
 
@@ -311,8 +311,23 @@ namespace part2 {
   }
 }
 
+void test() {
+  Rock r1{Vector{.row=8,.col=2},ROCKS[1]};
+  Rock r2{Vector{.row=6,.col=6},ROCKS[4]};
+  while (!r1.m_sprite.does_collide_with(r2.m_sprite)) {
+    r2.m_sprite += Sprite::LEFT;
+    Rock merged{Vector{.row=6,.col=0},Sprite::Rows(10,"                  ")};
+    merged.m_sprite += r1.m_sprite;
+    merged.m_sprite += r2.m_sprite;
+    std::cout << "\n\n" << merged.m_sprite; 
+  }
+
+  exit(0);
+}
+
 int main(int argc, char *argv[])
 {
+  // test();
   Answers answers{};
   // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   answers.push_back({"Part 1     ",part1::solve_for(pData)});
