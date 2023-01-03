@@ -223,7 +223,7 @@ Model parse(auto& in) {
 }
 
 struct State {
-  BluePrint* blueprint;
+  BluePrint const* blueprint;
   int time{};
   Resources robots{};
   Resources resources{};
@@ -256,18 +256,17 @@ std::ostream& operator<<(std::ostream& os,State const& state) {
   return os;
 }
 
-Result dfs(State state,int end_time) {
+Result dfs(State const& state,int end_time) {
   Result result{state.resources.m_amounts[3]}; // result = count of created geodes so far
-  std::cout << "\n" << result << " dfs(state.time:" << state.time  << ")";
-  std::cout << state;
+  // std::cout << "\n" << result << " dfs(state.time:" << state.time  << ")";
+  // std::cout << state;
   if (state.time<end_time) {
     // at least one more
-    for (int index=0;index<SYMBOL_TABLE.size();++index) {
+    for (int index=SYMBOL_TABLE.size()-1;index>=0;--index) {
       auto cost = state.blueprint->cost[index];
       if (state.resources >= cost) {
         // std::cout << "\nSpend " << cost << " to start building a " << to_name(index) << " collecting/cracking robot.";
-        state.resources -= cost; // pay for the new robot
-        State adj_state{.blueprint=state.blueprint,.time=state.time+1,.robots=state.robots,.resources=state.resources};
+        State adj_state{.blueprint=state.blueprint,.time=state.time+1,.robots=state.robots,.resources=state.resources-cost};
         adj_state.execute_robots(); // execute existing robots in next state
         ++adj_state.robots.m_amounts[index]; // create the new robot
         result = std::max(dfs(adj_state,end_time),result);
@@ -287,10 +286,14 @@ namespace part1 {
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << "\n" << data_model;
-      for (auto& blueprint : data_model) {
+      Result best{};
+      for (int index=0;index<data_model.size();++index) {
+        auto const& blueprint = data_model[index];
         std::cout << "\n\nTRY BLUEPRINT";
         std::cout << "\n\t" << blueprint;
-        result = std::max(dfs(State{.blueprint=&blueprint,.time=1,.robots={.m_amounts={1,0,0,0}},.resources={}},19),result);
+        best = std::max(dfs(State{.blueprint=&blueprint,.time=1,.robots={.m_amounts={1,0,0,0}},.resources={}},19),best);
+        result += best * index;
+        std::cout << "\nblueprint:" << index << " best:" << best << " result:" << result;
       }
       return result;
   }
