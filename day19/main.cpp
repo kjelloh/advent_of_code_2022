@@ -290,7 +290,7 @@ namespace part1 {
       for (auto& blueprint : data_model) {
         std::cout << "\n\nTRY BLUEPRINT";
         std::cout << "\n\t" << blueprint;
-        result = std::max(dfs(State{.blueprint=&blueprint,.time=1,.robots={.m_amounts={1,0,0,0}},.resources={}},20),result);
+        result = std::max(dfs(State{.blueprint=&blueprint,.time=1,.robots={.m_amounts={1,0,0,0}},.resources={}},19),result);
       }
       return result;
   }
@@ -373,15 +373,22 @@ int main(int argc, char *argv[])
     exit(0);
   }
   Answers answers{};
+
+  std::chrono::time_point<std::chrono::system_clock> start_time{};
+  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
+  exec_times.push_back(std::chrono::system_clock::now());
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
-  for (auto const& answer : answers) {
-    std::cout << "\nanswer[" << answer.first << "] " << answer.second;
+  exec_times.push_back(std::chrono::system_clock::now());
+  for (int i=0;i<answers.size();++i) {
+    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms"; 
+    std::cout << " answer[" << answers[i].first << "] " << answers[i].second;
   }
-  // std::cout << "\nPress <enter>...";
-  // std::cin.get();
   std::cout << "\n";
   return 0;
 }
