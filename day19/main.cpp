@@ -70,16 +70,20 @@ struct Resources {
   using Amounts = std::vector<Result>;
   Amounts m_amounts{Amounts(SYMBOL_TABLE.size(),0)};
   bool operator>=(Resources const& other) const {
-    return m_amounts >= other.m_amounts;
+    bool result{true};
+    for (int index=0;index<SYMBOL_TABLE.size() and result;++index) {
+      result = result and m_amounts[index] >= other.m_amounts[index];
+    }
+    return result;
   }
   Resources& operator+=(Resources const& other) {
-    for (int index=0;index<other.m_amounts.size();++index) {
+    for (int index=0;index<SYMBOL_TABLE.size();++index) {
       m_amounts[index] += other.m_amounts[index];
     }
     return *this;
   }
   Resources& operator-=(Resources const& other) {
-    for (int index=0;index<other.m_amounts.size();++index) {
+    for (int index=0;index<SYMBOL_TABLE.size();++index) {
       m_amounts[index] -= other.m_amounts[index];
     }
     return *this;
@@ -223,44 +227,16 @@ struct State {
   int time{};
   Resources robots{};
   Resources resources{};
-  State& update_resources();
+  State& execute_robots();
 };
 
-State& State::update_resources() {
+State& State::execute_robots() {
   for (int index=0;index<this->robots.m_amounts.size();++index) {
-    std::cout << "\n" << this->robots.m_amounts[index] << " of robot " << to_name(index) << " collects " << this->robots.m_amounts[index] << " of " << to_name(index); 
+    // std::cout << "\n" << this->robots.m_amounts[index] << " of robot " << to_name(index) << " collects " << this->robots.m_amounts[index] << " of " << to_name(index); 
     this->resources.m_amounts[index] += this->robots.m_amounts[index]; // each robot creates one of its resource type
-    std::cout << ". You have " << this->resources.m_amounts[index] << " " << to_name(index);
+    // std::cout << ". You have " << this->resources.m_amounts[index] << " " << to_name(index);
   }
   return *this;
-}
-
-std::vector<State> adj(State const& state) {
-  // Create possible (adjacent) sub-states of state
-  std::vector<State> result;
-  if (state.time>0) {
-    auto adj_t = state.time-1;
-    auto resources = state.resources;
-    // Try adding a robot for next state (going from max index to 0, i.e., assuming it is better to aim at building a high value robot before a low value?)
-    for (int index=0;index<SYMBOL_TABLE.size();++index) {
-      auto cost = state.blueprint->cost.at(index);
-      if (resources >= cost) {
-        State new_state{state};
-        new_state.time = adj_t;
-        new_state.resources = resources-cost;
-        new_state.update_resources(); // exercise robots
-        ++new_state.robots.m_amounts[index]; // build new robot
-        result.push_back(new_state);
-        resources = new_state.resources;
-      }
-    }
-    // Try next time t without building any robot (?)
-    State new_state{state};
-    new_state.time = adj_t;
-    new_state.update_resources(); // exercise robots
-    result.push_back(new_state);
-  }
-  return result;
 }
 
 std::ostream& operator<<(std::ostream& os,State const& state) {
@@ -280,14 +256,27 @@ std::ostream& operator<<(std::ostream& os,State const& state) {
   return os;
 }
 
-Result dfs(State const& state,int end_time) {
-  std::cout << "\ndfs(state.time:" << state.time  << ")";
+Result dfs(State state,int end_time) {
+  Result result{state.resources.m_amounts[3]}; // result = count of created geodes so far
+  std::cout << "\n" << result << " dfs(state.time:" << state.time  << ")";
   std::cout << state;
-  Result result{state.resources.m_amounts[4]}; // count of geodes
-  if (state.time>end_time) {
-    for (auto const& adj_state : adj(state)) {
-      result = std::max(dfs(adj_state,end_time),result);
+  if (state.time<end_time) {
+    // at least one more
+    for (int index=0;index<SYMBOL_TABLE.size();++index) {
+      auto cost = state.blueprint->cost[index];
+      if (state.resources >= cost) {
+        // std::cout << "\nSpend " << cost << " to start building a " << to_name(index) << " collecting/cracking robot.";
+        state.resources -= cost; // pay for the new robot
+        State adj_state{.blueprint=state.blueprint,.time=state.time+1,.robots=state.robots,.resources=state.resources};
+        adj_state.execute_robots(); // execute existing robots in next state
+        ++adj_state.robots.m_amounts[index]; // create the new robot
+        result = std::max(dfs(adj_state,end_time),result);
+      }
     }
+    // explore next state with same robots
+    State adj_state{.blueprint=state.blueprint,.time=state.time+1,.robots=state.robots,.resources=state.resources};
+    adj_state.execute_robots(); // execute existing robots
+    result = std::max(dfs(adj_state,end_time),result);
   }
   return result;
 }
@@ -301,7 +290,7 @@ namespace part1 {
       for (auto& blueprint : data_model) {
         std::cout << "\n\nTRY BLUEPRINT";
         std::cout << "\n\t" << blueprint;
-        result = std::max(dfs(State{.blueprint=&blueprint,.time=24,.robots={.m_amounts={1,0,0,0}},.resources={}},0),result);
+        result = std::max(dfs(State{.blueprint=&blueprint,.time=1,.robots={.m_amounts={1,0,0,0}},.resources={}},20),result);
       }
       return result;
   }
@@ -339,7 +328,7 @@ void test(char const* pData) {
     auto op = ops[op_index];
     while (state.time < op.first) {
       std::cout << "\n== minute " << state.time << " ==";
-      state.update_resources();
+      state.execute_robots();
       ++state.time;
     }
     std::cout << "\n== minute " << state.time << " ==";
@@ -348,7 +337,7 @@ void test(char const* pData) {
     if (state.resources >= cost) {
       std::cout << "\nSpend " << cost << " to start building a " << to_name(index) << " collectin/cracking robot.";
       state.resources -= cost;
-      state.update_resources();
+      state.execute_robots();
       ++state.robots.m_amounts[index];
       ++state.time;
     }
@@ -356,7 +345,7 @@ void test(char const* pData) {
   }
   while (state.time <= 24) {
     std::cout << "\n== minute " << state.time << " ==";
-    state.update_resources();
+    state.execute_robots();
     ++state.time;
   }
 }
@@ -378,7 +367,7 @@ void test(char const* pData) {
 
 int main(int argc, char *argv[])
 {
-  if (true) {
+  if (false) {
     std::cout << "\nTEST";
     test(pTest);
     exit(0);
