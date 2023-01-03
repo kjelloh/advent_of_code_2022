@@ -18,7 +18,7 @@
 extern char const* pTest;
 extern char const* pData;
 
-using Result = size_t;
+using Result = int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 std::string to_trimmed(std::string const& s) {
@@ -53,39 +53,69 @@ std::vector<std::string> to_tokens(std::string s,std::string const& delim) {
   return result;
 }
 
-struct Resource {
-  std::map<std::string,Result> m_amount;
-  Resource& operator+=(Resource const& other) {
-    for (auto const& [name,amount] : other.m_amount) {
-      m_amount[name] += amount;
+const std::vector<std::string> SYMBOL_TABLE{"ore","clay","obsidian","geode"};
+
+std::string to_name(int index) {
+  return SYMBOL_TABLE[index];
+}
+
+int to_index(std::string const& name) {
+  auto iter = std::find_if(SYMBOL_TABLE.begin(),SYMBOL_TABLE.end(),[&name](auto const& s){
+    return s==name;
+  });
+  return std::distance(SYMBOL_TABLE.begin(),iter);
+}
+
+struct Resources {
+  using Amounts = std::vector<Result>;
+  Amounts m_amounts{Amounts(SYMBOL_TABLE.size(),0)};
+  bool operator>=(Resources const& other) const {
+    return m_amounts >= other.m_amounts;
+  }
+  Resources& operator+=(Resources const& other) {
+    for (int index=0;index<other.m_amounts.size();++index) {
+      m_amounts[index] += other.m_amounts[index];
     }
     return *this;
   }
+  Resources& operator-=(Resources const& other) {
+    for (int index=0;index<other.m_amounts.size();++index) {
+      m_amounts[index] -= other.m_amounts[index];
+    }
+    return *this;
+  }
+  Resources operator-(Resources const& other) const {
+    Resources result{.m_amounts=other.m_amounts};
+    result -= other;
+    return result;
+  }
 };
 
-std::ostream& operator<<(std::ostream& os,Resource const& r) {
-  for (auto iter=r.m_amount.begin();iter!=r.m_amount.end();++iter) {
-    if (iter != r.m_amount.begin()) os << " and ";
-    os << " name:" << iter->first << " amount:" << iter->second;
+std::ostream& operator<<(std::ostream& os,Resources const& r) {
+  for (int index=0;index<r.m_amounts.size();++index) {
+    if (index>0) os << " and ";
+    os << " name:" << to_name(index) << " amount:" << r.m_amounts[index];
   }
   return os;
 }
 
-Resource to_resource(std::string const& name,int amount) {
-  Resource result{};
-  result.m_amount[name] = amount;
+Resources to_resource(std::string const& name,int amount) {
+  // std::cout << "\nto_resource(name:" << name << " amount:" << amount << ")" << std::flush; 
+  Resources result{.m_amounts=Resources::Amounts(SYMBOL_TABLE.size(),{})};
+  // std::cout << " to_index(" << name << ")=" << to_index(name) << std::flush;
+  result.m_amounts[to_index(name)] = amount;
+  // std::cout << " result" << std::flush;
   return result;
 }
 
 struct BluePrint {
-  std::map<std::string,Resource> cost{};
+  std::vector<Resources> cost{std::vector<Resources>(SYMBOL_TABLE.size(),Resources{})};
 };
 
 std::ostream& operator<<(std::ostream& os,BluePrint const& blueprint) {
-  int count{};
-  for (auto [name,resource] : blueprint.cost) {
-    if (count++>0) os << "\n\t";
-    std::cout << " robot:" << name << " cost:" << resource;
+  for (int index=0;index<blueprint.cost.size();++index) {
+    if (index>0) os << "\n\t";
+    os << " robot:" << to_name(index) << " cost:" << blueprint.cost[index];
   }
   return os;
 }
@@ -95,17 +125,13 @@ using BluePrints = std::vector<BluePrint>;
 std::ostream& operator<<(std::ostream& os,BluePrints const& blueprints) {
   int index{};
   for (auto const& blueprint : blueprints) {
-    if (index>0) std::cout << "\n";
-    std::cout << "blueprint:" << index+1;
-    std::cout << "\n\t" << blueprint;
+    if (index>0) os << "\n";
+    os << "blueprint:" << index+1;
+    os << "\n\t" << blueprint;
     ++index;
   }
   return os;
 }
-
-struct GeodeCrackingOperation {
-  BluePrint blueprint{};
-};
 
 using Model = BluePrints;
 
@@ -146,13 +172,13 @@ BluePrint to_blueprint(std::string const& s) {
     for (int i = 4;i<words.size();++i) {
       std::cout << " " << words[i];
     }
-    auto left{4};
-    auto right{left+1};
+    int left{4};
+    int right{left+1};
     while (right < words.size()) {
-      std::cout << " left:" << words[left] << " right:" << words[right];
-      result.cost[words[1]] += to_resource(words[right],std::stoi(words[left]));
+      std::cout << " left:" << words[left] << " right:" << words[right] << std::flush;
+      result.cost[to_index(words[1])] += to_resource(words[right],std::stoi(words[left]));
       left += 2;
-      if (words[left] == "and") ++left;
+      if (left < words.size() and words[left] == "and") ++left;
       right = left+1;
     }
   }
@@ -192,12 +218,91 @@ Model parse(auto& in) {
     return result;
 }
 
+struct State {
+  BluePrint* blueprint;
+  int time{};
+  Resources robots{};
+  Resources resources{};
+  State& update_resources();
+};
+
+State& State::update_resources() {
+  for (int index=0;index<this->robots.m_amounts.size();++index) {
+    std::cout << "\n" << this->robots.m_amounts[index] << " of robot " << to_name(index) << " collects " << this->robots.m_amounts[index] << " of " << to_name(index); 
+    this->resources.m_amounts[index] += this->robots.m_amounts[index]; // each robot creates one of its resource type
+    std::cout << ". You have " << this->resources.m_amounts[index] << " " << to_name(index);
+  }
+  return *this;
+}
+
+std::vector<State> adj(State const& state) {
+  // Create possible (adjacent) sub-states of state
+  std::vector<State> result;
+  if (state.time>0) {
+    auto adj_t = state.time-1;
+    auto resources = state.resources;
+    // Try adding a robot for next state (going from max index to 0, i.e., assuming it is better to aim at building a high value robot before a low value?)
+    for (int index=0;index<SYMBOL_TABLE.size();++index) {
+      auto cost = state.blueprint->cost.at(index);
+      if (resources >= cost) {
+        State new_state{state};
+        new_state.time = adj_t;
+        new_state.resources = resources-cost;
+        new_state.update_resources(); // exercise robots
+        ++new_state.robots.m_amounts[index]; // build new robot
+        result.push_back(new_state);
+        resources = new_state.resources;
+      }
+    }
+    // Try next time t without building any robot (?)
+    State new_state{state};
+    new_state.time = adj_t;
+    new_state.update_resources(); // exercise robots
+    result.push_back(new_state);
+  }
+  return result;
+}
+
+std::ostream& operator<<(std::ostream& os,State const& state) {
+  os << " time:" << state.time;
+  os << " robots[";
+  for (int index = 0;index<state.robots.m_amounts.size();++index) {
+    if (index>0) os << ",";
+    os << state.robots.m_amounts[index];
+  }
+  os << "]";
+  os << " resources[";
+  for (int index = 0;index<state.resources.m_amounts.size();++index) {
+    if (index>0) os << ",";
+    os << state.resources.m_amounts[index];
+  }
+  os << "]";
+  return os;
+}
+
+Result dfs(State const& state,int end_time) {
+  std::cout << "\ndfs(state.time:" << state.time  << ")";
+  std::cout << state;
+  Result result{state.resources.m_amounts[4]}; // count of geodes
+  if (state.time>end_time) {
+    for (auto const& adj_state : adj(state)) {
+      result = std::max(dfs(adj_state,end_time),result);
+    }
+  }
+  return result;
+}
+
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << "\n" << data_model;
+      for (auto& blueprint : data_model) {
+        std::cout << "\n\nTRY BLUEPRINT";
+        std::cout << "\n\t" << blueprint;
+        result = std::max(dfs(State{.blueprint=&blueprint,.time=24,.robots={.m_amounts={1,0,0,0}},.resources={}},0),result);
+      }
       return result;
   }
 }
@@ -211,11 +316,76 @@ namespace part2 {
   }
 }
 
+void test(char const* pData) {
+  std::stringstream in{ pData };
+  auto data_model = parse(in);
+  auto blueprint = data_model[0];
+  std::cout << "\n" << data_model;
+  std::cout << "\n\nTRY BLUEPRINT";
+  std::cout << "\n\t" << blueprint;
+  State state{.blueprint=&blueprint,.time=1,.robots={.m_amounts={1,0,0,0}},.resources={}};
+  std::vector<std::pair<int,std::string>> ops{
+     {3,"clay"}
+    ,{5,"clay"}
+    ,{7,"clay"}
+    ,{11,"obsidian"}
+    ,{12,"clay"}
+    ,{15,"obsidian"}
+    ,{18,"geode"}
+    ,{21,"geode"}
+  };
+  int op_index{0};
+  while (op_index<ops.size()) {
+    auto op = ops[op_index];
+    while (state.time < op.first) {
+      std::cout << "\n== minute " << state.time << " ==";
+      state.update_resources();
+      ++state.time;
+    }
+    std::cout << "\n== minute " << state.time << " ==";
+    auto index = to_index(op.second);
+    auto cost = state.blueprint->cost.at(to_index(op.second));
+    if (state.resources >= cost) {
+      std::cout << "\nSpend " << cost << " to start building a " << to_name(index) << " collectin/cracking robot.";
+      state.resources -= cost;
+      state.update_resources();
+      ++state.robots.m_amounts[index];
+      ++state.time;
+    }
+    ++op_index;
+  }
+  while (state.time <= 24) {
+    std::cout << "\n== minute " << state.time << " ==";
+    state.update_resources();
+    ++state.time;
+  }
+}
+
+/*
+
+== minute 24 ==
+1 of robot ore collects 1 of ore. You have 6 ore
+4 of robot clay collects 4 of clay. You have 41 clay
+2 of robot obsidian collects 2 of obsidian. You have 8 obsidian
+2 of robot geode collects 2 of geode. You have 9 geode%         
+
+== Minute 24 ==
+1 ore-collecting robot collects 1 ore; you now have 6 ore.
+4 clay-collecting robots collect 4 clay; you now have 41 clay.
+2 obsidian-collecting robots collect 2 obsidian; you now have 8 obsidian.
+2 geode-cracking robots crack 2 geodes; you now have 9 open geodes.
+*/
+
 int main(int argc, char *argv[])
 {
+  if (true) {
+    std::cout << "\nTEST";
+    test(pTest);
+    exit(0);
+  }
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
