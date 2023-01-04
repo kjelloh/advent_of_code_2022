@@ -265,6 +265,7 @@ Result dfs(State const& state,int end_time) {
     for (int index=SYMBOL_TABLE.size()-1;index>=0;--index) {
       auto cost = state.blueprint->cost[index];
       if (state.resources >= cost) {
+        // can afford this robot 
         // std::cout << "\nSpend " << cost << " to start building a " << to_name(index) << " collecting/cracking robot.";
         State adj_state{.blueprint=state.blueprint,.time=state.time+1,.robots=state.robots,.resources=state.resources-cost};
         adj_state.execute_robots(); // execute existing robots in next state
