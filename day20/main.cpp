@@ -42,8 +42,9 @@ public:
       m_head->prev = node;  
     }
     if (node->value == 0) {
-      m_z = node;
-      std::cout << "\nm_z OK";
+      m_head = node;
+      m_z=m_head->prev;
+      std::cout << "\nm_head OK";
     }
     return node;
   }
@@ -53,34 +54,44 @@ public:
     if (offset == 0) {
       // NOP
     }
-    else if (offset < 0) {
-      for (Result i = 0;i>offset;--i) {
-        iter = iter->prev;
-      }
-      if (iter != node) {
-        // Unlink node
-        node->prev->next = node->next;
-        node->next->prev = node->prev;
-        // Insert node before iter
-        node->next=iter;
-        node->prev=iter->prev;
-        iter->prev->next=node;
-        iter->prev=node;
-      }
-    }
     else {
-      for (Result i=0;i<offset;++i) {
-        iter = iter->next;
+      if (node==m_head) {
+        m_head=m_head->next;
+        m_z=m_head->prev;
       }
-      if (iter != node) {
-        // Unlink node
-        node->prev->next = node->next;
-        node->next->prev = node->prev;
-        // Insert node after iter
-        node->next = iter->next;
-        node->prev = iter;
-        iter->next->prev = node;
-        iter->next = node;
+      else if (node==m_z) {
+        m_z=m_z->next;
+        m_head=m_z->next;
+      }
+      if (offset < 0) {
+        for (Result i = 0;i>offset;--i) {
+          iter = iter->prev;
+        }
+        if (iter != node) {
+          // Unlink node
+          node->prev->next = node->next;
+          node->next->prev = node->prev;
+          // Insert node before iter
+          node->next=iter;
+          node->prev=iter->prev;
+          iter->prev->next=node;
+          iter->prev=node;
+        }
+      }
+      else {
+        for (Result i=0;i<offset;++i) {
+          iter = iter->next;
+        }
+        if (iter != node) {
+          // Unlink node
+          node->prev->next = node->next;
+          node->next->prev = node->prev;
+          // Insert node after iter
+          node->next = iter->next;
+          node->prev = iter;
+          iter->next->prev = node;
+          iter->next = node;
+        }
       }
     }
   }
@@ -92,7 +103,11 @@ public:
     } while (iter != m_head);
   }
   Result operator[](Result index) {
-    auto iter = m_z;
+    auto iter = m_head;
+    while (iter!=m_z) {
+      if (iter->value==0) break;
+      else iter=iter->next;
+    }
     for (Result i=0;i<index;++i) {
       iter = iter->next;
     }
@@ -137,6 +152,42 @@ void mix(File const& file,List& list) {
     print(list);
   }
 }
+
+/*
+Initial arrangement:
+1, 2, -3, 3, -2, 0, 4
+
+1 moves between 2 and -3:
+2, 1, -3, 3, -2, 0, 4
+
+2 moves between -3 and 3:
+1, -3, 2, 3, -2, 0, 4
+
+-3 moves between -2 and 0:
+1, 2, 3, -2, -3, 0, 4
+
+3 moves between 0 and 4:
+1, 2, -2, -3, 0, 3, 4
+
+-2 moves between 4 and 1:
+1, 2, -3, 0, 3, 4, -2
+
+0 does not move:
+1, 2, -3, 0, 3, 4, -2
+
+4 moves between -3 and 0:
+1, 2, -3, 4, 0, 3, -2
+
+list: 1 2 -3 3 -2 0 4
+list: 2 1 -3 3 -2 0 4
+list: 1 -3 2 3 -2 0 4
+list: 1 2 3 -2 -3 0 4
+list: 1 2 -2 -3 0 3 4
+list: 1 2 -3 0 3 4 -2
+list: 1 2 -3 0 3 4 -2
+list: 1 2 -3 4 0 3 -2
+
+*/
 
 namespace part1 {
   Result solve_for(char const* pData) {
