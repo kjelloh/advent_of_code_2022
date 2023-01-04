@@ -9,6 +9,7 @@
 #include <queue>
 #include <deque>
 #include <array>
+#include <list>
 #include <ranges> // E.g., std::subrange, std::view 
 #include <utility> // E.g., std::pair,..
 #include <algorithm> // E.g., std::find, std::all_of,...
@@ -23,25 +24,47 @@ using Answers = std::vector<std::pair<std::string,Result>>;
 
 using Values = std::vector<int>;
 
-class Mixer {
+std::ostream& operator<<(std::ostream& os,Values const& values) {
+  os << "[";
+  for (int index=0;index<values.size();++index) {
+    if (index>0) os << ",";
+    os << values[index];
+  }
+  os << "]";
+  return os;
+}
+
+class Mixed {
 public:
-  Mixer(Values const& values) : m_values{values} {
-    for (int index=0;index<m_values.size();++index) {
-      m_mixed_ix[index] = index;
-    }
+  Mixed(Values const& values) : m_values{values} {
+    this->mix();
   }
-  void push_back(int value) {m_values.push_back(value);}
-  int mixed(int index) {
-    index = (index>=0)? index % m_values.size() : index % m_values.size() + m_values.size();
-    return m_values[m_mixed_ix[index]];
-  }
-  Mixer& mix() {
-    return *this;
+  auto size() const {return m_values.size();};
+  int operator[](int index) const {
+    return m_values[m_indices[index]];
   }
 private:
+  friend std::ostream& operator<<(std::ostream& os,Mixed const& mixed);
   std::vector<int> m_values{};
-  std::map<int,int> m_mixed_ix{};
+  std::vector<int> m_indices{}; // the order of indices after mixing
+  void mix() {
+    for (int index=0;index<m_values.size();++index) {
+      auto value = m_values[index];
+      // std::cout << "\nmix index:" << index << " value:" << m_values[index] << " before new_index:" << shifted_index << " value:" << m_values[shifted_index] << std::flush;
+      // std::cout << "\n" << *this << std::flush;
+    }
+  }
 };
+
+std::ostream& operator<<(std::ostream& os,Mixed const& mixed) {
+  os << "[";
+  for (int index=0;index<mixed.size();++index) {
+    if (index>0) os << ",";
+    os << mixed[index];
+  }
+  os << "]";
+  return os;
+}
 
 using Model = Values;
 
@@ -60,11 +83,12 @@ namespace part1 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
-      Mixer mixer{data_model};
-      mixer.mix();
-      auto r1000 = mixer.mixed(1000); std::cout << "\nr1000:" << r1000;
-      auto r2000 = mixer.mixed(2000); std::cout << "\nr2000:" << r2000;
-      auto r3000 = mixer.mixed(3000); std::cout << "\nr3000:" << r3000;
+      std::cout << "\nmodel:" << data_model;
+      Mixed mixed{data_model};
+      std::cout << "\nmixed:" << mixed;
+      auto r1000 = mixed[1000]; std::cout << "\nr1000:" << r1000;
+      auto r2000 = mixed[2000]; std::cout << "\nr2000:" << r2000;
+      auto r3000 = mixed[3000]; std::cout << "\nr3000:" << r3000;
       result =  r1000 + r2000 + r3000;
       return result;
   }
@@ -82,8 +106,8 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
@@ -106,8 +130,8 @@ char const* pTest = R"(1
 // List where each member will shift to itself = should NOT shift/mix
 // char const* pTest = R"(-3
 // 6
-// 0
-// )";
+// 0)";
+
 char const* pData = R"(6948
 -3729
 3230
