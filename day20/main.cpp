@@ -41,11 +41,6 @@ public:
       m_head->prev->next = node;
       m_head->prev = node;  
     }
-    if (node->value == 0) {
-      m_head = node;
-      m_z=m_head->prev;
-      std::cout << "\nm_head OK";
-    }
     return node;
   }
   void shift(Node* node) {
@@ -55,19 +50,20 @@ public:
       // NOP
     }
     else {
-      if (node==m_head) {
-        m_head=m_head->next;
-        m_z=m_head->prev;
+      for (int i=0;i<std::abs(offset);++i) {
+        iter = (offset<0)?iter->prev:iter->next;
       }
-      else if (node==m_z) {
-        m_z=m_z->next;
-        m_head=m_z->next;
-      }
-      if (offset < 0) {
-        for (Result i = 0;i>offset;--i) {
-          iter = iter->prev;
+      if (iter!=node) {
+        if (node==m_head) {
+          m_head=m_head->next;
+          m_z=m_head->prev;
         }
-        if (iter != node) {
+        else if (node==m_z) {
+          m_z=m_z->next;
+          m_head=m_z->next;
+        }
+        if (offset<0) {
+          // insert left
           // Unlink node
           node->prev->next = node->next;
           node->next->prev = node->prev;
@@ -76,13 +72,9 @@ public:
           node->prev=iter->prev;
           iter->prev->next=node;
           iter->prev=node;
-        }
-      }
-      else {
-        for (Result i=0;i<offset;++i) {
-          iter = iter->next;
-        }
-        if (iter != node) {
+        }        
+        else {
+          // insert right
           // Unlink node
           node->prev->next = node->next;
           node->next->prev = node->prev;
@@ -95,19 +87,26 @@ public:
       }
     }
   }
-  void for_each(auto f) {
-    auto iter = m_head;
+  void for_each(auto f,auto begin) {
+    auto iter = begin;
     do {
       f(iter);
       iter = iter->next;
-    } while (iter != m_head);
+    } while (iter!=begin);
+  }
+  void for_each(auto f) {
+    for_each(f,m_head);
+  }
+  auto find(int value) {
+    auto result = m_head;
+    while (true) {
+      if (result->value==value) break;
+      else result = result->next;
+    }
+    return result;
   }
   Result operator[](Result index) {
-    auto iter = m_head;
-    while (iter!=m_z) {
-      if (iter->value==0) break;
-      else iter=iter->next;
-    }
+    auto iter = find(0);
     for (Result i=0;i<index;++i) {
       iter = iter->next;
     }
@@ -141,8 +140,11 @@ File to_file(List list) {
 }
 
 void print(List& list) {
-  std::cout << "\nlist:";
-  list.for_each([](Node* node){std::cout << " " << node->value;});
+  auto f = [](Node* node){std::cout << " " << node->value;};
+  std::cout << "\nlist[head..z]:";
+  list.for_each(f);
+  // std::cout << "\nlist['0'..last]:";
+  // list.for_each(f,list.find(0));
 }
 
 void mix(File const& file,List& list) {
@@ -178,14 +180,15 @@ Initial arrangement:
 4 moves between -3 and 0:
 1, 2, -3, 4, 0, 3, -2
 
-list: 1 2 -3 3 -2 0 4
-list: 2 1 -3 3 -2 0 4
-list: 1 -3 2 3 -2 0 4
-list: 1 2 3 -2 -3 0 4
-list: 1 2 -2 -3 0 3 4
-list: 1 2 -3 0 3 4 -2
-list: 1 2 -3 0 3 4 -2
-list: 1 2 -3 4 0 3 -2
+list[head..z]: 1 2 -3 3 -2 0 4
+list[head..z]: 2 1 -3 3 -2 0 4
+list[head..z]: 1 -3 2 3 -2 0 4
+list[head..z]: 1 2 3 -2 -3 0 4
+list[head..z]: 1 2 -2 -3 0 3 4
+list[head..z]: 1 2 -3 0 3 4 -2
+list[head..z]: 1 2 -3 0 3 4 -2
+list[head..z]: 1 2 -3 4 0 3 -2
+
 
 */
 
@@ -217,8 +220,8 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
@@ -237,6 +240,12 @@ char const* pTest = R"(1
 -2
 0
 4)";
+
+// List where each member will shift to itself = should NOT shift/mix
+// char const* pTest = R"(-3
+// 6
+// 0
+// )";
 char const* pData = R"(6948
 -3729
 3230
