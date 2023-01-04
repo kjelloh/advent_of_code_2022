@@ -37,24 +37,90 @@ std::ostream& operator<<(std::ostream& os,Values const& values) {
 class Mixed {
 public:
   Mixed(Values const& values) : m_values{values} {
+    std::cout << "\nvalues:" << m_values;
+    for (int index=0;index<m_values.size();++index) {
+      m_indices.push_back(index);
+    }
+    std::cout << "\nmixed:" << *this;
     this->mix();
   }
   auto size() const {return m_values.size();};
-  int operator[](int index) const {
-    return m_values[m_indices[index]];
+  int operator[](int pos) const {
+    int count = static_cast<int>(m_values.size());
+    pos = pos % count;
+    if (pos<0) pos += count;
+    auto iter = m_indices.begin();std::advance(iter,pos);
+    return m_values[*iter];
+  }
+  int from_0(int pos) {
+    // std::cout << "\nfrom_0(" << pos << ")";
+    auto zeta = std::find_if(m_indices.begin(),m_indices.end(),[this](int ix){
+      return this->m_values[ix] == 0;
+    });
+    if (zeta == m_indices.end()) std::cout << " ZETA?? ";
+    auto offset = std::distance(m_indices.begin(),zeta);
+    // std::cout << " offset:" << offset;
+    int count = static_cast<int>(m_values.size());
+    pos = (pos+offset) % count;
+    if (pos<0) pos += count;
+    // std::cout << " pos:" << pos;
+    auto iter = m_indices.begin();std::advance(iter,pos);
+    // std::cout << " value:" << m_values[*iter];
+    return m_values[*iter];
   }
 private:
   friend std::ostream& operator<<(std::ostream& os,Mixed const& mixed);
   std::vector<int> m_values{};
-  std::vector<int> m_indices{}; // the order of indices after mixing
+  std::list<int> m_indices{}; // the order of indices after mixing
   void mix() {
     for (int index=0;index<m_values.size();++index) {
-      auto value = m_values[index];
-      // std::cout << "\nmix index:" << index << " value:" << m_values[index] << " before new_index:" << shifted_index << " value:" << m_values[shifted_index] << std::flush;
-      // std::cout << "\n" << *this << std::flush;
+      auto delta = m_values[index];
+      auto iter = std::find(m_indices.begin(),m_indices.end(),index);
+      auto old_pos = std::distance(m_indices.begin(),iter);  
+      int count = static_cast<int>(m_values.size());
+      auto new_pos = (delta>=0)? (old_pos + delta + 1) % count : (old_pos+delta) % count;
+      if (new_pos<0) new_pos += count;
+      // std::cout << "\n\nvalue " << m_values[*iter] << "  before " << (*this)[new_pos];
+      // std::cout << "\npos " << old_pos << "  before " << new_pos;
+      // Now re-arrange m_indices into the new order
+      // m_indices is an std::list so insert and erase are independent
+      auto insert_at = m_indices.begin();std::advance(insert_at,new_pos);
+      m_indices.insert(insert_at,index);
+      m_indices.erase(iter);
+
+      // std::cout << "\nmixed:" << *this << std::flush;
     }
   }
 };
+
+/*
+
+Initial arrangement:
+1, 2, -3, 3, -2, 0, 4
+
+1 moves between 2 and -3:
+2, 1, -3, 3, -2, 0, 4
+
+2 moves between -3 and 3:
+1, -3, 2, 3, -2, 0, 4
+
+-3 moves between -2 and 0:
+1, 2, 3, -2, -3, 0, 4
+
+3 moves between 0 and 4:
+1, 2, -2, -3, 0, 3, 4
+
+-2 moves between 4 and 1:
+1, 2, -3, 0, 3, 4, -2
+
+0 does not move:
+1, 2, -3, 0, 3, 4, -2
+
+4 moves between -3 and 0:
+1, 2, -3, 4, 0, 3, -2
+
+*/
+
 
 std::ostream& operator<<(std::ostream& os,Mixed const& mixed) {
   os << "[";
@@ -86,9 +152,10 @@ namespace part1 {
       std::cout << "\nmodel:" << data_model;
       Mixed mixed{data_model};
       std::cout << "\nmixed:" << mixed;
-      auto r1000 = mixed[1000]; std::cout << "\nr1000:" << r1000;
-      auto r2000 = mixed[2000]; std::cout << "\nr2000:" << r2000;
-      auto r3000 = mixed[3000]; std::cout << "\nr3000:" << r3000;
+      // for (int i=0;i<20;++i) std::cout << " " << i << " " << mixed.from_0(i);
+      auto r1000 = mixed.from_0(1000); std::cout << "\nr1000:" << r1000;
+      auto r2000 = mixed.from_0(2000); std::cout << "\nr2000:" << r2000;
+      auto r3000 = mixed.from_0(3000); std::cout << "\nr3000:" << r3000;
       result =  r1000 + r2000 + r3000;
       return result;
   }
@@ -105,6 +172,10 @@ namespace part2 {
 
 int main(int argc, char *argv[])
 {
+  // for (int i = -10;i<=10;++i) {
+  //   std::cout << "\n" << i << " % " << static_cast<size_t>(7) << " = " << i % 7;
+  // }
+
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   // answers.push_back({"Part 1     ",part1::solve_for(pData)});
