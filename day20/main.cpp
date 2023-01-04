@@ -21,188 +21,50 @@ extern char const* pData;
 using Result = long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
-struct Node {
-  Result value;
-  Node* prev;
-  Node* next;
-};
+using Values = std::vector<int>;
 
-class List {
+class Mixer {
 public:
-  Node* push_back(Node* node) {
-    if (m_head==nullptr) {
-      m_head=node;
-      m_head->next = m_head;
-      m_head->prev = m_head;
-    }
-    else {
-      node->next = m_head;
-      node->prev = m_head->prev;
-      m_head->prev->next = node;
-      m_head->prev = node;  
-    }
-    return node;
-  }
-  void shift(Node* node) {
-    auto offset = node->value;
-    auto iter = node;
-    if (offset == 0) {
-      // NOP
-    }
-    else {
-      for (int i=0;i<std::abs(offset);++i) {
-        iter = (offset<0)?iter->prev:iter->next;
-      }
-      if (iter!=node) {
-        if (node==m_head) {
-          m_head=m_head->next;
-          m_z=m_head->prev;
-        }
-        else if (node==m_z) {
-          m_z=m_z->next;
-          m_head=m_z->next;
-        }
-        if (offset<0) {
-          // insert left
-          // Unlink node
-          node->prev->next = node->next;
-          node->next->prev = node->prev;
-          // Insert node before iter
-          node->next=iter;
-          node->prev=iter->prev;
-          iter->prev->next=node;
-          iter->prev=node;
-        }        
-        else {
-          // insert right
-          // Unlink node
-          node->prev->next = node->next;
-          node->next->prev = node->prev;
-          // Insert node after iter
-          node->next = iter->next;
-          node->prev = iter;
-          iter->next->prev = node;
-          iter->next = node;
-        }
-      }
+  Mixer(Values const& values) : m_values{values} {
+    for (int index=0;index<m_values.size();++index) {
+      m_mixed_ix[index] = index;
     }
   }
-  void for_each(auto f,auto begin) {
-    auto iter = begin;
-    do {
-      f(iter);
-      iter = iter->next;
-    } while (iter!=begin);
+  void push_back(int value) {m_values.push_back(value);}
+  int mixed(int index) {
+    index = (index>=0)? index % m_values.size() : index % m_values.size() + m_values.size();
+    return m_values[m_mixed_ix[index]];
   }
-  void for_each(auto f) {
-    for_each(f,m_head);
-  }
-  auto find(int value) {
-    auto result = m_head;
-    while (true) {
-      if (result->value==value) break;
-      else result = result->next;
-    }
-    return result;
-  }
-  Result operator[](Result index) {
-    auto iter = find(0);
-    for (Result i=0;i<index;++i) {
-      iter = iter->next;
-    }
-    return iter->value;
+  Mixer& mix() {
+    return *this;
   }
 private:
-  Node* m_head{nullptr};
-  Node* m_z{nullptr};
+  std::vector<int> m_values{};
+  std::map<int,int> m_mixed_ix{};
 };
 
-using File = std::vector<Node*>;
-
-using Model = List;
+using Model = Values;
 
 Model parse(auto& in) {
     Model result{};
     Result i;
     while (in >> i) {
       // std::cout << "\nparsed:" << i;
-      result.push_back(new Node{i});
+      result.push_back(i);
     }
     return result;
 }
-
-File to_file(List list) {
-  File result{};
-  list.for_each([&result](Node* node){
-    result.push_back(node);
-  });
-  return result;
-}
-
-void print(List& list) {
-  auto f = [](Node* node){std::cout << " " << node->value;};
-  std::cout << "\nlist[head..z]:";
-  list.for_each(f);
-  // std::cout << "\nlist['0'..last]:";
-  // list.for_each(f,list.find(0));
-}
-
-void mix(File const& file,List& list) {
-  print(list);
-  for (auto node : file) {
-    list.shift(node);
-    print(list);
-  }
-}
-
-/*
-Initial arrangement:
-1, 2, -3, 3, -2, 0, 4
-
-1 moves between 2 and -3:
-2, 1, -3, 3, -2, 0, 4
-
-2 moves between -3 and 3:
-1, -3, 2, 3, -2, 0, 4
-
--3 moves between -2 and 0:
-1, 2, 3, -2, -3, 0, 4
-
-3 moves between 0 and 4:
-1, 2, -2, -3, 0, 3, 4
-
--2 moves between 4 and 1:
-1, 2, -3, 0, 3, 4, -2
-
-0 does not move:
-1, 2, -3, 0, 3, 4, -2
-
-4 moves between -3 and 0:
-1, 2, -3, 4, 0, 3, -2
-
-list[head..z]: 1 2 -3 3 -2 0 4
-list[head..z]: 2 1 -3 3 -2 0 4
-list[head..z]: 1 -3 2 3 -2 0 4
-list[head..z]: 1 2 3 -2 -3 0 4
-list[head..z]: 1 2 -2 -3 0 3 4
-list[head..z]: 1 2 -3 0 3 4 -2
-list[head..z]: 1 2 -3 0 3 4 -2
-list[head..z]: 1 2 -3 4 0 3 -2
-
-
-*/
 
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
-      // print(data_model);
-      auto file = to_file(data_model);
-      mix(file,data_model);
-      auto r1000 = data_model[1000]; std::cout << "\nr1000:" << r1000;
-      auto r2000 = data_model[2000]; std::cout << "\nr2000:" << r2000;
-      auto r3000 = data_model[3000]; std::cout << "\nr3000:" << r3000;
+      Mixer mixer{data_model};
+      mixer.mix();
+      auto r1000 = mixer.mixed(1000); std::cout << "\nr1000:" << r1000;
+      auto r2000 = mixer.mixed(2000); std::cout << "\nr2000:" << r2000;
+      auto r3000 = mixer.mixed(3000); std::cout << "\nr3000:" << r3000;
       result =  r1000 + r2000 + r3000;
       return result;
   }
