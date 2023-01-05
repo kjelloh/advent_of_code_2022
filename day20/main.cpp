@@ -36,6 +36,7 @@ public:
     Node const* p;
     int index;
     int cycle;
+    Node const* ptr() {return p;}
     int operator*() const {return p->value;}
     int pos() const {
       auto result = index%cycle;
@@ -45,14 +46,14 @@ public:
     ConstIterator& operator++() {
       p=p->next;
       ++index;
-      // std::cout << "\nindex:" << index << " pos:" << pos();
+      // std::cout << "\n++ index:" << index << " pos:" << pos();
       return *this;
     }
     ConstIterator(Node const* p,int index,int cycle) : p{p},index{index},cycle{cycle} {}
     ConstIterator& operator--() {
       p=p->prev;
       --index;
-      // std::cout << "\nindex:" << index << " pos:" << pos();
+      // std::cout << " --index:" << index << " pos:" << pos();
       return *this;
     }
     bool operator!=(ConstIterator const& other) {
@@ -86,10 +87,39 @@ public:
     return ConstIterator{m_last->next,m_size,m_size};
   }
   int operator[](int pos) const {
+    // return value at pos relative the member value 0
     auto iter = begin();
+    while (*iter!=0) ++iter;
     if (pos>0) for (int i=0;i<pos;++i) ++iter;
     else if (pos<0) for (int i=0;i<std::abs(pos);++i) --iter;
     return *iter;
+  }
+  void move(Node* p,int distance) {
+    std::cout << "\nmove(val:" << p->value << ",distance:" << distance;
+    distance = distance % size();
+    std::cout << "==" << distance << ")";
+    if (p==m_last) std::cout << " p is last";
+    if (distance!=0) {
+      auto insert_before = ConstIterator{p,-distance,size()};
+      std::cout << " insert_before.pos():" << insert_before.pos();
+      while (insert_before.pos()!=0) ++insert_before;
+      if (distance>0) ++insert_before;
+      auto pp = const_cast<Node*>(insert_before.ptr());
+      std::cout << " pp->value:" << pp->value;
+      if (pp==m_last) std::cout << " pp is last";
+      // make p take the location of pp
+      // unlink p
+      p->prev->next=p->next;
+      p->next->prev=p->prev;
+      --m_size;
+      // link in before pp
+      pp->prev->next=p;
+      p->next=pp;
+      p->prev=pp->prev;
+      pp->prev=p;
+      ++m_size;
+      std::cout << "\nmoved:" << *this;
+    }
   }
   static void test() {
     CircularList cl{};
@@ -116,6 +146,26 @@ public:
     std::cout << "\n" << cl;
     std::cout << "\n";
     for (int i=-30;i<30;++i) std::cout << "," << cl[i];
+    {
+      CircularList cl{};
+      cl.push_back(0);
+      cl.push_back(1);
+      cl.push_back(2);
+      cl.push_back(3);
+      auto iter = const_cast<Node*>(cl.begin().ptr());
+      cl.move(iter,0);
+      std::cout << "\ntest cl:" << cl;
+      cl.move(iter,1);
+      cl.move(iter,-1);
+      cl.move(iter,2);
+      cl.move(iter,-2);
+      cl.move(iter,-1);
+      cl.move(iter,1);
+      cl.move(iter,4); // same as move 0
+      cl.move(iter,5);
+      cl.move(iter,-5);
+    }
+    
   }
 private:
   Node* m_last{nullptr};
@@ -149,9 +199,15 @@ public:
     for (auto const& value : values) {
       m_nodes.push_back(m_mixed.push_back(value));
     }
+    mix();
   }
   auto size() const {return m_nodes.size();};
   int operator[](int pos) const {return m_mixed[pos];}
+  static void test() {
+    Values values{1,2,3,0};
+    Mixed mixed{values};
+    std::cout << "\ntest:" << mixed;
+  }
 private:
   friend std::ostream& operator<<(std::ostream& os,Mixed const& mixed);
   std::vector<CircularList::Node*> m_nodes{};
@@ -159,6 +215,7 @@ private:
   void mix() {
     for (int index=0;index<m_nodes.size();++index) {
       auto delta = m_nodes[index]->value;
+      m_mixed.move(m_nodes[index],delta);
     }
   }
 };
@@ -196,12 +253,15 @@ namespace part1 {
       if (false) {
         // test
         CircularList::test();
+        // Mixed::test();
       }
-      // for (int i=0;i<20;++i) std::cout << " " << i << " " << mixed.from_0(i);
-      auto r1000 = mixed[1000]; std::cout << "\nr1000:" << r1000;
-      auto r2000 = mixed[2000]; std::cout << "\nr2000:" << r2000;
-      auto r3000 = mixed[3000]; std::cout << "\nr3000:" << r3000;
-      result =  r1000 + r2000 + r3000;
+      else {
+        // for (int i=0;i<20;++i) std::cout << " " << i << " " << mixed.from_0(i);
+        auto r1000 = mixed[1000]; std::cout << "\nr1000:" << r1000;
+        auto r2000 = mixed[2000]; std::cout << "\nr2000:" << r2000;
+        auto r3000 = mixed[3000]; std::cout << "\nr3000:" << r3000;
+        result =  r1000 + r2000 + r3000;
+      }
       return result;
   }
 }
@@ -223,7 +283,7 @@ int main(int argc, char *argv[])
 
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)}); // wrong: 9663
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
