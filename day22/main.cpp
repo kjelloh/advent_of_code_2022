@@ -24,11 +24,15 @@ using Answers = std::vector<std::pair<std::string,Result>>;
 struct Vector {
   Result row;
   Result col;
+  Vector& operator+=(Vector const& other) {
+    row += other.row;
+    col += other.col;
+    return *this;
+  }
   Vector operator+(Vector const& other) const {
-    return Vector {
-      .row = row + other.row
-      ,.col = col + other.col
-    };
+    Vector result{*this};
+    result += other;
+    return result;
   }
   bool operator==(Vector const& other) const {
     if (row == other.row) return col == other.col;
@@ -38,7 +42,7 @@ struct Vector {
 
 struct Matrix {
   std::vector<Vector> rows;
-  Vector operator*(Vector const& v) {
+  Vector operator*(Vector const& v) const {
     Vector result{};
     result.row = rows[0].row*v.row + rows[0].col*v.col;
     result.col = rows[1].row*v.row + rows[1].col*v.col;
@@ -46,12 +50,12 @@ struct Matrix {
   }
 };
 
-const Matrix ROT_LEFT{{
+const Matrix TURN_LEFT{{
    {0,1}
   ,{-1,0}
 }};
 
-const Matrix ROT_RIGHT{{
+const Matrix TURN_RIGHT{{
    {0,-1}
   ,{1,0}
 }};
@@ -252,21 +256,51 @@ std::ostream& operator<<(std::ostream& os,Model const& model) {
   return os;
 }
 
+/*
+Facing is 0 for right (>), 1 for down (v), 2 for left (<), and 3 for up (^).
+*/
+const Vector RIGHT{.row=0,.col=1};
+const Vector DOWN{.row=1,.col=0};
+const Vector LEFT{.row=0,.col=-1};
+const Vector UP{.row=-1,.col=0};
+const std::vector<Vector> DELTA{RIGHT,DOWN,LEFT,UP};
+
 class Traveler {
 public:
   using LocationAndDir = std::pair<Vector,int>;
   Traveler(Grid const& grid,Path const path) : m_grid{grid},m_path{path} {
+    auto first_row = *m_grid.row_range().begin();
+    auto first_col = *m_grid.col_range().begin();
+    m_location_and_dir.first = Vector{.row=first_row,.col=first_col};
     walk_the_path();
   }
   LocationAndDir location_and_dir() {
     return m_location_and_dir;
   }
+  static void test(Grid const& grid,Path const path) {
+    Traveler traveler{grid,path};
+
+  }
 private:
   Grid m_grid;
   Path m_path;
+  Vector delta{RIGHT};
   LocationAndDir m_location_and_dir{};
+  void take_step() {
+    m_location_and_dir.first += delta;
+  }
+  void turn(char dir) {
+    switch (dir) {
+      case 'R': delta = TURN_RIGHT*delta; ;break;
+      case 'L': delta = TURN_LEFT*delta; break;
+      default: break;
+    }
+  }
   void walk_the_path() {
-    
+    for (auto const& step : m_path) {
+      for (int i=0;i<step.first;++i) take_step();
+      turn(step.second);
+    }
   }
 };
 
