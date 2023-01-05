@@ -36,6 +36,27 @@ struct Vector {
   }
 };
 
+struct Matrix {
+  std::vector<Vector> rows;
+  Vector operator*(Vector const& v) {
+    Vector result{};
+    result.row = rows[0].row*v.row + rows[0].col*v.col;
+    result.col = rows[1].row*v.row + rows[1].col*v.col;
+    return result;
+  }
+};
+
+const Matrix ROT_LEFT{{
+   {0,1}
+  ,{-1,0}
+}};
+
+const Matrix ROT_RIGHT{{
+   {0,-1}
+  ,{1,0}
+}};
+
+
 using Vectors = std::vector<Vector>;
 
 std::ostream& operator<<(std::ostream& os,Vector const& v) {
@@ -175,7 +196,8 @@ std::ostream& operator<<(std::ostream& os,Grid const& grid) {
   return os;
 }
 
-using Path = std::string;
+using Step = std::pair<int,char>;
+using Path = std::vector<Step>;
 
 using Model = std::pair<Grid,Path>;
 
@@ -196,10 +218,32 @@ Model parse(auto& in) {
           }
           ++pos.row;
         } break;
-        case 1: result.second=line;break;
+        case 1: {
+          int steps{};
+          char turn;
+          while (in) {
+            if (in >> steps) {
+              result.second.push_back(Step{steps,' '});
+            }
+            if (in >> turn) {
+              result.second.push_back(Step{0,turn});
+            } 
+          }
+        } break;
       }
     }
     return result;
+}
+
+std::ostream& operator<<(std::ostream& os,Step const& step) {
+  if (step.first>' ') os << step.first;
+  else os << step.second;
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os,Path const& path) {
+  for (auto const& step : path) os << "\n\tstep:" << step.first << " turn:" << step.second;
+  return os;
 }
 
 std::ostream& operator<<(std::ostream& os,Model const& model) {
@@ -208,12 +252,33 @@ std::ostream& operator<<(std::ostream& os,Model const& model) {
   return os;
 }
 
+class Traveler {
+public:
+  using LocationAndDir = std::pair<Vector,int>;
+  Traveler(Grid const& grid,Path const path) : m_grid{grid},m_path{path} {
+    walk_the_path();
+  }
+  LocationAndDir location_and_dir() {
+    return m_location_and_dir;
+  }
+private:
+  Grid m_grid;
+  Path m_path;
+  LocationAndDir m_location_and_dir{};
+  void walk_the_path() {
+    
+  }
+};
+
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << data_model;
+      Traveler traveler{data_model.first,data_model.second};
+      auto location_and_dir = traveler.location_and_dir();
+      result = 1000*(location_and_dir.first.row+1) + 4*(location_and_dir.first.col+1) + location_and_dir.second;
       return result;
   }
 }
@@ -231,7 +296,7 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
