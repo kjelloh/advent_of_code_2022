@@ -278,21 +278,44 @@ public:
     return m_location_and_dir;
   }
   static void test(Grid const& grid,Path const path) {
-    Traveler traveler{grid,path};
-    Grid temp{};
-    Vector pos{};
-    Vector delta{RIGHT};
-    std::cout << "\npos:" << pos;
-    for (auto i : {0,0,0,0}) pos += delta;
-    std::cout << "\npos:" << pos;
-    delta = TURN_RIGHT*delta;
-    for (auto i : {0,0,0,0}) pos += delta;
-    std::cout << "\npos:" << pos;
-    delta = TURN_LEFT*delta;
-    for (auto i : {0,0,0,0}) pos += delta;
-    std::cout << "\npos:" << pos;
-    {
+    if (false) {
+      Grid temp{};
+      Vector pos{};
+      Vector delta{RIGHT};
+      std::cout << "\npos:" << pos;
+      for (auto i : {0,0,0,0}) pos += delta;
+      std::cout << "\npos:" << pos;
+      delta = TURN_RIGHT*delta;
+      for (auto i : {0,0,0,0}) pos += delta;
+      std::cout << "\npos:" << pos;
+      delta = TURN_LEFT*delta;
+      for (auto i : {0,0,0,0}) pos += delta;
+      std::cout << "\npos:" << pos;      
+    }
+    if (false) {
       std::cout << "\npath:" << path;
+      Grid temp{};
+      Vector pos{};
+      Vector delta{RIGHT};
+      temp.insert(pos,'*');      
+      for (auto const& step : path) {
+        std::cout << "\nstep:" << step; 
+        for (int i=0;i<step.first;++i) {
+          pos += delta;
+          temp.insert(pos,'*');      
+        }
+        switch (step.second) {
+          case 'R': delta = TURN_RIGHT*delta; ;break;
+          case 'L': delta = TURN_LEFT*delta; break;
+          default: break;
+        }
+        std::cout << "\n" << temp;
+      }
+    }
+    if (true) {
+      std::cout << "\npath:" << path;
+      Grid temp{grid};
+      std::cout << "\n" << temp;
       Vector pos{};
       Vector delta{RIGHT};
       temp.insert(pos,'*');      
