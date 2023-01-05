@@ -50,12 +50,12 @@ struct Matrix {
   }
 };
 
-const Matrix TURN_LEFT{{
+const Matrix TURN_RIGHT{{
    {0,1}
   ,{-1,0}
 }};
 
-const Matrix TURN_RIGHT{{
+const Matrix TURN_LEFT{{
    {0,-1}
   ,{1,0}
 }};
@@ -97,7 +97,7 @@ public:
   using Vertices = std::vector<Vertex>;
   auto V() {return m_dict.size();}
   void insert(Vector const& pos,char ch) {
-    std::cout << "\nGrid::insert(" << pos << ")";
+    // std::cout << "\nGrid::insert(" << pos << ")";
     auto iter = std::find_if(m_dict.begin(),m_dict.end(),[&pos](auto const& entry){
       return entry.first == pos;
     });
@@ -109,7 +109,7 @@ public:
       bottom_right.row = std::max(bottom_right.row,pos.row);
       bottom_right.col = std::max(bottom_right.col,pos.col);
     }
-    std::cout << " V:" << V(); 
+    // std::cout << " V:" << V(); 
   }
   Vertices adj(Vertex v) const {
     Vertices result{};
@@ -142,7 +142,7 @@ public:
   }
 
   std::optional<Vertex> to_vertex(Vector pos) const {
-    std::cout << "\nto_vertex(" << pos << ")";
+    // std::cout << "\nto_vertex(" << pos << ")";
     std::optional<Vertex> result{};
     auto iter = std::find_if(m_dict.begin(),m_dict.end(),[&pos](auto const& entry){
       return entry.first == pos;
@@ -150,8 +150,8 @@ public:
     if (iter != m_dict.end()) {
       result = iter->second;
     }
-    if (result) std::cout << " result:" << *result;
-    else std::cout << "null";
+    // if (result) std::cout << " result:" << *result;
+    // else std::cout << "null";
     return result;
   }
 
@@ -240,8 +240,8 @@ Model parse(auto& in) {
 }
 
 std::ostream& operator<<(std::ostream& os,Step const& step) {
-  if (step.first>' ') os << step.first;
-  else os << step.second;
+  if (step.second >' ') os << step.second;
+  else os << step.first;
   return os;
 }
 
@@ -279,7 +279,37 @@ public:
   }
   static void test(Grid const& grid,Path const path) {
     Traveler traveler{grid,path};
-
+    Grid temp{};
+    Vector pos{};
+    Vector delta{RIGHT};
+    std::cout << "\npos:" << pos;
+    for (auto i : {0,0,0,0}) pos += delta;
+    std::cout << "\npos:" << pos;
+    delta = TURN_RIGHT*delta;
+    for (auto i : {0,0,0,0}) pos += delta;
+    std::cout << "\npos:" << pos;
+    delta = TURN_LEFT*delta;
+    for (auto i : {0,0,0,0}) pos += delta;
+    std::cout << "\npos:" << pos;
+    {
+      std::cout << "\npath:" << path;
+      Vector pos{};
+      Vector delta{RIGHT};
+      temp.insert(pos,'*');      
+      for (auto const& step : path) {
+        std::cout << "\nstep:" << step; 
+        for (int i=0;i<step.first;++i) {
+          pos += delta;
+          temp.insert(pos,'*');      
+        }
+        switch (step.second) {
+          case 'R': delta = TURN_RIGHT*delta; ;break;
+          case 'L': delta = TURN_LEFT*delta; break;
+          default: break;
+        }
+        std::cout << "\n" << temp;
+      }
+    }
   }
 private:
   Grid m_grid;
@@ -310,9 +340,14 @@ namespace part1 {
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << data_model;
-      Traveler traveler{data_model.first,data_model.second};
-      auto location_and_dir = traveler.location_and_dir();
-      result = 1000*(location_and_dir.first.row+1) + 4*(location_and_dir.first.col+1) + location_and_dir.second;
+      if (true) {
+        Traveler::test(data_model.first,data_model.second);        
+      }
+      else {
+        Traveler traveler{data_model.first,data_model.second};
+        auto location_and_dir = traveler.location_and_dir();
+        result = 1000*(location_and_dir.first.row+1) + 4*(location_and_dir.first.col+1) + location_and_dir.second;
+      }
       return result;
   }
 }
