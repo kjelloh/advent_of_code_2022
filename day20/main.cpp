@@ -24,6 +24,115 @@ using Answers = std::vector<std::pair<std::string,Result>>;
 
 using Values = std::vector<int>;
 
+class CircularList {
+public:
+  friend std::ostream& operator<<(std::ostream& os,CircularList const& cl);
+  struct Node {
+    int value;
+    Node* next{nullptr};
+    Node* prev{nullptr};
+  };
+  struct ConstIterator {
+    Node const* p;
+    int index;
+    int cycle;
+    int operator*() const {return p->value;}
+    int pos() const {
+      auto result = index%cycle;
+      if (result<0) result += cycle;
+      return result;
+    }
+    ConstIterator& operator++() {
+      p=p->next;
+      ++index;
+      // std::cout << "\nindex:" << index << " pos:" << pos();
+      return *this;
+    }
+    ConstIterator(Node const* p,int index,int cycle) : p{p},index{index},cycle{cycle} {}
+    ConstIterator& operator--() {
+      p=p->prev;
+      --index;
+      // std::cout << "\nindex:" << index << " pos:" << pos();
+      return *this;
+    }
+    bool operator!=(ConstIterator const& other) {
+      if (p==other.p) return index!=other.index; // distinguish between loops
+      else return p!=other.p;
+    }
+  };
+  Node* push_back(int value) {
+    auto p = new Node{.value=value};
+    if (m_size==0) {
+      // empty
+      m_last=p;
+      p->next=p;
+      p->prev=p;
+    }
+    else {
+      p->next=m_last->next;
+      p->prev=m_last;
+      m_last->next=p;
+      m_last=p;
+      p->next->prev=p;
+    }
+    ++m_size;
+    return p;
+  }
+  int size() const {return m_size;}
+  ConstIterator begin() const {
+    return ConstIterator{m_last->next,0,m_size};
+  }
+  ConstIterator end() const {
+    return ConstIterator{m_last->next,m_size,m_size};
+  }
+  int operator[](int pos) const {
+    auto iter = begin();
+    if (pos>0) for (int i=0;i<pos;++i) ++iter;
+    else if (pos<0) for (int i=0;i<std::abs(pos);++i) --iter;
+    return *iter;
+  }
+  static void test() {
+    CircularList cl{};
+    cl.push_back(1);
+    // std::cout << "\n" << cl;
+    std::cout << "\n[0]" << cl[0];
+    auto iter=cl.begin();
+    auto end = cl.end();
+    std::cout << "\niter!=end:" << (iter!=end);
+    ++iter;
+    std::cout << "\niter!=end:" << (iter!=end);
+    ++iter;
+    std::cout << "\niter!=end:" << (iter!=end);
+
+    cl.push_back(2);
+    std::cout << "\n" << cl;
+    std::cout << "\n" << cl[1];
+    cl.push_back(3);
+    std::cout << "\n" << cl;
+    std::cout << "\n" << cl[2];
+    for (int i=-10;i<10;++i) cl.push_back(i);
+    iter = cl.begin();
+    std::cout << "\n" << *iter;
+    std::cout << "\n" << cl;
+    std::cout << "\n";
+    for (int i=-30;i<30;++i) std::cout << "," << cl[i];
+  }
+private:
+  Node* m_last{nullptr};
+  int m_size{0};
+};
+
+std::ostream& operator<<(std::ostream& os,CircularList const& cl) {
+  os << "[" << cl.size() << "]";
+  os << "[";
+  for (auto iter=cl.begin();iter!=cl.end();++iter) {
+    if (iter!=cl.begin()) os << ',';
+    os << *iter;
+  }
+  os << "]";
+  return os;
+}
+
 std::ostream& operator<<(std::ostream& os,Values const& values) {
   os << "[";
   for (int index=0;index<values.size();++index) {
@@ -36,16 +145,20 @@ std::ostream& operator<<(std::ostream& os,Values const& values) {
 
 class Mixed {
 public:
-  Mixed(Values const& values) : m_values{values} {
+  Mixed(Values const& values)  {
+    for (auto const& value : values) {
+      m_nodes.push_back(m_mixed.push_back(value));
+    }
   }
-  auto size() const {return m_values.size();};
-  int operator[](int pos) const {return 0;}
+  auto size() const {return m_nodes.size();};
+  int operator[](int pos) const {return m_mixed[pos];}
 private:
   friend std::ostream& operator<<(std::ostream& os,Mixed const& mixed);
-  std::vector<int> m_values{};
+  std::vector<CircularList::Node*> m_nodes{};
+  CircularList m_mixed{};
   void mix() {
-    for (int index=0;index<m_values.size();++index) {
-      auto delta = m_values[index];
+    for (int index=0;index<m_nodes.size();++index) {
+      auto delta = m_nodes[index]->value;
     }
   }
 };
@@ -80,6 +193,10 @@ namespace part1 {
       std::cout << "\nmodel:" << data_model;
       Mixed mixed{data_model};
       std::cout << "\nmixed:" << mixed;
+      if (false) {
+        // test
+        CircularList::test();
+      }
       // for (int i=0;i<20;++i) std::cout << " " << i << " " << mixed.from_0(i);
       auto r1000 = mixed[1000]; std::cout << "\nr1000:" << r1000;
       auto r2000 = mixed[2000]; std::cout << "\nr2000:" << r2000;
@@ -105,8 +222,8 @@ int main(int argc, char *argv[])
   // }
 
   Answers answers{};
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
