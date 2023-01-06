@@ -26,13 +26,16 @@ struct Vector {
   int col;
   bool operator==(Vector const& other) const {return row==other.row and col==other.col;}
   Vector operator+(Vector const& other) const {return {.row=row+other.row,.col=col+other.col};}
+  bool operator<(Vector const& other) const {return (row==other.row)?col<other.col:row<other.row;}
 };
+
+extern const std::set<std::pair<Vector,int>> EXPECTED;
 
 const std::vector<Vector> DIRS{
    {-1,0}
+  ,{0,-1}
   ,{0,1}
   ,{1,0}
-  ,{0,-1}
 };
 
 struct Blizzard {
@@ -40,6 +43,18 @@ struct Blizzard {
   Vector pos;
 };
 using Blizzards = std::vector<Blizzard>;
+struct BlizzardsHash {
+  std::size_t operator()(Blizzards const& blizzards) const noexcept {
+    std::size_t result{};
+    for (auto const& blizzard : blizzards) {
+      result ^= (std::hash<char>{}(blizzard.dir)) << 1;
+      result ^= (std::hash<int>{}(blizzard.pos.row)) << 1;
+      result ^= (std::hash<int>{}(blizzard.pos.col)) << 1;
+    }
+    return result;
+  }
+};
+
 using Row = std::string;
 using Map = std::vector<Row>;
 
@@ -128,8 +143,11 @@ public:
   }
   bool is_free(Vector const& pos) {
     bool result{};
-    if (pos.row==m_top_left.row or pos.row==m_bottom_right.row or pos.col==m_top_left.col or pos.col==m_bottom_right.col) result=false;
-    else result = has_blizzard_at_pos(pos);
+    if (pos.row<=m_top_left.row) result=false;
+    else if (pos.col<=m_top_left.col or pos.col>=m_bottom_right.col) result = false;
+    else if (pos.row==m_bottom_right.row and pos.col!=m_bottom_right.col-1) result = false;
+    else result = (has_blizzard_at_pos(pos) == false);
+    std::cout << "\nis_free(" << pos << ") = " << result;
     return result;
   }
 
@@ -258,23 +276,35 @@ Map map_at_t(Valley const& valley_at_0,int t) {
   return valley.to_map();
 }
 
+const int REVISIT_LIMIT{1000000};
+const int TIME_LIMIT{20};
+
 class DFS {
 public:
   class State {
   public:
-    State(int t,Valley const& valley,Vector const& pos,Result step_count) : m_t{t},m_valley{valley},m_pos{pos},m_step_count{step_count} {}
-    int t() const {return m_t;}
+    State(int t,Valley const& valley,Vector const& pos) : m_t{t},m_valley{valley},m_pos{pos} {}
+    Result t() const {return m_t;}
     Valley const& valley() const {return m_valley;}
     Vector const& pos() const {return m_pos;}
-    Result step_count() const {return m_step_count;}
   private:
-    int m_t;
+    Result m_t;
     Valley m_valley;
     Vector m_pos;
-    Result m_step_count;
   };
+  struct StateHash
+  {
+      std::size_t operator()(State const& state) const noexcept
+      {
+          std::size_t result = std::hash<int>{}(state.t());
+          result ^= (BlizzardsHash{}(state.valley().blizzards()) << 1);
+          result ^= (std::hash<int>{}(state.pos().row) << 1);
+          result ^= (std::hash<int>{}(state.pos().col) << 1);
+          return result;
+      }
+  };  
   DFS(Valley const& valley_at_0) 
-    : m_initial_state(0,valley_at_0,Vector{.row=0,.col=1},0)
+    : m_initial_state(0,valley_at_0,Vector{.row=0,.col=1})
      ,m_end{.row=valley_at_0.bottom_right().row,.col = valley_at_0.bottom_right().col-1} {
     m_best = dfs(m_initial_state);
   }
@@ -283,27 +313,69 @@ private:
   State m_initial_state;
   Vector m_end;
   std::deque<State> m_Q{};
+  std::map<Vector,std::vector<State>> m_revisited{};
+  Result m_best{std::numeric_limits<Result>::max()};
   std::vector<State> adj(State const& state_t) {
     std::vector<State> result{};
     auto adj_valley = valley_at_t(m_initial_state.valley(),state_t.t()+1);
     for (auto const& delta : DIRS) {
       auto adj_pos = state_t.pos() + delta;
-      if (adj_valley.is_free(adj_pos)) result.push_back(State(state_t.t()+1,adj_valley,adj_pos,state_t.step_count()+1));
+      std::cout << "\nadj_pos:" << adj_pos;
+      if (adj_valley.is_free(adj_pos)) {
+        std::cout << "\nfree adj_pos:" << adj_pos;
+        result.push_back(State(state_t.t()+1,adj_valley,adj_pos));
+      }
     }
+    if (result.size()==0) {
+      // wait at t+1 without moving
+      result.push_back(State(state_t.t()+1,adj_valley,state_t.pos()));
+    }
+    std::cout << "\nadj:" << result.size();
     return result;
   }
-  Result m_best{std::numeric_limits<Result>::max()};
   Result dfs(State const& initial_state) {
     Result result{std::numeric_limits<Result>::max()-1};
     m_Q.push_back(initial_state);
     while (m_Q.size()>0) {
-      auto state = m_Q.front();
-      m_Q.pop_front();
+      std::cout << "\nm_Q:" << m_Q.size();
+      auto state = m_Q.back();
+      m_Q.pop_back();
+      std::cout << "\nt:" << state.t() << " pos:" << state.pos();
+      std::cout << "\n" << state.valley();
+      m_revisited[state.pos()].push_back(state);
       if (state.pos()==m_end) {
-        result = std::min(result,state.step_count());
+        result = std::min(result,state.t());
+        std::cout << "\nCANDIDATE:" << result;
+        continue;
+      }
+      if (state.t()>result) {
+        std::cout << "\nBEST:" << result;
+        continue;
+      }
+      if (state.t()>TIME_LIMIT) {
+        std::cout << "\nTIMES UP at t:" << state.t();
+        continue;
+      }
+      if (m_revisited[state.pos()].size() > REVISIT_LIMIT) {
+          std::cout << "\nREVISIT BLOCK pos:" << state.pos() << " count:" << m_revisited[state.pos()].size();
+          continue;
       }
       for (auto const& adj_state : adj(state)) {
+        std::cout << "\nfree:" << adj_state.pos();
         m_Q.push_back(adj_state);
+      }
+    }
+    std::set<std::pair<Vector,int>> missing_state{EXPECTED};
+    for (auto const& [pos,time] : EXPECTED) {
+      for (auto const& [pos,v] : m_revisited) {
+        for (auto state : v) {
+          if (state.pos()==pos and state.t()==time) missing_state.erase(std::pair<Vector,int>{pos,time});
+        }
+      }
+    }
+    if (missing_state.size()>0) {
+      for (auto const [pos,time] : missing_state) {
+        std::cout << "\nMISSING STATE time:" << time << " pos:" << pos;
       }
     }
     return result;
@@ -357,6 +429,157 @@ int main(int argc, char *argv[])
   std::cout << "\n";
   return 0;
 }
+
+const std::set<std::pair<Vector,int>> EXPECTED{
+   {{1,1},1}
+   ,{{5,6},18}
+};
+
+/*
+Minute 1, move down:
+#.######
+#E>3.<.#
+#<..<<.#
+#>2.22.#
+#>v..^<#
+######.#
+
+Minute 2, move down:
+#.######
+#.2>2..#
+#E^22^<#
+#.>2.^>#
+#.>..<.#
+######.#
+
+Minute 3, wait:
+#.######
+#<^<22.#
+#E2<.2.#
+#><2>..#
+#..><..#
+######.#
+
+Minute 4, move up:
+#.######
+#E<..22#
+#<<.<..#
+#<2.>>.#
+#.^22^.#
+######.#
+
+Minute 5, move right:
+#.######
+#2Ev.<>#
+#<.<..<#
+#.^>^22#
+#.2..2.#
+######.#
+
+Minute 6, move right:
+#.######
+#>2E<.<#
+#.2v^2<#
+#>..>2>#
+#<....>#
+######.#
+
+Minute 7, move down:
+#.######
+#.22^2.#
+#<vE<2.#
+#>>v<>.#
+#>....<#
+######.#
+
+Minute 8, move left:
+#.######
+#.<>2^.#
+#.E<<.<#
+#.22..>#
+#.2v^2.#
+######.#
+
+Minute 9, move up:
+#.######
+#<E2>>.#
+#.<<.<.#
+#>2>2^.#
+#.v><^.#
+######.#
+
+Minute 10, move right:
+#.######
+#.2E.>2#
+#<2v2^.#
+#<>.>2.#
+#..<>..#
+######.#
+
+Minute 11, wait:
+#.######
+#2^E^2>#
+#<v<.^<#
+#..2.>2#
+#.<..>.#
+######.#
+
+Minute 12, move down:
+#.######
+#>>.<^<#
+#.<E.<<#
+#>v.><>#
+#<^v^^>#
+######.#
+
+Minute 13, move down:
+#.######
+#.>3.<.#
+#<..<<.#
+#>2E22.#
+#>v..^<#
+######.#
+
+Minute 14, move right:
+#.######
+#.2>2..#
+#.^22^<#
+#.>2E^>#
+#.>..<.#
+######.#
+
+Minute 15, move right:
+#.######
+#<^<22.#
+#.2<.2.#
+#><2>E.#
+#..><..#
+######.#
+
+Minute 16, move right:
+#.######
+#.<..22#
+#<<.<..#
+#<2.>>E#
+#.^22^.#
+######.#
+
+Minute 17, move down:
+#.######
+#2.v.<>#
+#<.<..<#
+#.^>^22#
+#.2..2E#
+######.#
+
+Minute 18, move down:
+#.######
+#>2.<.<#
+#.2v^2<#
+#>..>2>#
+#<....>#
+######E# 5,6
+*/
 
 // char const* pTest = R"(#.#####
 // #.....#
