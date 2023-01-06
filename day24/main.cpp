@@ -276,8 +276,8 @@ Map map_at_t(Valley const& valley_at_0,int t) {
   return valley.to_map();
 }
 
-const int REVISIT_LIMIT{1000000};
-const int TIME_LIMIT{20};
+const int REVISIT_LIMIT{3};
+const int TIME_LIMIT{137*4};
 
 class DFS {
 public:
@@ -350,14 +350,14 @@ private:
       }
       if (state.t()>result) {
         std::cout << "\nBEST:" << result;
-        break;
+        continue;
       }
       if (state.t()>TIME_LIMIT) {
-        std::cout << "\nTIME LIMIT at t:" << state.t();
+        std::cout << "\nTIME EXHAUST at t:" << state.t();
         continue;
       }
       if (m_revisited[state.pos()].size() > REVISIT_LIMIT) {
-          std::cout << "\nREVISIT BLOCK pos:" << state.pos() << " count:" << m_revisited[state.pos()].size();
+          std::cout << "\nREVISIT EXHAUST pos:" << state.pos() << " count:" << m_revisited[state.pos()].size();
           continue;
       }
       for (auto const& adj_state : adj(state)) {
@@ -378,6 +378,16 @@ private:
     //     std::cout << "\nMISSING STATE time:" << time << " pos:" << pos;
     //   }
     // }
+    std::pair<Vector,int> furthest{};
+    for (auto const& [pos,v] : m_revisited) {
+      for (auto state : v) {
+        if (pos.row+pos.col > furthest.first.row+furthest.first.col) {
+          furthest.first = pos;
+          furthest.second = state.t();
+        }
+      }
+    }
+    std::cout << "\nFURTHEST t:" << furthest.second << " pos:" << furthest.first;
     return result;
   }
 };
@@ -393,6 +403,7 @@ namespace part1 {
         auto data_model = parse(in);
         DFS dfs{data_model};
         result = dfs.best();
+        std::cout << "\nvalley bottom_right:" << data_model.bottom_right();
       }
       return result;
   }
@@ -420,16 +431,16 @@ int main(int argc, char *argv[])
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   // exec_times.push_back(std::chrono::system_clock::now());
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   exec_times.push_back(std::chrono::system_clock::now());
   for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::microseconds>(exec_times[i+1] - exec_times[i]).count() << "us"; 
+    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms"; 
     std::cout << " answer[" << answers[i].first << "] " << answers[i].second;
   }
 }
