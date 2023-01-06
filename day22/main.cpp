@@ -107,7 +107,17 @@ public:
     m_bottom_right.row = m_map.size()-1;
     if (m_bottom_right.col < 0) m_bottom_right.col = row.size()-1;
     // std::cout << "\nPUSH_BACK m_bottom_right.col:" << m_bottom_right.col << " row.size()-1:" << row.size()-1;
-    if (m_bottom_right.col < static_cast<Result>(row.size()-1)) {
+    if (static_cast<Result>(row.size()-1) < m_bottom_right.col) {
+      auto& ref = m_map.back();
+      auto diff =  m_bottom_right.col - static_cast<Result>(ref.size() - 1);
+      if (diff>0) {
+        // std::cout << "\ndiff:" << diff << std::flush;
+        auto expansion = std::string(diff,' ');
+        ref += expansion;
+        // std::cout << " expansion:" << std::quoted(expansion) << " ref:" << std::quoted(ref) << std::flush;
+      }
+    }
+    else if (m_bottom_right.col < static_cast<Result>(row.size()-1)) {
       m_bottom_right.col = row.size()-1;
       // std::cout << "\nEXPAND!" << std::flush;
       // expand map to the right
@@ -395,8 +405,8 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
