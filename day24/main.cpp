@@ -24,6 +24,15 @@ using Answers = std::vector<std::pair<std::string,Result>>;
 struct Vector {
   int row;
   int col;
+  bool operator==(Vector const& other) const {return row==other.row and col==other.col;}
+  Vector operator+(Vector const& other) const {return {.row=row+other.row,.col=col+other.col};}
+};
+
+const std::vector<Vector> DIRS{
+   {-1,0}
+  ,{0,1}
+  ,{1,0}
+  ,{0,-1}
 };
 
 struct Blizzard {
@@ -57,12 +66,12 @@ std::ostream& operator<<(std::ostream& os,Map const& map) {
 }
 
 std::ostream& operator<<(std::ostream& os,Vector const& v) {
-  std::cout << "[row:" << v.row << ",col:" << v.col << "]";
+  os << "[row:" << v.row << ",col:" << v.col << "]";
   return os;
 }
 
 std::ostream& operator<<(std::ostream& os,Blizzard const& blizzard) {
-  std::cout << blizzard.dir << " at " << blizzard.pos;
+  os << blizzard.dir << " at " << blizzard.pos;
   return os;
 }
 
@@ -109,6 +118,19 @@ public:
   }
   Blizzards const& blizzards() const {
     return m_blizzards;
+  }
+  bool has_blizzard_at_pos(Vector const& pos) {
+    bool Result{};
+    auto iter = std::find_if(m_blizzards.begin(),m_blizzards.end(),[&pos](Blizzard const& blizzard){
+      return blizzard.pos==pos;
+    });
+    return (iter!=m_blizzards.end());
+  }
+  bool is_free(Vector const& pos) {
+    bool result{};
+    if (pos.row==m_top_left.row or pos.row==m_bottom_right.row or pos.col==m_top_left.col or pos.col==m_bottom_right.col) result=false;
+    else result = has_blizzard_at_pos(pos);
+    return result;
   }
 
   Map to_map() const {
@@ -192,34 +214,34 @@ Model parse(auto& in) {
 
 Blizzard blizzard_at_t(Blizzard const& blizzard_at_0,int t,Vector const& top_left,Vector const& bottom_right) {
   Blizzard result{blizzard_at_0};
-  std::cout << "\nt:" << t << " " << blizzard_at_0;
+  // std::cout << "\nt:" << t << " " << blizzard_at_0;
   int row{blizzard_at_0.pos.row};
   int col{blizzard_at_0.pos.col};
   auto height = (bottom_right.row-top_left.row)+1;
   auto width = (bottom_right.col - top_left.col)+1;
-  std::cout << "\n\theight:" << height << " width:" << width;
+  // std::cout << "\n\theight:" << height << " width:" << width;
   switch (blizzard_at_0.dir) {
     case '^': {
       row = ((row-1 - t) % (height-2)) + 1;
       if (row <= 0) row += (height-2);
-      std::cout << "\n\t^ row:" << row;
+      // std::cout << "\n\t^ row:" << row;
      } break; 
     case '>': {
       col = ((col-1 + t) % (width-2)) + 1;
-      std::cout << "\n\t> col:" << row;
+      // std::cout << "\n\t> col:" << row;
      } break;
     case 'v': { 
       row = ((row-1 + t) % (height-2)) + 1;
-      std::cout << "\n\tv row:" << row;
+      // std::cout << "\n\tv row:" << row;
     } break;
     case '<': {
       col = ((col-1 - t) % (width-2)) + 1;
       if (col <= 0) col += (width-2);
-      std::cout << "\n\t< col:" << row;
+      // std::cout << "\n\t< col:" << row;
      } break;
   }
   result.pos = Vector{.row=row,.col=col};
-  std::cout << "\nt:" << t << " " << blizzard_at_0.dir << " :" << blizzard_at_0 << " to " << result;
+  // std::cout << "\nt:" << t << " " << blizzard_at_0.dir << " :" << blizzard_at_0 << " to " << result;
   return result;
 }
 
@@ -236,15 +258,69 @@ Map map_at_t(Valley const& valley_at_0,int t) {
   return valley.to_map();
 }
 
+class DFS {
+public:
+  class State {
+  public:
+    State(int t,Valley const& valley,Vector const& pos,Result step_count) : m_t{t},m_valley{valley},m_pos{pos},m_step_count{step_count} {}
+    int t() const {return m_t;}
+    Valley const& valley() const {return m_valley;}
+    Vector const& pos() const {return m_pos;}
+    Result step_count() const {return m_step_count;}
+  private:
+    int m_t;
+    Valley m_valley;
+    Vector m_pos;
+    Result m_step_count;
+  };
+  DFS(Valley const& valley_at_0) 
+    : m_initial_state(0,valley_at_0,Vector{.row=0,.col=1},0)
+     ,m_end{.row=valley_at_0.bottom_right().row,.col = valley_at_0.bottom_right().col-1} {
+    m_best = dfs(m_initial_state);
+  }
+  Result best() {return m_best;}
+private:
+  State m_initial_state;
+  Vector m_end;
+  std::deque<State> m_Q{};
+  std::vector<State> adj(State const& state_t) {
+    std::vector<State> result{};
+    auto adj_valley = valley_at_t(m_initial_state.valley(),state_t.t()+1);
+    for (auto const& delta : DIRS) {
+      auto adj_pos = state_t.pos() + delta;
+      if (adj_valley.is_free(adj_pos)) result.push_back(State(state_t.t()+1,adj_valley,adj_pos,state_t.step_count()+1));
+    }
+    return result;
+  }
+  Result m_best{std::numeric_limits<Result>::max()};
+  Result dfs(State const& initial_state) {
+    Result result{std::numeric_limits<Result>::max()-1};
+    m_Q.push_back(initial_state);
+    while (m_Q.size()>0) {
+      auto state = m_Q.front();
+      m_Q.pop_front();
+      if (state.pos()==m_end) {
+        result = std::min(result,state.step_count());
+      }
+      for (auto const& adj_state : adj(state)) {
+        m_Q.push_back(adj_state);
+      }
+    }
+    return result;
+  }
+};
+
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
-      if (true) {
+      if (false) {
         Valley::test(pData);
       }
       else {
         std::stringstream in{ pData };
-        auto data_model = parse(in);        
+        auto data_model = parse(in);
+        DFS dfs{data_model};
+        result = dfs.best();
       }
       return result;
   }
