@@ -18,7 +18,7 @@
 extern char const* pTest;
 extern char const* pData;
 
-using Result = size_t;
+using Result = long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 struct Vector {
@@ -31,9 +31,8 @@ struct Blizzard {
   Vector pos;
 };
 using Blizzards = std::vector<Blizzard>;
-using Map = std::vector<std::vector<char>>;
-using Maps = std::vector<Map>;
-using Model = std::pair<Blizzards,Maps>;
+using Row = std::string;
+using Map = std::vector<Row>;
 
 Map to_map(std::string const& s) {
   std::istringstream in{s};
@@ -49,35 +48,10 @@ Map to_map(std::string const& s) {
   return result;  
 }
 
-Model parse(auto& in) {
-    Model result{};
-    result.second.push_back({});
-    std::string line{};
-    int row{0};
-    while (std::getline(in,line)) {
-      result.second[0].push_back({});
-      for (int col=0;col<line.size();++col) {
-        auto ch = line[col];
-        result.second[0].back().push_back(ch);
-        for (auto bch : {'^','>','v','<'}) {
-          if (bch==ch) {
-            result.first.push_back(Blizzard{ch,Vector{.row=row,.col=col}});
-            break;
-          }
-        }
-      }
-      ++row;
-    }
-    return result;
-}
-
 std::ostream& operator<<(std::ostream& os,Map const& map) {
   for (int row=0;row<map.size();++row) {
-    auto line = map[row];
     if (row>0) os << "\n";
-    for (int col = 0;col<line.size();++col) {
-      os << line[col];
-    }
+    os << map[row];
   }
   return os;
 }
@@ -100,91 +74,177 @@ std::ostream& operator<<(std::ostream& os,Blizzards const& blizzards) {
   return os;
 }
 
-Map to_map(Map const& initial_map,Blizzards const& blizzards) {
-  Map result{initial_map};
-  for (int row=1;row<initial_map.size()-1;++row) {
-    for (int col=1;col<initial_map[0].size()-1;++col) {
-      result[row][col] = '.';
-    }
-  }
-  for (auto const& blizzard : blizzards) {
-    auto& map_ch_ref = result[blizzard.pos.row][blizzard.pos.col];
-    if (map_ch_ref == '.') map_ch_ref = blizzard.dir;
-    else if (map_ch_ref == '^' or map_ch_ref == '>' or map_ch_ref == 'v' or map_ch_ref == '<') {
-      map_ch_ref = '2';
-    }
-    else if (map_ch_ref >= '2' and map_ch_ref <= '8') {
-      map_ch_ref = static_cast<char>(map_ch_ref + 1);
-    }
-    else map_ch_ref = 'X';
-  }
-  return result;
-}
+// forward
+class Valley;
+Valley parse(auto& in);
+Valley valley_at_t(Valley const& valley_at_0,int t);
+Map map_at_t(Valley const& valley_at_0,int t);
 
-Vector pos_at_t(Blizzard const& blizzard,int t,int height,int width) {
-  Vector result{blizzard.pos};
-  std::cout << "\nt:" << t << " " << blizzard.dir << " pos" << result << " to ";
-  switch (blizzard.dir) {
-    case '^': {
-      result.row = (result.row - t - 1) % (height-2) + 1;
-      if (result.row <= 0) result.row += (height-2);
-     } break; 
-    case '>': {
-      result.col = (result.col + t - 1) % (width-2) + 1;
-     } break;
-    case 'v': { 
-      result.row = (result.row + t - 1) % (height-2) + 1;
-    } break;
-    case '<': {
-      result.col = (result.col - t -1) % (width-2) + 1;
-      if (result.col <= 0) result.col += (width-2);
-     } break;
-  }
-  std::cout << result;
-  return result;
-}
 
-Blizzards blizzards_at_t(Model const& model,int t) {
-  Blizzards result{model.first};
-  for (int index=0;index<result.size();++index) {
-    result[index].pos = pos_at_t(result[index],t,model.second[0].size(),model.second[0][0].size());
-  }
-  return result;
-}
-
-Map map_at_t(Model const& model,int t) {
-  auto blizzards = blizzards_at_t(model,t);
-  return to_map(model.second[0],blizzards);
-}
-
-namespace part1 {
-  Result solve_for(char const* pData) {
-      Result result{};
-      std::stringstream in{ pData };
-      auto data_model = parse(in);
-      std::cout << "\n" << data_model.second[0];
-      if (data_model.second[0] == to_map(pData)) {
-        std::cout << "\nSAME";
+class Valley {
+public:
+  friend std::ostream& operator<<(std::ostream& os,Valley const& valley);
+  Valley& push_back(Row const& line) {
+    ++m_bottom_right.row;
+    for (int col=0;col<line.size();++col) {
+      auto ch = line[col];
+      for (auto bch : {'^','>','v','<'}) {
+        if (bch==ch) {
+          m_blizzards.push_back(Blizzard{ch,Vector{.row=m_bottom_right.row,.col=col}});
+          break;
+        }
       }
-      std::cout << "\n" << data_model.first;
-      for (int t=0;t<10;++t) {
-        auto map_t = map_at_t(data_model,t);
-        std::cout << "\nt:" << t << "\n" << map_t;
+    }
+    m_bottom_right.col = line.size()-1; // col 0..size-1
+    return *this;
+  }
+  Vector const& top_left() const {
+    return m_top_left;
+  }
+  Vector const&  bottom_right() const {
+    return m_bottom_right;
+  }
+  Blizzards& blizzards() {
+    return m_blizzards;
+  }
+  Blizzards const& blizzards() const {
+    return m_blizzards;
+  }
+
+  Map to_map() const {
+    int min_col{top_left().col};
+    int max_col{bottom_right().col};
+    int min_row{top_left().row};
+    int max_row{bottom_right().row};
+    auto result = Map(max_row+1,Row(max_col+1,'.'));
+    for (int row=min_row;row<=max_row;++row) {
+      for (int col=min_col;col<=max_col;++col) {
+        if (row==0 and col!=1) result[row][col] = '#';
+        else if (col==0 or col==max_col) result[row][col] = '#';
+        else if (row==max_row and col!=max_col-1) result[row][col] = '#';
       }
-      int t = 18;
-      auto map_t = map_at_t(data_model,t);
-      std::cout << "\nt:" << t;
-      std::cout << "\n" << map_t;
-      if (map_t == to_map(R"(#.######
+    }
+    for (auto const& blizzard : blizzards()) {
+      auto& map_ch_ref = result[blizzard.pos.row][blizzard.pos.col];
+      if (map_ch_ref == '.') map_ch_ref = blizzard.dir;
+      else if (map_ch_ref == '^' or map_ch_ref == '>' or map_ch_ref == 'v' or map_ch_ref == '<') {
+        map_ch_ref = '2';
+      }
+      else if (map_ch_ref >= '2' and map_ch_ref <= '8') {
+        map_ch_ref = static_cast<char>(map_ch_ref + 1);
+      }
+      else map_ch_ref = 'X';
+    }
+    return result;
+  }
+
+  static void test(const char* pData) {
+    std::istringstream in{pData};
+    auto valley_at_0 = parse(in);
+    auto map_at_0 = valley_at_0.to_map();
+    std::cout << "\n" << map_at_0;
+    if (map_at_0 == ::to_map(pData)) {
+      std::cout << "\nSAME";
+    }
+    std::cout << "\n" << valley_at_0.blizzards();
+    for (int t=0;t<10;++t) {
+      auto map_t = map_at_t(valley_at_0,t);
+      std::cout << "\nt:" << t << "\n" << map_t;
+    }
+    int t = 18;
+    auto map_t = map_at_t(valley_at_0,t);
+    std::cout << "\nt:" << t;
+    std::cout << "\n" << map_t;
+    if (map_t == ::to_map(R"(#.######
 #>2.<.<#
 #.2v^2<#
 #>..>2>#
 #<....>#
 ######.#)"))  {
-        std::cout << "\nSAME";
+      std::cout << "\nSAME";
+    }
+    else {
+      std::cout << "\nDEVIATES";
+    }
+
+  }
+private:
+  Blizzards m_blizzards{};
+  Vector m_top_left{};
+  Vector m_bottom_right{.row=-1,.col=-1}; // empty
+};
+
+std::ostream& operator<<(std::ostream& os,Valley const& valley) {
+  os << valley.to_map();
+  return os;
+}
+
+using Model = Valley;
+
+Model parse(auto& in) {
+    Model result{};
+    std::string line{};
+    while (std::getline(in,line)) {
+      result.push_back(line);
+    }
+    return result;
+}
+
+Blizzard blizzard_at_t(Blizzard const& blizzard_at_0,int t,Vector const& top_left,Vector const& bottom_right) {
+  Blizzard result{blizzard_at_0};
+  std::cout << "\nt:" << t << " " << blizzard_at_0;
+  int row{blizzard_at_0.pos.row};
+  int col{blizzard_at_0.pos.col};
+  auto height = (bottom_right.row-top_left.row)+1;
+  auto width = (bottom_right.col - top_left.col)+1;
+  std::cout << "\n\theight:" << height << " width:" << width;
+  switch (blizzard_at_0.dir) {
+    case '^': {
+      row = ((row-1 - t) % (height-2)) + 1;
+      if (row <= 0) row += (height-2);
+      std::cout << "\n\t^ row:" << row;
+     } break; 
+    case '>': {
+      col = ((col-1 + t) % (width-2)) + 1;
+      std::cout << "\n\t> col:" << row;
+     } break;
+    case 'v': { 
+      row = ((row-1 + t) % (height-2)) + 1;
+      std::cout << "\n\tv row:" << row;
+    } break;
+    case '<': {
+      col = ((col-1 - t) % (width-2)) + 1;
+      if (col <= 0) col += (width-2);
+      std::cout << "\n\t< col:" << row;
+     } break;
+  }
+  result.pos = Vector{.row=row,.col=col};
+  std::cout << "\nt:" << t << " " << blizzard_at_0.dir << " :" << blizzard_at_0 << " to " << result;
+  return result;
+}
+
+Valley valley_at_t(Valley const& valley_at_0,int t) {
+  Valley result{valley_at_0};
+  for (auto& blizzard : result.blizzards()) {
+    blizzard = blizzard_at_t(blizzard,t,valley_at_0.top_left(),valley_at_0.bottom_right());
+  }
+  return result;
+}
+
+Map map_at_t(Valley const& valley_at_0,int t) {
+  auto valley = valley_at_t(valley_at_0,t);
+  return valley.to_map();
+}
+
+namespace part1 {
+  Result solve_for(char const* pData) {
+      Result result{};
+      if (true) {
+        Valley::test(pData);
       }
       else {
-        std::cout << "\nDEVIATES";
+        std::stringstream in{ pData };
+        auto data_model = parse(in);        
       }
       return result;
   }
