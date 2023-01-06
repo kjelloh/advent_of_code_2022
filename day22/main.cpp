@@ -91,124 +91,59 @@ std::ostream& operator<<(std::ostream& os,std::vector<std::string> rows) {
   return os;
 }
 
-class Grid {
+class RowsGrid {
 public:
-  using Vertex = int;
-  using Vertices = std::vector<Vertex>;
-  auto V() {return m_dict.size();}
-  void insert(Vector const& pos,char ch) {
-    // std::cout << "\nGrid::insert(" << pos << ")";
-    auto iter = std::find_if(m_dict.begin(),m_dict.end(),[&pos](auto const& entry){
-      return entry.first == pos;
-    });
-    if (iter == m_dict.end()) {
-      iter = m_dict.insert(iter,{pos,m_dict.size()});
-      m_value[iter->second] = ch;
-      top_left.row = std::min(top_left.row,pos.row);
-      top_left.col = std::min(top_left.col,pos.col);
-      bottom_right.row = std::max(bottom_right.row,pos.row);
-      bottom_right.col = std::max(bottom_right.col,pos.col);
-    }
-    // std::cout << " V:" << V(); 
+  using Row = std::string;
+  using Map=std::vector<Row>;
+  RowsGrid& push_back(Row const& row) {
+    m_map.push_back(row);
+    m_bottom_right.row = m_map.size()-1;
+    return *this;
   }
-  Vertices adj(Vertex v) const {
-    Vertices result{};
-    static const Vectors DIRS = to_adjacent_dirs();
-    if (auto pos = to_pos(v)) {
-      for (auto const& delta : DIRS) {
-        if (auto v = to_vertex(*pos+delta)) {
-          result.push_back(*v);
-        }
-      }
-    }
+  Map const& map() const {
+    return m_map;
+  }
+  Vector const& top_left() const {
+    return m_top_left;
+  }
+  Vector const& bottom_right() const {
+    return m_bottom_right;
+  }
+  bool in_frame(Vector const& pos) const {
+    return (pos.row>=top_left().row and pos.row<=bottom_right().row and pos.col>=top_left().col and pos.col<=bottom_right().col);
+  }
+  Vector next(Vector const& pos,Vector const& delta) const {
+    Vector result{pos};
     return result;
   }
-
-  Vertices vertices() const {
-    Vertices result{};
-    for (auto const& [pos,v] : m_dict) {
-      result.push_back(v);
-    }
-    return result;
+  char at(Vector const& pos) const {
+    if (in_frame(pos)) return m_map.at(pos.row).at(pos.col);
+    else return ' ';
   }
-
-  std::optional<Vector> to_pos(Vertex v) const {
-    std::optional<Vector> result{};
-    auto iter = std::find_if(m_dict.begin(),m_dict.end(),[&v](auto const& entry){
-      return entry.second == v;
-    });
-    if (iter != m_dict.end()) result = iter->first;
-    return result;
+  char& at(Vector const& pos) {
+    static char NULL_POS{' '};
+    if (in_frame(pos)) return m_map[pos.row][pos.col];
+    else return NULL_POS;
   }
-
-  std::optional<Vertex> to_vertex(Vector pos) const {
-    // std::cout << "\nto_vertex(" << pos << ")";
-    std::optional<Vertex> result{};
-    auto iter = std::find_if(m_dict.begin(),m_dict.end(),[&pos](auto const& entry){
-      return entry.first == pos;
-    });
-    if (iter != m_dict.end()) {
-      result = iter->second;
-    }
-    // if (result) std::cout << " result:" << *result;
-    // else std::cout << "null";
-    return result;
-  }
-
-  std::optional<char> to_value(Vertex v) const {
-    std::optional<char> result{};
-    if (m_value.contains(v)) result = m_value.at(v);
-    return result;
-  }
-
-  auto row_range() const {
-    std::vector<Result> result{};
-    for (auto row=top_left.row;row<=bottom_right.row;++row) result.push_back(row);
-    return result;
-  }
-
-  auto col_range() const {
-    std::vector<Result> result{};
-    for (auto col=top_left.col;col<=bottom_right.col;++col) result.push_back(col);
-    return result;
-  }
-
 private:
-  Vector top_left{};
-  Vector bottom_right{};
-  using Dict = std::vector<std::pair<Vector,Vertex>>;
-  Dict m_dict{};
-  using Value = std::map<Vertex,char>;
-  Value m_value{};
+  Vector m_top_left{.row=0,.col=0};
+  Vector m_bottom_right{.row=-1,.col=-1}; // empty
+  Map m_map{};
 };
 
-std::ostream& operator<<(std::ostream& os,Grid const& grid) {
-  std::vector<std::string> map{};
-  for (auto row : grid.row_range()) {
-    map.push_back("");
-    for (auto col : grid.col_range()) {
-      Vector pos{.row=row,.col=col};
-      if (auto v = grid.to_vertex(pos)) {
-        map.back() += *grid.to_value(*v);
-      }
-      else {
-        map.back() += ' ';
-      }
-    }
-  }
-  os << "\n" << map;
+std::ostream& operator<<(std::ostream& os,RowsGrid const& grid) {
+  os << "\n" << grid.map();
   return os;
 }
 
 using Step = std::pair<int,char>;
 using Path = std::vector<Step>;
 
-using Model = std::pair<Grid,Path>;
+using Model = std::pair<RowsGrid,Path>;
 
 Model parse(auto& in) {
     Model result{};
     std::string line{};
-    Vector pos{};
     int state{0};
     while (std::getline(in,line)) {
       if (line.size()==0) {
@@ -216,11 +151,7 @@ Model parse(auto& in) {
       }
       switch (state) {
         case 0: {
-          for (int col = 0;col<line.size();++col) {
-            pos.col = col;
-            result.first.insert(pos,line[col]);
-          }
-          ++pos.row;
+          result.first.push_back(line);
         } break;
         case 1: {
           int steps{};
@@ -268,18 +199,20 @@ const std::vector<Vector> DELTA{RIGHT,DOWN,LEFT,UP};
 class Traveler {
 public:
   using LocationAndDir = std::pair<Vector,int>;
-  Traveler(Grid const& grid,Path const path) : m_grid{grid},m_path{path} {
-    auto first_row = *m_grid.row_range().begin();
-    auto first_col = *m_grid.col_range().begin();
-    m_location_and_dir.first = Vector{.row=first_row,.col=first_col};
+  Traveler(RowsGrid const& grid,Path const path) : m_grid{grid},m_path{path} {
+    auto first_col{m_grid.top_left().col};
+    for (;first_col<m_grid.bottom_right().col;++first_col) {
+      if (m_grid.map()[0][first_col]!=' ') break;
+    }
+    m_location_and_dir.first = Vector{.row=0,.col=first_col};
     walk_the_path();
   }
   LocationAndDir location_and_dir() {
     return m_location_and_dir;
   }
-  static void test(Grid const& grid,Path const path) {
+  static void test(RowsGrid const& grid,Path const path) {
     if (false) {
-      Grid temp{};
+      RowsGrid temp{};
       Vector pos{};
       Vector delta{RIGHT};
       std::cout << "\npos:" << pos;
@@ -294,15 +227,15 @@ public:
     }
     if (false) {
       std::cout << "\npath:" << path;
-      Grid temp{};
+      RowsGrid temp{};
       Vector pos{};
       Vector delta{RIGHT};
-      temp.insert(pos,'*');      
+      temp.at(pos) = '*';
       for (auto const& step : path) {
         std::cout << "\nstep:" << step; 
         for (int i=0;i<step.first;++i) {
           pos += delta;
-          temp.insert(pos,'*');      
+          temp.at(pos) = '*';
         }
         switch (step.second) {
           case 'R': delta = TURN_RIGHT*delta; ;break;
@@ -314,16 +247,16 @@ public:
     }
     if (true) {
       std::cout << "\npath:" << path;
-      Grid temp{grid};
+      RowsGrid temp{grid};
       std::cout << "\n" << temp;
       Vector pos{};
       Vector delta{RIGHT};
-      temp.insert(pos,'*');      
+      temp.at(pos) = '*';
       for (auto const& step : path) {
         std::cout << "\nstep:" << step; 
         for (int i=0;i<step.first;++i) {
           pos += delta;
-          temp.insert(pos,'*');      
+          temp.at(pos) = '*';
         }
         switch (step.second) {
           case 'R': delta = TURN_RIGHT*delta; ;break;
@@ -335,12 +268,13 @@ public:
     }
   }
 private:
-  Grid m_grid;
+  RowsGrid m_grid;
   Path m_path;
   Vector delta{RIGHT};
   LocationAndDir m_location_and_dir{};
   void take_step() {
-    m_location_and_dir.first += delta;
+    auto next = m_grid.next(m_location_and_dir.first,delta);
+    if (m_grid.at(next)!='#') m_location_and_dir.first = next;
   }
   void turn(char dir) {
     switch (dir) {
