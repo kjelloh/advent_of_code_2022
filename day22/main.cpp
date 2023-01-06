@@ -22,8 +22,17 @@ using Result = long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 struct Vector {
-  Result row;
-  Result col;
+  int row;
+  int col;
+  Vector& operator-=(Vector const& other) {
+    row -= other.row;
+    col -= other.col;
+    return *this;
+  }
+  Vector operator-() const {
+    Vector result{.row=-row,.col=-col};
+    return result;
+  }
   Vector& operator+=(Vector const& other) {
     row += other.row;
     col += other.col;
@@ -39,6 +48,19 @@ struct Vector {
     else return row == other.row;
   }
 };
+
+const Vector RIGHT{.row=0,.col=1};
+const Vector DOWN{.row=1,.col=0};
+const Vector LEFT{.row=0,.col=-1};
+const Vector UP{.row=-1,.col=0};
+/*
+Facing is 0 for right (>), 1 for down (v), 2 for left (<), and 3 for up (^).
+*/
+const std::vector<Vector> DELTA{RIGHT,DOWN,LEFT,UP};
+char char_of_delta(Vector const& delta) {
+  if (delta.row==0) return (delta.col>0)?'>':'<';
+  else return (delta.row>0)?'v':'^';
+}
 
 struct Matrix {
   std::vector<Vector> rows;
@@ -68,25 +90,10 @@ std::ostream& operator<<(std::ostream& os,Vector const& v) {
   return os;
 }
 
-Vectors to_adjacent_dirs() {
-  std::cout << "\nto_adjacent_dirs()";
-  Vectors result{};
-  for (int row : {-1,0,1}) {
-    for (int col : {-1,0,1}) {
-      if (row==0 and col==0) continue; // exclude "same"
-      if (std::abs(row)==1 and std::abs(col)==1) continue; // exclude diagonals
-      Vector delta{.row=row,.col=col};
-      result.push_back(delta);
-      std::cout << " delta:" << delta;
-    }
-  }
-  return result;
-}
-
 std::ostream& operator<<(std::ostream& os,std::vector<std::string> rows) {
   for (int row=0;row<rows.size();++row) {
     if (row>0) os << "\n";
-    os << rows[row];
+    os << std::quoted(rows[row]);
   }
   return os;
 }
@@ -98,6 +105,23 @@ public:
   RowsGrid& push_back(Row const& row) {
     m_map.push_back(row);
     m_bottom_right.row = m_map.size()-1;
+    if (m_bottom_right.col < 0) m_bottom_right.col = row.size()-1;
+    // std::cout << "\nPUSH_BACK m_bottom_right.col:" << m_bottom_right.col << " row.size()-1:" << row.size()-1;
+    if (m_bottom_right.col < static_cast<Result>(row.size()-1)) {
+      m_bottom_right.col = row.size()-1;
+      // std::cout << "\nEXPAND!" << std::flush;
+      // expand map to the right
+      for (auto& ref : m_map) {
+        // std::cout << "\nexpand ref:" << std::quoted(ref);
+        auto diff =  m_bottom_right.col - static_cast<Result>(ref.size() - 1);
+        if (diff>0) {
+          // std::cout << "\ndiff:" << diff << std::flush;
+          auto expansion = std::string(diff,' ');
+          ref += expansion;
+          // std::cout << " expansion:" << std::quoted(expansion) << " ref:" << std::quoted(ref) << std::flush;
+        }
+      }
+    }
     return *this;
   }
   Map const& map() const {
@@ -113,7 +137,19 @@ public:
     return (pos.row>=top_left().row and pos.row<=bottom_right().row and pos.col>=top_left().col and pos.col<=bottom_right().col);
   }
   Vector next(Vector const& pos,Vector const& delta) const {
-    Vector result{pos};
+    // std::cout << "\nnext(pos:" << pos << ",delta:" << delta << ")"; 
+    Vector result{pos+delta}; // optimistic
+    // std::cout << "\n\tat(" << result << "):" << at(result);
+    // we are now at '.', '#' or at ' ' (the last meaning out of map or out of frame)
+    if (at(result)==' ') {
+      // wrap around
+      result -=delta; // back off
+      while (at(result)!=' ') result -=delta; // back track on map
+      result += delta; // back off
+      // std::cout << "\n\tat(" << result << "):" << at(result);
+    }
+    if (at(result)=='#') result = next(result,-delta);
+    // std::cout << "\n\tat(" << result << "):" << at(result);
     return result;
   }
   char at(Vector const& pos) const {
@@ -187,21 +223,14 @@ std::ostream& operator<<(std::ostream& os,Model const& model) {
   return os;
 }
 
-/*
-Facing is 0 for right (>), 1 for down (v), 2 for left (<), and 3 for up (^).
-*/
-const Vector RIGHT{.row=0,.col=1};
-const Vector DOWN{.row=1,.col=0};
-const Vector LEFT{.row=0,.col=-1};
-const Vector UP{.row=-1,.col=0};
-const std::vector<Vector> DELTA{RIGHT,DOWN,LEFT,UP};
-
 class Traveler {
 public:
   using LocationAndDir = std::pair<Vector,int>;
-  Traveler(RowsGrid const& grid,Path const path) : m_grid{grid},m_path{path} {
+  Traveler(RowsGrid const& grid,Path const path) : m_grid{grid},m_path{path},rendered{grid} {
+    std::cout << "\nTraveler::Traveler";
     auto first_col{m_grid.top_left().col};
     for (;first_col<m_grid.bottom_right().col;++first_col) {
+      std::cout << "\n[row:0,col:" << first_col << "]=" << m_grid.map()[0][first_col];
       if (m_grid.map()[0][first_col]!=' ') break;
     }
     m_location_and_dir.first = Vector{.row=0,.col=first_col};
@@ -210,7 +239,11 @@ public:
   LocationAndDir location_and_dir() {
     return m_location_and_dir;
   }
+  Vector const& pos() const {
+    return m_location_and_dir.first;
+  }
   static void test(RowsGrid const& grid,Path const path) {
+    std::cout << "\ntest(...)";
     if (false) {
       RowsGrid temp{};
       Vector pos{};
@@ -226,55 +259,88 @@ public:
       std::cout << "\npos:" << pos;      
     }
     if (false) {
-      std::cout << "\npath:" << path;
+      std::cout << "\n2 path:" << path;
       RowsGrid temp{};
       Vector pos{};
       Vector delta{RIGHT};
-      temp.at(pos) = '*';
       for (auto const& step : path) {
-        std::cout << "\nstep:" << step; 
-        for (int i=0;i<step.first;++i) {
-          pos += delta;
-          temp.at(pos) = '*';
-        }
+        std::cout << "\nfrom:" << pos << " step:" << step; 
         switch (step.second) {
           case 'R': delta = TURN_RIGHT*delta; ;break;
           case 'L': delta = TURN_LEFT*delta; break;
           default: break;
         }
+        temp.at(pos) = char_of_delta(delta);
+        for (int i=0;i<step.first;++i) {
+          pos += delta;
+        }
+        temp.at(pos) = char_of_delta(delta);
         std::cout << "\n" << temp;
       }
     }
+/*
+
+        >>v#    
+        .#v.    
+        #.v.    
+        ..v.    
+...#...v..v#    
+>>>v...>#.>>    
+..#v...#....    
+...>>>>v..#.    
+        ...#....
+        .....#..
+        .#......
+        ......#.
+
+"        >>v#    "
+"        .#v.    "
+"        #.v.    "
+"        ..v.    "
+"...#...v..v#    "
+">>>v...>#.>>    "
+"..#v...#....    "
+"...>>>>v..#.    "
+"        ...#...."
+"        .....#.."
+"        .#......"
+"        ......#."
+*/    
     if (true) {
-      std::cout << "\npath:" << path;
-      RowsGrid temp{grid};
-      std::cout << "\n" << temp;
-      Vector pos{};
-      Vector delta{RIGHT};
-      temp.at(pos) = '*';
+      std::cout << "\n3 path:" << path << std::flush;
+      Traveler traveler{grid,path};
+      RowsGrid rendered{grid};
+      auto pos = traveler.pos();
+      std::cout << "\nstart_pos" << pos;
+      auto delta = RIGHT;
+      std::cout << "\n" << rendered;
       for (auto const& step : path) {
-        std::cout << "\nstep:" << step; 
-        for (int i=0;i<step.first;++i) {
-          pos += delta;
-          temp.at(pos) = '*';
-        }
+        std::cout << "\nfrom:" << pos << " step:" << step; 
         switch (step.second) {
           case 'R': delta = TURN_RIGHT*delta; ;break;
           case 'L': delta = TURN_LEFT*delta; break;
           default: break;
         }
-        std::cout << "\n" << temp;
+        rendered.at(pos) = char_of_delta(delta);
+        for (int i=0;i<step.first;++i) {
+          pos = traveler.m_grid.next(pos,delta);
+          rendered.at(pos) = char_of_delta(delta);
+        }
+        std::cout << "\n" << rendered;
       }
     }
   }
 private:
+  friend std::ostream& operator<<(std::ostream& os,Traveler const& traveler);
   RowsGrid m_grid;
   Path m_path;
   Vector delta{RIGHT};
   LocationAndDir m_location_and_dir{};
+  RowsGrid rendered{};
   void take_step() {
     auto next = m_grid.next(m_location_and_dir.first,delta);
     if (m_grid.at(next)!='#') m_location_and_dir.first = next;
+    rendered.at(m_location_and_dir.first) = char_of_delta(delta);
   }
   void turn(char dir) {
     switch (dir) {
@@ -282,6 +348,7 @@ private:
       case 'L': delta = TURN_LEFT*delta; break;
       default: break;
     }
+    rendered.at(m_location_and_dir.first) = char_of_delta(delta);
   }
   void walk_the_path() {
     for (auto const& step : m_path) {
@@ -291,19 +358,26 @@ private:
   }
 };
 
+std::ostream& operator<<(std::ostream& os,Traveler const& traveler) {
+  os << "traveled:" << traveler.m_path;
+  os << "\n" << traveler.rendered;
+  return os;
+}
+
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << data_model;
-      if (true) {
+      if (false) {
         Traveler::test(data_model.first,data_model.second);        
       }
       else {
         Traveler traveler{data_model.first,data_model.second};
         auto location_and_dir = traveler.location_and_dir();
         result = 1000*(location_and_dir.first.row+1) + 4*(location_and_dir.first.col+1) + location_and_dir.second;
+        std::cout << traveler;
       }
       return result;
   }
@@ -334,6 +408,20 @@ int main(int argc, char *argv[])
   return 0;
 }
 
+// char const* pTest = R"(        ...#
+//         .#..
+//         #...
+//         ....
+// ...#.......#
+// ........#...
+// ..#....#....
+// ..........#.
+//         ...#....
+//         .....#..
+//         .#......
+//         ......#.
+
+// 10R5L5R10L4R5L5)";
 char const* pTest = R"(        ...#
         .#..
         #...
@@ -347,7 +435,8 @@ char const* pTest = R"(        ...#
         .#......
         ......#.
 
-10R5L5R10L4R5L5)";
+10R3R4R0R4R2L5R10L4R5L5)";
+
 char const* pData = R"(                                                  ..........#..................#...........#.................#......#..................#...........#..
                                                   .........................#.......#.....#..............................#...........#.......#.........
                                                   .................#...............#.#....#.........#................#...##.....#...........#.........
