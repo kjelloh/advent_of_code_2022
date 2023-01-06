@@ -147,7 +147,7 @@ public:
     else if (pos.col<=m_top_left.col or pos.col>=m_bottom_right.col) result = false;
     else if (pos.row==m_bottom_right.row and pos.col!=m_bottom_right.col-1) result = false;
     else result = (has_blizzard_at_pos(pos) == false);
-    std::cout << "\nis_free(" << pos << ") = " << result;
+    // std::cout << "\nis_free(" << pos << ") = " << result;
     return result;
   }
 
@@ -320,9 +320,9 @@ private:
     auto adj_valley = valley_at_t(m_initial_state.valley(),state_t.t()+1);
     for (auto const& delta : DIRS) {
       auto adj_pos = state_t.pos() + delta;
-      std::cout << "\nadj_pos:" << adj_pos;
+      // std::cout << "\nadj_pos:" << adj_pos;
       if (adj_valley.is_free(adj_pos)) {
-        std::cout << "\nfree adj_pos:" << adj_pos;
+        // std::cout << "\nfree adj_pos:" << adj_pos;
         result.push_back(State(state_t.t()+1,adj_valley,adj_pos));
       }
     }
@@ -330,30 +330,30 @@ private:
       // wait at t+1 without moving
       result.push_back(State(state_t.t()+1,adj_valley,state_t.pos()));
     }
-    std::cout << "\nadj:" << result.size();
+    // std::cout << "\nadj:" << result.size();
     return result;
   }
   Result dfs(State const& initial_state) {
     Result result{std::numeric_limits<Result>::max()-1};
     m_Q.push_back(initial_state);
     while (m_Q.size()>0) {
-      std::cout << "\nm_Q:" << m_Q.size();
+      // std::cout << "\nm_Q:" << m_Q.size();
       auto state = m_Q.back();
       m_Q.pop_back();
-      std::cout << "\nt:" << state.t() << " pos:" << state.pos();
-      std::cout << "\n" << state.valley();
+      // std::cout << "\nt:" << state.t() << " pos:" << state.pos();
+      // std::cout << "\n" << state.valley();
       m_revisited[state.pos()].push_back(state);
       if (state.pos()==m_end) {
         result = std::min(result,state.t());
-        std::cout << "\nCANDIDATE:" << result;
+        // std::cout << "\nCANDIDATE:" << result;
         continue;
       }
       if (state.t()>result) {
         std::cout << "\nBEST:" << result;
-        continue;
+        break;
       }
       if (state.t()>TIME_LIMIT) {
-        std::cout << "\nTIMES UP at t:" << state.t();
+        std::cout << "\nTIME LIMIT at t:" << state.t();
         continue;
       }
       if (m_revisited[state.pos()].size() > REVISIT_LIMIT) {
@@ -361,23 +361,23 @@ private:
           continue;
       }
       for (auto const& adj_state : adj(state)) {
-        std::cout << "\nfree:" << adj_state.pos();
+        // std::cout << "\nfree:" << adj_state.pos();
         m_Q.push_back(adj_state);
       }
     }
-    std::set<std::pair<Vector,int>> missing_state{EXPECTED};
-    for (auto const& [pos,time] : EXPECTED) {
-      for (auto const& [pos,v] : m_revisited) {
-        for (auto state : v) {
-          if (state.pos()==pos and state.t()==time) missing_state.erase(std::pair<Vector,int>{pos,time});
-        }
-      }
-    }
-    if (missing_state.size()>0) {
-      for (auto const [pos,time] : missing_state) {
-        std::cout << "\nMISSING STATE time:" << time << " pos:" << pos;
-      }
-    }
+    // std::set<std::pair<Vector,int>> missing_state{EXPECTED};
+    // for (auto const& [pos,time] : EXPECTED) {
+    //   for (auto const& [pos,v] : m_revisited) {
+    //     for (auto state : v) {
+    //       if (state.pos()==pos and state.t()==time) missing_state.erase(std::pair<Vector,int>{pos,time});
+    //     }
+    //   }
+    // }
+    // if (missing_state.size()>0) {
+    //   for (auto const [pos,time] : missing_state) {
+    //     std::cout << "\nMISSING STATE time:" << time << " pos:" << pos;
+    //   }
+    // }
     return result;
   }
 };
@@ -416,18 +416,22 @@ int main(int argc, char *argv[])
     }
     return 0;
   }
+  std::chrono::time_point<std::chrono::system_clock> start_time{};
   Answers answers{};
+  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
+  exec_times.push_back(std::chrono::system_clock::now());
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
-  for (auto const& answer : answers) {
-    std::cout << "\nanswer[" << answer.first << "] " << answer.second;
+  exec_times.push_back(std::chrono::system_clock::now());
+  for (int i=0;i<answers.size();++i) {
+    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::microseconds>(exec_times[i+1] - exec_times[i]).count() << "us"; 
+    std::cout << " answer[" << answers[i].first << "] " << answers[i].second;
   }
-  // std::cout << "\nPress <enter>...";
-  // std::cin.get();
-  std::cout << "\n";
-  return 0;
 }
 
 const std::set<std::pair<Vector,int>> EXPECTED{
