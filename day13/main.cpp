@@ -84,11 +84,10 @@ int compare(IntegerPacket* p1,IntegerPacket* p2) {
   */  
   int result{};
   if (p1!=nullptr and p2!=nullptr) {
-    std::cout << "\ncompare(integer:" << p1->to_string() << ",integer:" << p2->to_string() << ")";
     if (p1->integer<p2->integer) result = -1;
     else if (p1->integer==p2->integer) result = 0;
     else result = 1;
-    std::cout << " result:" << result;
+    std::cout << "\ncompare(integer:" << p1->to_string() << ",integer:" << p2->to_string() << ")" << " result:" << result;
   }
   else {
     std::cout << "\ncompare(integer,integer) called with nullptr(s)" << std::flush;
@@ -99,11 +98,10 @@ int compare(PacketList* p1,PacketList* p2); // forward
 int compare(IntegerPacket* p1,PacketList* p2) {
   int result{};
   if (p1!=nullptr and p2!=nullptr) {
-    std::cout << "\ncompare(integer:" << p1->to_string() << ",list:" << p2->to_string() << ")";
     PacketList* pp1 = new PacketList{};
     pp1->packets.push_back(p1);
     result = compare(pp1,p2);
-    std::cout << " result:" << result;
+    std::cout << "\ncompare(integer:" << p1->to_string() << ",list:" << p2->to_string() << ")" << " result:" << result;
   }
   else {
     std::cout << "\ncompare(integer,list) called with nullptr(s)" << std::flush;
@@ -113,11 +111,10 @@ int compare(IntegerPacket* p1,PacketList* p2) {
 int compare(PacketList* p1,IntegerPacket* p2) {
   int result{};
   if (p1!=nullptr and p2!=nullptr) {
-    std::cout << "\ncompare(list:" << p1->to_string() << ",integer:" << p2->to_string() << ")" << std::flush;
     PacketList* pp2 = new PacketList{};
     pp2->packets.push_back(p2);
     result = compare(p1,pp2);
-    std::cout << " result:" << result;
+    std::cout << "\ncompare(list:" << p1->to_string() << ",integer:" << p2->to_string() << ")" << " result:" << result << std::flush;
   }
   else {
     std::cout << "\ncompare(list,integer) called with nullptr(s)" << std::flush;
@@ -131,7 +128,6 @@ int compare(PacketList* p1,PacketList* p2) {
   If the right list runs out of items first, the inputs are not in the right order. 
   If the lists are the same length and no comparison makes a decision about the order, continue checking the next part of the input.
   */
-  std::cout << "\ncompare(list:" << p1->to_string() << ",list:" << p2->to_string() << ")";
   int result{0};
   auto p1_iter = p1->packets.begin();
   auto p1_end = p1->packets.end();
@@ -149,7 +145,7 @@ int compare(PacketList* p1,PacketList* p2) {
       break;
     }
   }
-  std::cout << " result:" << result;
+  std::cout << "\ncompare(list:" << p1->to_string() << ",list:" << p2->to_string() << ")" << " result:" << result;
   return result;
 }
 
@@ -375,9 +371,9 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
