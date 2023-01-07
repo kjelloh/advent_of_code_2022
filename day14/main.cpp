@@ -203,34 +203,45 @@ struct Grain {
   Vector pos;
 };
 
-bool is_free(Map const& map,Vector const& pos) {
-  if (map.contains(pos)) return (map.at(pos)=='.');
-  else return true;
-}
-
-const Vectors DELTAS {
-   {1,0}
-  ,{1,-1}
-  ,{1,1}
-};
-
-Vector to_moved_grain(Map const& map,Grain const& grain) {
-  Vector result{grain.pos};
-  for (auto const& delta : DELTAS) {
-    auto pos = grain.pos + delta;
-    if (is_free(map,pos)) {
-      result = pos;
-      break;
-    }
-  }
-  return result;
-}
 
 struct GrainEngine {
-  GrainEngine(Model const& model) : m_grains(1,Grain{Vector{.row=0,.col=500}}),m_model{model} {
-      m_model.insert(m_grains.back().pos,'O');
-  }
   std::vector<Grain> m_grains{};
+  Model m_model;
+  bool m_eternal_floor;
+
+  GrainEngine(Model const& model,bool eternal_floor=false) 
+    :  m_grains(1,Grain{Vector{.row=0,.col=500}})
+      ,m_model{model}
+      ,m_eternal_floor{eternal_floor} {
+    m_model.insert(m_grains.back().pos,'O');
+    if (m_eternal_floor) {
+      m_model.bottom_right.row += 2;
+    }
+  }
+
+  bool is_free(Map const& map,Vector const& pos) {
+    if (map.contains(pos)) return (map.at(pos)=='.');
+    else return (m_eternal_floor)?pos.row<m_model.bottom_right.row:true;
+  }
+
+  const Vectors DELTAS {
+    {1,0}
+    ,{1,-1}
+    ,{1,1}
+  };
+
+  Vector to_moved_grain(Map const& map,Grain const& grain) {
+    Vector result{grain.pos};
+    for (auto const& delta : DELTAS) {
+      auto pos = grain.pos + delta;
+      if (is_free(map,pos)) {
+        result = pos;
+        break;
+      }
+    }
+    return result;
+  }
+
   bool operator++() {
     bool result{true};
     m_model.erase(m_grains.back().pos);
@@ -251,12 +262,19 @@ struct GrainEngine {
     else {
       // at rest
       m_model.insert(m_grains.back().pos,'O');
-      m_grains.push_back(Grain{Vector{.row=0,.col=500}});
-      m_model.insert(m_grains.back().pos,'O');
+      if (m_grains.back().pos.row!=0) {
+        // drop new grain
+        m_grains.push_back(Grain{Vector{.row=0,.col=500}});
+        m_model.insert(m_grains.back().pos,'O');
+      } 
+      else {
+        // Full
+        result = false;
+      }
+
     }
     return result;
   }
-  Model m_model;
 };
 
 namespace part1 {
@@ -281,6 +299,13 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      GrainEngine ge{data_model,true};
+      std::cout << "\n" << ge.m_model.map;
+      while (++ge) {
+        // std::cout << "\n" << ge.m_model.map;
+      }
+      std::cout << "\n" << ge.m_model.map;
+      result = ge.m_grains.size();
       return result;
   }
 }
@@ -289,8 +314,8 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
