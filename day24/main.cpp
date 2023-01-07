@@ -9,6 +9,7 @@
 #include <queue>
 #include <deque>
 #include <array>
+#include <unordered_set>
 #include <ranges> // E.g., std::subrange, std::view 
 #include <utility> // E.g., std::pair,..
 #include <algorithm> // E.g., std::find, std::all_of,...
@@ -276,7 +277,7 @@ Map map_at_t(Valley const& valley_at_0,int t) {
   return valley.to_map();
 }
 
-const int REVISIT_LIMIT{8};
+const int REVISIT_LIMIT{10};
 const int TIME_LIMIT{468};
 
 class DFS {
@@ -287,6 +288,13 @@ public:
     Result t() const {return m_t;}
     Valley const& valley() const {return m_valley;}
     Vector const& pos() const {return m_pos;}
+    bool operator<(State const& other) const {
+      auto height = (m_valley.bottom_right().row - m_valley.top_left().row)+1;
+      auto width = (m_valley.bottom_right().col - m_valley.top_left().col)+1;
+      auto cycle = (height-1)*(width-2);
+      if ((m_t % cycle) == (other.m_t % cycle)) return (m_pos < other.m_pos);
+      else return ((m_t % cycle) < (other.m_t % cycle));
+    }
   private:
     Result m_t;
     Valley m_valley;
@@ -313,7 +321,8 @@ private:
   State m_initial_state;
   Vector m_end;
   std::deque<State> m_Q{};
-  std::map<Vector,std::vector<State>> m_revisited{};
+  // std::map<Vector,std::vector<State>> m_revisited{};
+  std::set<State> m_seen{};
   Result m_best{std::numeric_limits<Result>::max()};
   std::vector<State> adj(State const& state_t) {
     std::vector<State> result{};
@@ -337,33 +346,40 @@ private:
     Result result{std::numeric_limits<Result>::max()-1};
     m_Q.push_back(initial_state);
     int hit_count{};
+    Result call_count{};
     while (m_Q.size()>0) {
+      if (call_count++ % 1000 == 0) std::cout << "\n" << m_Q.size() << " hit_count:" << hit_count << std::flush;
       // std::cout << "\nm_Q:" << m_Q.size();
       auto state = m_Q.back();
       m_Q.pop_back();
       // std::cout << "\nt:" << state.t() << " pos:" << state.pos();
       // std::cout << "\n" << state.valley();
-      m_revisited[state.pos()].push_back(state);
+      // m_revisited[state.pos()].push_back(state);
       if (state.pos()==m_end) {
         result = std::min(result,state.t());
-        // std::cout << "\nCANDIDATE:" << result;
+        std::cout << "\nCANDIDATE:" << result;
         ++hit_count;
         continue;
       }
+      m_seen.insert(state);
       for (auto const& adj_state : adj(state)) {
-        // std::cout << "\nfree:" << adj_state.pos();
         if (adj_state.t()>=result) {
-          std::cout << "\nBEST:" << result;
-          continue;
+          // std::cout << "\nBEST:" << result;
+          break;
         }
         if (adj_state.t()>TIME_LIMIT) {
-          std::cout << "\nTIME EXHAUST at t:" << adj_state.t();
+          // std::cout << "\nTIME EXHAUST at t:" << adj_state.t();
+          break;
+        }
+        if (m_seen.contains(adj_state)) {
+          // std::cout << "\nseen t:" << adj_state.t() << " " << adj_state.pos();
           continue;
         }
-        if (m_revisited[adj_state.pos()].size() > REVISIT_LIMIT) {
-            std::cout << "\nREVISIT EXHAUST pos:" << adj_state.pos() << " count:" << m_revisited[adj_state.pos()].size();
-            continue;
-        }
+        // if (m_revisited[adj_state.pos()].size() > REVISIT_LIMIT) {
+        //     // std::cout << "\nREVISIT EXHAUST pos:" << adj_state.pos() << " count:" << m_revisited[adj_state.pos()].size();
+        //     continue;
+        // }
+        // std::cout << "\nnew t:" << adj_state.t() << " " << adj_state.pos();
         m_Q.push_back(adj_state);
       }
     }
@@ -380,20 +396,20 @@ private:
     //     std::cout << "\nMISSING STATE time:" << time << " pos:" << pos;
     //   }
     // }
-    std::pair<Vector,int> furthest{};
-    for (auto const& [pos,v] : m_revisited) {
-      for (auto state : v) {
-        if (pos.row+pos.col > furthest.first.row+furthest.first.col) {
-          furthest.first = pos;
-          furthest.second = state.t();
-        }
-      }
-    }
-    std::cout << "\nSEARCH SPACE SIZE:" << std::accumulate(m_revisited.begin(),m_revisited.end(),Result{0},[](auto acc,auto const& entry){
-      acc += entry.second.size();
-      return acc;
-    });
-    std::cout << "\nFURTHEST t:" << furthest.second << " pos:" << furthest.first;
+    // std::pair<Vector,int> furthest{};
+    // for (auto const& [pos,v] : m_revisited) {
+    //   for (auto state : v) {
+    //     if (pos.row+pos.col > furthest.first.row+furthest.first.col) {
+    //       furthest.first = pos;
+    //       furthest.second = state.t();
+    //     }
+    //   }
+    // }
+    // std::cout << "\nSEARCH SPACE SIZE:" << std::accumulate(m_revisited.begin(),m_revisited.end(),Result{0},[](auto acc,auto const& entry){
+    //   acc += entry.second.size();
+    //   return acc;
+    // });
+    // std::cout << "\nFURTHEST t:" << furthest.second << " pos:" << furthest.first;
     std::cout << "\nhit_count:" << hit_count;
     std::cout << "\nBEST:" << result;
     return result;
@@ -439,9 +455,9 @@ int main(int argc, char *argv[])
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   // exec_times.push_back(std::chrono::system_clock::now());
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // exec_times.push_back(std::chrono::system_clock::now());
