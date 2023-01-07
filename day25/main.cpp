@@ -18,11 +18,17 @@
 extern char const* pTest;
 extern char const* pData;
 
-using Result = long long int;
-using Answers = std::vector<std::pair<std::string,Result>>;
 struct SNAFU {
   std::string s;
 };
+std::ostream& operator<<(std::ostream& os,SNAFU const& snafu) {
+  os << std::quoted(snafu.s);
+  return os;
+}
+
+using Result = SNAFU;
+using Answers = std::vector<std::pair<std::string,Result>>;
+using Integer = long long int; // in: 843 253 387 long int: 32 762 853 787 275 long long int: 32 762 853 787 275
 
 using Model = std::vector<SNAFU>;
 
@@ -35,39 +41,53 @@ Model parse(auto& in) {
     return result;
 }
 
-Result to_decimal(SNAFU const& snafu) {
-  Result result{0};
-  for (auto snafu_digit : snafu.s) {
-    switch (snafu_digit) {
-      case '2': result = result*5 + 2;break;
-      case '1': result = result*5 + 1;break;
-      case '0': result = result*5 + 0;break;
-      case '-': result = result*5 - 1;break;
-      case '=': result = result*5 - 2;break;
-    }
-  }
-  return result;
-}
-
-SNAFU to_snafu(Result x) {
-  SNAFU result{};
+Integer to_decimal(SNAFU snafu) {
+  Integer result{0};
+  Integer pos_pow{1};
   do {
-    Result reminder = x % 5;
-    std::cout << "\n\tx:" << x << " reminder:" << reminder;
+    char reminder = snafu.s.back();
+    std::cout << "\n\tsnafu:" << snafu << " reminder:" << reminder;
+    int digit{};
     switch (reminder) {
-      case -4: result.s = '1' + result.s; x-=1; break;
-      case -3: result.s = '2' + result.s; x-=2; break;
-      case -2: result.s = '=' + result.s; break; 
-      case -1: result.s = '-' + result.s; break; 
-      case 0: result.s = '0' + result.s; break;
-      case 1: result.s = '1' + result.s; break;
-      case 2: result.s = '2' + result.s; break;
-      case 3: result.s = '=' + result.s; x+=2;break;
-      case 4: result.s = '-' + result.s; x+=1;break;
+      case '=': digit = - 2;break;
+      case '-': digit = - 1;break;
+      case '0': digit = + 0;break;
+      case '1': digit = + 1;break;
+      case '2': digit = + 2;break;
       default: {
         std::cerr << "\nERROR: remainder:" << reminder;
       }
     }
+    std::cout << " -> " << digit;
+    result = digit*pos_pow + result;;
+    snafu.s.pop_back();
+    pos_pow *= 5;
+  } while (snafu.s.size()>0);
+  return result;
+}
+
+SNAFU to_snafu(Integer x) {
+  SNAFU result{};
+  do {
+    Integer reminder = x % 5;
+    std::cout << "\n\tx:" << x << " reminder:" << reminder;
+    char digit{'?'};
+    switch (reminder) {
+      case -3: digit = '2'; x-=2; break;
+      case -4: digit = '1'; x-=1; break;
+      case -2: digit = '='; break; 
+      case -1: digit = '-'; break; 
+      case 0: digit = '0'; break;
+      case 1: digit = '1'; break;
+      case 2: digit = '2'; break;
+      case 3: digit = '='; x+=2;break;
+      case 4: digit = '-'; x+=1;break;
+      default: {
+        std::cerr << "\nERROR: remainder:" << reminder;
+      }
+    }
+    std::cout << " -> " << digit;
+    result.s = digit + result.s;
     x = x/5;
   } while (std::abs(x)>0);
   std::cout << " ";
@@ -106,17 +126,125 @@ SNAFU:1= = decimal:3
 SNAFU:122 = decimal:37
 */
 
+const std::vector<std::pair<Integer,std::string>> DEC2SNAFU{
+   {1,"1"}
+  ,{2,"2"}
+  ,{3,"1="}
+  ,{4,"1-"}
+  ,{5,"10"}
+  ,{6,"11"}
+  ,{7,"12"}
+  ,{8,"2="}
+  ,{9,"2-"}
+  ,{10,"20"}
+  ,{15,"1=0"}
+  ,{20,"1-0"}
+  ,{2022,"1=11-2"}
+  ,{12345,"1-0---0"}
+  ,{314159265,"1121-1110-1=0"}
+};
+/*
+  Decimal          SNAFU
+        1              1
+        2              2
+        3             1=
+        4             1-
+        5             10
+        6             11
+        7             12
+        8             2=
+        9             2-
+       10             20
+       15            1=0
+       20            1-0
+     2022         1=11-2
+    12345        1-0---0
+314159265  1121-1110-1=0
+*/
+
+const std::vector<std::pair<std::string,Integer>> SNAFU2DEC{
+   {"1=-0-2",1747}
+  ,{"12111",906}
+  ,{"2=0=",198}
+  ,{"21",11}
+  ,{"2=01",201}
+  ,{"111",31}
+  ,{"20012",1257}
+  ,{"112",32}
+  ,{"1=-1=",353}
+  ,{"1-12",107}
+  ,{"12",7}
+  ,{"1=",3}
+  ,{"122",37}
+};
+
+/*
+ SNAFU  Decimal
+1=-0-2     1747
+ 12111      906
+  2=0=      198
+    21       11
+  2=01      201
+   111       31
+ 20012     1257
+   112       32
+ 1=-1=      353
+  1-12      107
+    12        7
+    1=        3
+   122       37
+*/
+
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
-      for (auto const& snafu : data_model) {
-        auto x = to_decimal(snafu);
-        auto s = to_snafu(x);
-        std::cout << "\nSNAFU:" << std::quoted(snafu.s) << " = decimal:" << x << " to_snafu:" << s.s;
-        if (snafu.s == s.s) std::cout << " ok";
-        else std::cout << " ERROR";
+      if (false) {
+        // Test
+        if (true) {
+          for (auto const& [dec,s] : DEC2SNAFU) {
+            std::cout << "\n--------------------";
+            auto snafu = to_snafu(dec);
+            std::cout << "\nto_snafu(" << dec << "):" << snafu.s << "  s:" << s;
+            if (snafu.s!=s) std::cout << " DIFFERS";
+            else std::cout << " ok";
+            auto x = to_decimal(snafu);
+            std::cout << "\nto_decimal(" << snafu << "):" << x << "  dec:" << dec;
+            if (x!=dec) std::cout << " DIFFERS";
+            else std::cout << " ok";
+          }
+        }
+        if (true) {
+          for (auto const& [s,dec] : SNAFU2DEC) {
+            std::cout << "\n--------------------";
+            auto x = to_decimal(SNAFU{s});
+            std::cout << "\nto_decimal(" << s << "):" << x << "  dec:" << dec;
+            if (x!=dec) std::cout << " DIFFERS";
+            else std::cout << " ok";
+            auto snafu = to_snafu(x);
+            std::cout << "\nto_snafu(" << dec << "):" << snafu.s << "  s:" << s;
+            if (snafu.s!=s) std::cout << " DIFFERS";
+            else std::cout << " ok";
+          }
+        }
+        if (false) {
+          for (auto const& snafu : data_model) {
+            auto x = to_decimal(snafu);
+            auto s = to_snafu(x);
+            std::cout << "\nSNAFU:" << std::quoted(snafu.s) << " = decimal:" << x << " to_snafu:" << s.s;
+            if (snafu.s == s.s) std::cout << " ok";
+            else std::cout << " ERROR";
+          }
+        }
+      }
+      else {
+        Integer decimal_sum{};
+        for (auto const& snafu : data_model) {
+          decimal_sum += to_decimal(snafu);
+        }
+        std::cout << "\ndecimal sum:" << decimal_sum;
+        result = to_snafu(decimal_sum);
       }
       return result;
   }
@@ -134,7 +262,7 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
