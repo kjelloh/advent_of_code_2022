@@ -350,6 +350,24 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      std::cout << "\n" << data_model;
+      std::vector<Packet*> packets{};
+      for (auto [p1,p2] : data_model) {
+        packets.push_back(p1);
+        packets.push_back(p2);
+      }
+      auto p_div_1 = to_packet_ptr("[[2]]");
+      packets.push_back(p_div_1);
+      auto p_div_2 = to_packet_ptr("[[6]]");
+      packets.push_back(p_div_2);
+      std::sort(packets.begin(),packets.end(),[](Packet* const& p1,Packet* const& p2){
+        return compare(p1,p2) < 0;
+      });
+      auto iter1 = std::find(packets.begin(),packets.end(),p_div_1);
+      auto iter2 = std::find(packets.begin(),packets.end(),p_div_2);
+      auto i1 = std::distance(packets.begin(),iter1)+1;
+      auto i2 = std::distance(packets.begin(),iter2)+1;
+      result = i1*i2;
       return result;
   }
 }
@@ -358,8 +376,8 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
