@@ -70,7 +70,7 @@ struct Monkey {
       auto wl = worry_levels.front();
       worry_levels.erase(worry_levels.begin());
       wl = new_wl(wl);
-      wl = wl / 3;
+      wl = (wl>reduction)?wl % reduction:wl;
       std::cout << "\n\twl:" << wl << std::flush;
       if (wl % divisor == 0) {
         if_true_op(wl,to_throw);
@@ -252,7 +252,13 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
-      for (auto& [id,monkey] : data_model) monkey.reduction = 1;
+      auto reduction = std::accumulate(data_model.begin(),data_model.end(),Result{1},[](Result acc,auto const& entry){
+        std::cout << "\nmonkey.divisor:" << entry.second.divisor; 
+        acc *= entry.second.divisor;
+        return acc;
+      });
+      std::cout << "\nreduction:" << reduction;
+      for (auto& [id,monkey] : data_model) monkey.reduction = reduction;
       ToThrow to_trow{};
       for (int round = 1;round<=10000;++round) {
         std::cout << "\nBEGIN round:" << round;
@@ -266,8 +272,8 @@ namespace part2 {
           }
         }
       }
-      Result m1{data_model[0].inspect_count};
-      Result m2{data_model[1].inspect_count};
+      Result m1{};
+      Result m2{};
       for (auto const& entry : data_model) {
         std::cout << "\nmonkey:" << entry.second.id << " inspect_count:" << entry.second.inspect_count;
         if (entry.second.inspect_count>m1) {
@@ -285,8 +291,8 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
