@@ -29,7 +29,7 @@ struct NewWlFunc {
   std::string r_term;
   Result operator()(Result old) {
     Result result{};
-    std::cout << "\n\tNewWlFunc::operator(" << old << ") l_term:" << std::quoted(l_term) << " op:'" << op << "' r_term:" << std::quoted(r_term);
+    // std::cout << "\n\tNewWlFunc::operator(" << old << ") l_term:" << std::quoted(l_term) << " op:'" << op << "' r_term:" << std::quoted(r_term);
     Result term2{};
     if (r_term == "old") {
       term2 = old;
@@ -42,7 +42,7 @@ struct NewWlFunc {
       case '*': result = old * term2; break;
       default: std::cerr << "\nERROR, unknown op:" << op;
     }
-    std::cout << " = " << result;
+    // std::cout << " = " << result;
     return result;
   };
 };
@@ -70,8 +70,9 @@ struct Monkey {
       auto wl = worry_levels.front();
       worry_levels.erase(worry_levels.begin());
       wl = new_wl(wl);
-      wl = (wl>reduction)?wl % reduction:wl;
-      std::cout << "\n\twl:" << wl << std::flush;
+      if (reduction==3) wl /= 3; // part 1
+      else wl = (wl>reduction)?wl % reduction:wl; // part 2
+      // std::cout << "\n\twl:" << wl << std::flush;
       if (wl % divisor == 0) {
         if_true_op(wl,to_throw);
       }
@@ -291,10 +292,10 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+  answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
   }
