@@ -276,8 +276,8 @@ Map map_at_t(Valley const& valley_at_0,int t) {
   return valley.to_map();
 }
 
-const int REVISIT_LIMIT{3};
-const int TIME_LIMIT{137*4};
+const int REVISIT_LIMIT{8};
+const int TIME_LIMIT{468};
 
 class DFS {
 public:
@@ -326,7 +326,7 @@ private:
         result.push_back(State(state_t.t()+1,adj_valley,adj_pos));
       }
     }
-    if (result.size()==0) {
+    if (adj_valley.is_free(state_t.pos())) {
       // wait at t+1 without moving
       result.push_back(State(state_t.t()+1,adj_valley,state_t.pos()));
     }
@@ -336,6 +336,7 @@ private:
   Result dfs(State const& initial_state) {
     Result result{std::numeric_limits<Result>::max()-1};
     m_Q.push_back(initial_state);
+    int hit_count{};
     while (m_Q.size()>0) {
       // std::cout << "\nm_Q:" << m_Q.size();
       auto state = m_Q.back();
@@ -346,9 +347,10 @@ private:
       if (state.pos()==m_end) {
         result = std::min(result,state.t());
         // std::cout << "\nCANDIDATE:" << result;
+        ++hit_count;
         continue;
       }
-      if (state.t()>result) {
+      if (state.t()>=result) {
         std::cout << "\nBEST:" << result;
         continue;
       }
@@ -387,7 +389,13 @@ private:
         }
       }
     }
+    std::cout << "\nSEARCH SPACE SIZE:" << std::accumulate(m_revisited.begin(),m_revisited.end(),Result{0},[](auto acc,auto const& entry){
+      acc += entry.second.size();
+      return acc;
+    });
     std::cout << "\nFURTHEST t:" << furthest.second << " pos:" << furthest.first;
+    std::cout << "\nhit_count:" << hit_count;
+    std::cout << "\nBEST:" << result;
     return result;
   }
 };
@@ -431,9 +439,9 @@ int main(int argc, char *argv[])
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   // exec_times.push_back(std::chrono::system_clock::now());
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // exec_times.push_back(std::chrono::system_clock::now());
