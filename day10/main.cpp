@@ -21,13 +21,13 @@ extern char const* pData;
 using Result = long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
-using Instruction = std::pair<std::string,std::optional<int>>;
+using Instruction = std::pair<std::string,int>;
 using Program = std::vector<Instruction>;
 using Model = Program;
 
 std::ostream& operator<<(std::ostream& os,Instruction const& instruction) {
-  os << "op:" << instruction.first << " arg:";
-  if (instruction.second) os << *instruction.second;
+  os << "op:" << instruction.first;
+  if (instruction.first != "noop") os << " arg:" << instruction.second;
   else os << "_";
   return os;
 }
@@ -47,43 +47,49 @@ Instruction to_instruction(std::string const& entry) {
       result = {head,std::stoi(tail)};
     }
     else {
-      result = {head,std::nullopt};
+      result = {head,0};
     }
   }
-  else result = {entry,std::nullopt};
+  else result = {entry,0};
   std::cout << " = " << result;
   return result;
 }
 
 struct CPU {
   CPU(Program const& program) : m_program{program} {
-    count_down=to_count_down(program[0].first);
+    std::cout << "\nCPU::CPU ";
+    count_down=to_count_down(program[0]);
+    ++(*this); // cycle 0
   }
-  int to_count_down(std::string const& op) {
+  int to_count_down(Instruction const& instr) {
+    std::cout << " begin execute " << instr;
     int result{};
-    if (op=="noop") result=1;
-    else if (op=="addx") result=2;
+    if (instr.first=="noop") result=1;
+    else if (instr.first=="addx") result=2;
     return result;
   }
   Program m_program;
-  int count_down{0};
-  int ix{0};
+  int count_down{-1};
+  int ix{};
   int call_count{0};
   Result x{1};
-  CPU& operator++() {
-    std::cout << "\n\toperator++() call_count:" << call_count << " ix:" << ix << " count_down:" << count_down;
+  void operator++() {
+    std::cout << "\n\toperator++()";
+    std::cout << "\n\tSTART of cycle: " << call_count << " ix:" << ix << " count_down:" << count_down;
+    std::cout << "\n\tDURING cycle:   " << call_count << " X:" << x;
+    std::cout << "\n\tEND of cycle:   " << call_count;
     if (count_down==0) {
-      auto [op,arg] = m_program[ix];
-      if (op=="addx") {
-        x += *arg;
-        std::cout << " x:" << x;
+      auto instr = m_program[ix];
+      std::cout << " Finnish " << instr;
+      if (instr.first=="addx") {
+        x += instr.second;
+        std::cout << " += " << instr.second <<  " new_x:" << x;
       }
       ++ix;
-      count_down = to_count_down(m_program[ix].first);
+      count_down = to_count_down(m_program[ix]);
     }
     --count_down;
     ++call_count;
-    return *this;
   }
 };
 
@@ -122,11 +128,120 @@ namespace part1 {
   }
 }
 
+using Map = std::vector<std::string>;
+std::ostream& operator<<(std::ostream& os,Map const& map) {
+  for (int row=0;row<map.size();++row) {
+    if (row>0) os << "\n";
+    os << std::quoted(map[row]);
+  }
+  return os;
+}
+
+Map to_map(std::string const& s) {
+  Map result{};
+  std::istringstream in{s};
+  std::string line{};
+  while (std::getline(in,line)) result.push_back(line);
+  return result;
+}
+
+char const* pPart2TestMap = R"(##..##..##..##..##..##..##..##..##..##..
+###...###...###...###...###...###...###.
+####....####....####....####....####....
+#####.....#####.....#####.....#####.....
+######......######......######......####
+#######.......#######.......#######.....)";
+
+/*
+"##  ##  ##  ##  ##  ##  ##  ##  ##  ##  "
+"###   ###   ###   ###   ###   ###   ### "
+"####    ####    ####    ####    ####    "
+"#####     #####     #####     #####     "
+"######      ######      ######      ####"
+"#######       #######       #######     "
+
+*/
+
+/*
+
+Start cycle   1: begin executing addx 15
+During cycle  1: CRT draws pixel in position 0
+Current CRT row: #
+
+During cycle  2: CRT draws pixel in position 1
+Current CRT row: ##
+End of cycle  2: finish executing addx 15 (Register X is now 16)
+Sprite position: ...............###......................
+
+Start cycle   3: begin executing addx -11
+During cycle  3: CRT draws pixel in position 2
+Current CRT row: ##.
+
+During cycle  4: CRT draws pixel in position 3
+Current CRT row: ##..
+End of cycle  4: finish executing addx -11 (Register X is now 5)
+Sprite position: ....###.................................
+
+Start cycle   5: begin executing addx 6
+During cycle  5: CRT draws pixel in position 4
+Current CRT row: ##..#
+
+	operator++()
+	START of cycle: 1 ix:0 count_down:2
+	DURING cycle:   1 X:1
+	END of cycle:   1
+DURING cycle:1 X:1 row:1 col:1 HIT!
+	operator++()
+	START of cycle: 2 ix:0 count_down:1
+	DURING cycle:   2 X:1
+	END of cycle:   2
+DURING cycle:2 X:1 row:1 col:2 HIT!
+	operator++()
+	START of cycle: 3 ix:0 count_down:0
+	DURING cycle:   3 X:1
+	END of cycle:   3 Finnish addx 15 += 15 new_x:16
+DURING cycle:3 X:1 row:1 col:3
+	operator++()
+	START of cycle: 4 ix:1 count_down:1
+	DURING cycle:   4 X:16
+	END of cycle:   4
+DURING cycle:4 X:16 row:1 col:4
+	operator++()
+	START of cycle: 5 ix:1 count_down:0
+	DURING cycle:   5 X:16
+	END of cycle:   5 Finnish addx -11 += -11 new_x:5
+DURING cycle:5 X:16 row:1 col:5
+
+*/
+
 namespace part2 {
+  auto map = std::vector<std::string>(6,std::string(40,'.'));
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      CPU cpu{data_model};
+      int width = map[0].size();
+      int height = map.size();
+      auto x{cpu.x};
+      for (auto cycle=0;cycle<width*height;++cycle) {
+      // for (auto cycle=0;cycle<10;++cycle) {
+        ++cpu;
+        auto row = cycle / width;
+        auto col = cycle % width;
+        std::cout << "\nDURING cycle:" << cycle+1 << " X:" << x << " row:" << row+1 << " col:" << col+1;
+        if (col >= (x-1) and col <= (x+1)) {
+          map[row][col] = '#';
+          std::cout << " HIT!";
+        }
+        x = cpu.x;
+      }
+      std::cout << "\n" << map;
+      if (data_model[0].second==15) {
+        // test
+        if (map==to_map(pPart2TestMap)) std::cout << "\nMAP OK!";
+        else std::cout << "\nSORRY - Generated MAP is NOT the one given in the puzzle example";
+      }
       return result;
   }
 }
@@ -134,9 +249,9 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
