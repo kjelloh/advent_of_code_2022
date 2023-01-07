@@ -152,66 +152,19 @@ char const* pPart2TestMap = R"(##..##..##..##..##..##..##..##..##..##..
 ######......######......######......####
 #######.......#######.......#######.....)";
 
-/*
-"##  ##  ##  ##  ##  ##  ##  ##  ##  ##  "
-"###   ###   ###   ###   ###   ###   ### "
-"####    ####    ####    ####    ####    "
-"#####     #####     #####     #####     "
-"######      ######      ######      ####"
-"#######       #######       #######     "
-
-*/
 
 /*
 
-Start cycle   1: begin executing addx 15
-During cycle  1: CRT draws pixel in position 0
-Current CRT row: #
+My part 2
 
-During cycle  2: CRT draws pixel in position 1
-Current CRT row: ##
-End of cycle  2: finish executing addx 15 (Register X is now 16)
-Sprite position: ...............###......................
+"####.###..#..#.###..#..#.####..##..#..#."
+"#....#..#.#..#.#..#.#..#....#.#..#.#..#."
+"###..###..#..#.#..#.####...#..#....####."
+"#....#..#.#..#.###..#..#..#...#....#..#."
+"#....#..#.#..#.#.#..#..#.#....#..#.#..#."
+"#....###...##..#..#.#..#.####..##..#..#."
 
-Start cycle   3: begin executing addx -11
-During cycle  3: CRT draws pixel in position 2
-Current CRT row: ##.
-
-During cycle  4: CRT draws pixel in position 3
-Current CRT row: ##..
-End of cycle  4: finish executing addx -11 (Register X is now 5)
-Sprite position: ....###.................................
-
-Start cycle   5: begin executing addx 6
-During cycle  5: CRT draws pixel in position 4
-Current CRT row: ##..#
-
-	operator++()
-	START of cycle: 1 ix:0 count_down:2
-	DURING cycle:   1 X:1
-	END of cycle:   1
-DURING cycle:1 X:1 row:1 col:1 HIT!
-	operator++()
-	START of cycle: 2 ix:0 count_down:1
-	DURING cycle:   2 X:1
-	END of cycle:   2
-DURING cycle:2 X:1 row:1 col:2 HIT!
-	operator++()
-	START of cycle: 3 ix:0 count_down:0
-	DURING cycle:   3 X:1
-	END of cycle:   3 Finnish addx 15 += 15 new_x:16
-DURING cycle:3 X:1 row:1 col:3
-	operator++()
-	START of cycle: 4 ix:1 count_down:1
-	DURING cycle:   4 X:16
-	END of cycle:   4
-DURING cycle:4 X:16 row:1 col:4
-	operator++()
-	START of cycle: 5 ix:1 count_down:0
-	DURING cycle:   5 X:16
-	END of cycle:   5 Finnish addx -11 += -11 new_x:5
-DURING cycle:5 X:16 row:1 col:5
-
+FBURHZCH
 */
 
 namespace part2 {
@@ -251,8 +204,8 @@ int main(int argc, char *argv[])
   Answers answers{};
   // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
   }
