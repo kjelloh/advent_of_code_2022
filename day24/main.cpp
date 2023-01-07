@@ -350,20 +350,20 @@ private:
         ++hit_count;
         continue;
       }
-      if (state.t()>=result) {
-        std::cout << "\nBEST:" << result;
-        continue;
-      }
-      if (state.t()>TIME_LIMIT) {
-        std::cout << "\nTIME EXHAUST at t:" << state.t();
-        continue;
-      }
-      if (m_revisited[state.pos()].size() > REVISIT_LIMIT) {
-          std::cout << "\nREVISIT EXHAUST pos:" << state.pos() << " count:" << m_revisited[state.pos()].size();
-          continue;
-      }
       for (auto const& adj_state : adj(state)) {
         // std::cout << "\nfree:" << adj_state.pos();
+        if (adj_state.t()>=result) {
+          std::cout << "\nBEST:" << result;
+          continue;
+        }
+        if (adj_state.t()>TIME_LIMIT) {
+          std::cout << "\nTIME EXHAUST at t:" << adj_state.t();
+          continue;
+        }
+        if (m_revisited[adj_state.pos()].size() > REVISIT_LIMIT) {
+            std::cout << "\nREVISIT EXHAUST pos:" << adj_state.pos() << " count:" << m_revisited[adj_state.pos()].size();
+            continue;
+        }
         m_Q.push_back(adj_state);
       }
     }
