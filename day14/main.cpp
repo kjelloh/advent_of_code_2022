@@ -103,7 +103,7 @@ struct Model {
     }
   }
   void insert(Vector const& pos,char ch) {
-    std::cout << "\ninsert(pos:" << pos << ",ch:" << ch << ")";
+    // std::cout << "\ninsert(pos:" << pos << ",ch:" << ch << ")";
     map[pos] = ch;
     top_left = to_top_left(top_left,pos);
     bottom_right = to_bottom_right(bottom_right,pos);
@@ -134,44 +134,44 @@ std::ostream& operator<<(std::ostream& os,Model const& model) {
 
 Vector to_vertex(std::string const& s) {
   auto [s_col,s_row] = to_splitted(s,",");
-  std::cout << "\nto_vertex(" << s << ")";
+  // std::cout << "\nto_vertex(" << s << ")";
   Vector result{.row = std::stoi(s_row),.col=std::stoi(s_col)};
-  std::cout << " " << result;
+  // std::cout << " " << result;
   return result;
 }
 
 using Vertices = std::vector<Vector>;
 Vertices to_vertices(std::string const& s) {
-  std::cout << "\nto_vertices(" << s << ")";
+  // std::cout << "\nto_vertices(" << s << ")";
   Vertices result{};
   auto tokens = to_tokens(s,"->");
   for (auto const& token : tokens) {
-    std::cout << "\n\ttoken:" << std::quoted(token);
+    // std::cout << "\n\ttoken:" << std::quoted(token);
     result.push_back(to_vertex(token));
   }
   return result;
 }
 
 std::vector<Vector> to_brick_line(std::pair<Vector,Vector> edge) {
-  std::cout << "\nto_brick_line(" << edge.first << "," << edge.second << ")";
+  // std::cout << "\nto_brick_line(" << edge.first << "," << edge.second << ")";
   std::vector<Vector> result{};
   if (edge.second<edge.first) {
     auto temp = edge.first;
     edge.first = edge.second;
     edge.second = temp;
-    std::cout << "\ni.e., to_brick_line(" << edge.first << "," << edge.second << ")";
+    // std::cout << "\ni.e., to_brick_line(" << edge.first << "," << edge.second << ")";
   }
   if (edge.first.row == edge.second.row) {
     for (int col=edge.first.col;col<=edge.second.col;++col) {
       Vector pos{.row=edge.first.row,.col=col};
-      std::cout << "\n\tbrick:" << pos;
+      // std::cout << "\n\tbrick:" << pos;
       result.push_back(pos);
     }
   }
   else if (edge.first.col == edge.second.col) {
     for (int row=edge.first.row;row<=edge.second.row;++row) {
       Vector pos{.row=row,.col=edge.first.col}; 
-      std::cout << "\n\tbrick:" << pos;
+      // std::cout << "\n\tbrick:" << pos;
       result.push_back(pos);
     }
   }
@@ -269,6 +269,7 @@ struct GrainEngine {
       } 
       else {
         // Full
+        std::cout << "\nFULL grain:" << pos;
         result = false;
       }
 
@@ -282,7 +283,6 @@ namespace part1 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
-      std::cout << "\n" << data_model;
       GrainEngine ge{data_model};
       std::cout << "\n" << ge.m_model.map;
       while (++ge) {
@@ -313,9 +313,9 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
