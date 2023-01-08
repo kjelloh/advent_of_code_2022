@@ -17,6 +17,7 @@
 #include <limits> // E.g., std::numeric_limits
 #include <chrono>
 #include <cassert>
+#include <bitset>
 
 extern char const* pTest;
 extern char const* pData;
@@ -67,7 +68,7 @@ std::ostream& operator<<(std::ostream& os,Valve const& valve) {
   return os;
 }
 
-using Valves = std::map<std::string,Valve>;
+using Valves = std::vector<Valve>;
 
 using Connection = std::pair<Valve,std::vector<std::string>>;
 using Connections = std::vector<Connection>;
@@ -96,6 +97,7 @@ public:
     });
     for (auto [valve,names] : connections) {
       m_name2index[valve.name] = index(valve.name);
+      m_valves.push_back(valve);
       std::sort(names.begin(),names.end());
       for (auto const& name : names) {
         m_name2index[name] = index(name);
@@ -116,9 +118,11 @@ public:
     else return m_name2index.size();
   }
   Graph const& graph() const {return m_graph;}
+  Valves const& valves() const {return m_valves;}
 private:
   Graph m_graph{};
   std::map<std::string,Index> m_name2index{};
+  Valves m_valves{};
 };
 
 std::ostream& operator<<(std::ostream& os,CaveSystem const& cave_system) {  
@@ -134,9 +138,22 @@ std::ostream& operator<<(std::ostream& os,CaveSystem const& cave_system) {
 
 class MaxFlow {
 public:
-  MaxFlow(CaveSystem const& cave_system) {}
-  Result operator()(int start_time) {return 0;}
+  using Index = CaveSystem::Index;
+  using BitMap = std::bitset<15>;
+  MaxFlow(CaveSystem const& cave_system) : m_cave_system{cave_system} {
+    for (auto const& valve : m_cave_system.valves()) {
+      m_flowrate[m_cave_system.index(valve.name)] = valve.flow_rate;
+    }
+  }
+  Result operator()(int start_time) {return max_gained(m_cave_system.index("AA"),BitMap{},start_time);}
 private:
+  // find the maximal gained flor from cave with start index, provided open valves and the time left to 0
+  Result max_gained(Index start_index,BitMap is_open,int time_left) {
+    Result result;
+    return result;
+  }
+  CaveSystem const& m_cave_system;
+  std::map<Index,Integer> m_flowrate{};
 };
 
 using Model = CaveSystem;
