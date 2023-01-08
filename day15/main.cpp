@@ -323,7 +323,7 @@ namespace part2 {
         }
       }
 
-      if (true) {
+      if (false) {
         // Test
         auto intersect_count = std::vector<Result>(search_boundary+1,0);
         Result min_count{std::numeric_limits<Result>::max()},max_count{};
@@ -422,7 +422,7 @@ namespace part2 {
             // Thus end-start IS the count of position in the range [..[
             Result dx = (x_boundaries[on_off_x+1] - x_boundaries[on_off_x]);
             if (dx>0) {
-              uncovered_col=x_boundaries[on_off_x]; // assume only one
+              uncovered_col=x_boundaries[on_off_x]; // assume only one for this puzzle
             }
             off_count += dx;
           }
@@ -448,9 +448,9 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
