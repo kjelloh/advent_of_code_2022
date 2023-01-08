@@ -141,19 +141,32 @@ public:
   using Index = CaveSystem::Index;
   using BitMap = std::bitset<15>;
   MaxFlow(CaveSystem const& cave_system) : m_cave_system{cave_system} {
+    m_flowrate.resize(cave_system.size());
     for (auto const& valve : m_cave_system.valves()) {
       m_flowrate[m_cave_system.index(valve.name)] = valve.flow_rate;
     }
   }
-  Result operator()(int start_time) {return max_gained(m_cave_system.index("AA"),BitMap{},start_time);}
+  Result operator()(int start_time) {return max_to_gain(m_cave_system.index("AA"),BitMap{},start_time);}
 private:
-  // find the maximal gained flor from cave with start index, provided open valves and the time left to 0
-  Result max_gained(Index start_index,BitMap is_open,int time_left) {
+  // find the maximal possible flow to gain
+  // from cave with start index, provided open valves and the time left to 0
+  Result max_to_gain(Index start_index,BitMap is_open,int time_left) {
+    static int call_count{};
+    if (call_count++ % 10000 == 0) std::cout << "\n" << is_open.to_string();
     Result result;
+    if (time_left==0) return 0; // nothing to gain
+    if (!is_open[start_index] and m_flowrate[start_index]>0) {
+      // try open the valve here
+      is_open[start_index] = true;
+      result = std::max(result,m_flowrate[start_index]*(time_left-1) + max_to_gain(start_index,is_open,time_left-1));
+    }
+    for (auto adj : m_cave_system.graph().adj(start_index)) {
+      result = std::max(result,max_to_gain(adj,is_open,time_left-1));
+    }
     return result;
   }
   CaveSystem const& m_cave_system;
-  std::map<Index,Integer> m_flowrate{};
+  std::vector<int> m_flowrate{};
 };
 
 using Model = CaveSystem;
