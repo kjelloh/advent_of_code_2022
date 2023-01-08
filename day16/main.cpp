@@ -21,7 +21,8 @@
 extern char const* pTest;
 extern char const* pData;
 
-using Result = long int;
+using Integer = long int;
+using Result = Integer;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 std::string to_trimmed(std::string const& s) {
@@ -69,42 +70,76 @@ std::ostream& operator<<(std::ostream& os,Valve const& valve) {
 using Valves = std::map<std::string,Valve>;
 
 using Connection = std::pair<Valve,std::vector<std::string>>;
+using Connections = std::vector<Connection>;
 
 class Graph {
 public:
-  using Vertex = std::string;
-  using Vertices = std::vector<std::string>;
-  using AdjList = std::map<Vertex,Vertices>;
-  Vertices const& adj(std::string const& name) const {return m_adj.at(name);}
-  Graph& insert(Connection const& connection) {
-    m_valves[connection.first.name] = connection.first;
-    for (auto const& name : connection.second) {
-      m_adj[connection.first.name].push_back(name);
-    }     
+  using Index = int;
+  auto size() const {return m_adj.size();}
+  auto const& adj(Index index) const {return m_adj.at(index);}
+  Graph& insert(Index index1,Index index2) {
+    m_adj[index1].insert(index2);
+    m_adj[index2].insert(index1);
     return *this;
   }
-  Valves const& valves() const {
-    return m_valves;
-  }
-  Valve const& valve(Vertex const& v) const {
-    return m_valves.at(v);
-  }
 private:
-  AdjList m_adj;
-  Valves m_valves;
+  std::map<Index,std::set<Index>> m_adj{};
 };
 
-std::ostream& operator<<(std::ostream& os,Graph const& graph) {
-  for (auto const& [v_name,valve] : graph.valves()) {
-    os << "\nvalve:" << valve;
-    for (auto const& adj_name : graph.adj(valve.name)) {
-      os << " adj:" << adj_name;
+class CaveSystem {
+public:
+  using Index = Graph::Index;
+  CaveSystem(Connections connections) {
+    // make "AA" first
+    std::sort(connections.begin(),connections.end(),[](auto const& e1,auto const& e2){
+      return e1.first.name < e2.first.name;
+    });
+    for (auto [valve,names] : connections) {
+      m_name2index[valve.name] = index(valve.name);
+      std::sort(names.begin(),names.end());
+      for (auto const& name : names) {
+        m_name2index[name] = index(name);
+        m_graph.insert(index(valve.name),index(name));
+      }
+    }
+  }
+  auto size() const {return m_graph.size();}
+  std::string name(Index index) const {
+    auto iter = std::find_if(m_name2index.begin(),m_name2index.end(),[index](auto const& entry){
+      return (entry.second == index);
+    });
+    if (iter!=m_name2index.end()) return iter->first;
+    else return "??";
+  }
+  Index index(std::string const& name) const {
+    if (m_name2index.contains(name)) return m_name2index.at(name);
+    else return m_name2index.size();
+  }
+  Graph const& graph() const {return m_graph;}
+private:
+  Graph m_graph{};
+  std::map<std::string,Index> m_name2index{};
+};
+
+std::ostream& operator<<(std::ostream& os,CaveSystem const& cave_system) {  
+  for (int i=0;i<cave_system.graph().size();++i) {
+    if (i>0) os << "\n";
+    os << i << ":" << cave_system.name(i) << " ";
+    for (auto adj : cave_system.graph().adj(i)) {
+      os << " -> " << cave_system.name(adj);
     }
   }
   return os;
 }
 
-using Model = Graph;
+class MaxFlow {
+public:
+  MaxFlow(CaveSystem const& cave_system) {}
+  Result operator()(int start_time) {return 0;}
+private:
+};
+
+using Model = CaveSystem;
 
 Connection to_connection(std::string const& s) {
   std::cout << "\nto_connection(" << s << ")";
@@ -129,126 +164,13 @@ Connection to_connection(std::string const& s) {
 }
 
 Model parse(auto& in) {
-    Model result{};
     std::string line{};
+    Connections connections{};
     while (std::getline(in,line)) {
-      auto connection = to_connection(line);
-      result.insert(connection);
+      connections.push_back(to_connection(line));
     }
-    return result;
+    return Model{connections};
 }
-
-struct Flow {
-  int flow_t;
-  Valve on_valve;
-  Result to_gain() { return flow_t * on_valve.flow_rate;}
-};
-using Flows = std::set<Flow>;
-
-struct State {
-  using Vertex = Graph::Vertex;
-  using Path = std::vector<Vertex>;
-  Result gained_for_visting_v; // gained for visiting v
-  Graph::Vertex v; // vertex to visit
-  int flow_t_when_visit_v;
-  Path const& already_open; // already open when visiting v (including v if so chosen)
-  bool operator==(State const& other) const {
-    return gained_for_visting_v == other.gained_for_visting_v and v==other.v and flow_t_when_visit_v==other.flow_t_when_visit_v and already_open==other.already_open;
-  }
-};
-
-struct StateHash
-{
-    std::size_t operator()(State const& state) const noexcept {
-        std::size_t result = std::hash<Result>{}(state.gained_for_visting_v);
-        for (auto const& p : state.already_open) {
-          result ^= std::hash<std::string>{}(p);
-        }
-        return result;
-    }
-};
-
-class MaxFlow {
-private:
-  using Vertex = State::Vertex;
-  using Path = State::Path; 
-  Graph m_graph;
-  Valves m_working_valves{};
-  std::unordered_map<State,Result,StateHash> m_cache{};
-  Result dfs(State const& state) {
-    static Result call_counter{};
-    if (call_counter++ % 100000 == 0) std::cout << "\n" << call_counter;
-    auto dfs_id = StateHash{}(state);
-    Result result{};
-    auto gained_for_visting_v = state.gained_for_visting_v;
-    auto const& v = state.v;
-    auto flow_t_when_visit_v = state.flow_t_when_visit_v;
-    auto const& already_open = state.already_open;
-    // std::cout << "\ndfs_id:" << dfs_id << "dfs(gained_for_visting_v:" << gained_for_visting_v << " v:" << v << " flow_t_when_visit_v:" << flow_t_when_visit_v << " already_open_count:" << already_open.size()  << ")"; 
-    // for (auto const& p : already_open) std::cout<< "\ndfs_id:" << dfs_id << "\talready open:" << p;
-    if (result = m_cache[state];result>0) {
-      // std::cout << "\ndfs_id:" << dfs_id << "\talready known, RETURN gained_for_visting_v:" << result;
-      return result; // We already know the result coming to v with this state
-    }
-    else if (already_open.size() == m_working_valves.size()) {
-      // no more valves to open
-      result = gained_for_visting_v; 
-      // std::cout << "\ndfs_id:" << dfs_id << "\tall is open, RETURN gained_for_visting_v:" << result;
-      return result;
-    }
-    else if (flow_t_when_visit_v<=0) {
-      // No more time to open valves
-      result = gained_for_visting_v; 
-      // std::cout << "\ndfs_id:" << dfs_id << "\ttimes up, RETURN gained_for_visting_v:" << result;
-      return result; 
-    }
-    else {
-      // std::cout << "\ndfs_id:" << dfs_id << "\tadjacent_to:" << v;
-      for (auto const& adj_v : m_graph.adj(v)) {
-        // std::cout  << "\ndfs_id:" << dfs_id << "\t\tadj_v:" << adj_v;
-        auto valve_adj = m_graph.valve(adj_v);
-        auto iter = std::find_if(already_open.begin(),already_open.end(),[&adj_v](Vertex const& p){
-          return p == adj_v; // Adjacent valve is already open (in path)
-        });
-        if (iter == already_open.end() and valve_adj.flow_rate>0) {
-          // adj_v is NOT open and has a flow rate (not broke) -> try open adjacent valve
-          // std::cout  << "\ndfs_id:" << dfs_id  << "\ttry open adjacent:" << adj_v;
-          auto new_open = already_open; new_open.push_back(adj_v);
-          // std::sort(new_open.begin(),new_open.end());
-          // new gain for opening adjacent valve = flow_rate of adjacent valve * flow_t left to flow when we open it
-          // We will open adjacent valve at flow_t_when_visit_v - 2 (one minute to step there and one minute to open it)
-          auto gain_for_opening_adj_v = valve_adj.flow_rate*(std::max(flow_t_when_visit_v-2,0));
-          State state_adj_v{.gained_for_visting_v=gained_for_visting_v+gain_for_opening_adj_v,.v=adj_v,.flow_t_when_visit_v=flow_t_when_visit_v-2,.already_open=new_open};
-          result = std::max(result,dfs(state_adj_v)); // update result if better
-        }
-        {
-          // try next without opening the valve at adj_v
-          // std::cout  << "\ndfs_id:" << dfs_id  << "\tmove to adjacent:" << adj_v;
-          auto gain_for_not_opening_adj_v = gained_for_visting_v;
-          auto state_adj_v = state;
-          state_adj_v.v = adj_v;
-          state_adj_v.flow_t_when_visit_v = flow_t_when_visit_v-1;
-          result = std::max(result,dfs(state_adj_v)); // update result if better
-        }
-      }
-      // std::cout  << "\ndfs_id:" << dfs_id  << " RETURN from dfs(gained_for_visting_v:" << gained_for_visting_v << " v:" << v << " flow_t_when_visit_v:" << flow_t_when_visit_v << " already_open_count:" << already_open.size()  << ") = " << result;
-      m_cache[state] = result; // cache this result
-      return result;
-    }
-  }
-public:
-  MaxFlow(Graph const& graph) : m_graph{graph} {
-    for (auto const& [v,valve] : graph.valves()) {
-      if (valve.flow_rate>0) {
-        m_working_valves[v] = valve;
-      }
-    }
-  }
-  Result operator()(int start_t) {
-    Result result{};
-    return dfs(State{.gained_for_visting_v=0,.v="AA",.flow_t_when_visit_v=start_t,.already_open=Path{}});
-  }
-};
 
 namespace jonathanpaulsson {
   // Based on https://github.com/jonathanpaulson/AdventOfCode/blob/master/2022/16.cc 
@@ -395,9 +317,9 @@ int main(int argc, char *argv[])
   std::chrono::time_point<std::chrono::system_clock> start_time{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   // exec_times.push_back(std::chrono::system_clock::now());
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // exec_times.push_back(std::chrono::system_clock::now());
