@@ -415,17 +415,29 @@ namespace part2 {
         // We "just" needs to map the on-regions back to actual row (x) coordinates to get the
         // "count" of all positions that is "on".
         Result off_count{0};
+        Result uncovered_col{};
         for (int on_off_x=0;on_off_x < boundaries_count-1;on_off_x++) {
           if (on_off_vector[on_off_x]==false) {
             // Note that the interval is (..( (the last coordinate is NOT part of the range)
             // Thus end-start IS the count of position in the range [..[
             Result dx = (x_boundaries[on_off_x+1] - x_boundaries[on_off_x]);
+            if (dx>0) {
+              uncovered_col=x_boundaries[on_off_x]; // assume only one
+            }
             off_count += dx;
           }
         }
         if (true and is_test_data) {
           // Log
           std::cout << "\nrow:" << row << " off_count:" << off_count;
+        }
+
+        if (off_count==1) {
+          auto y = row;
+          auto x = uncovered_col;
+          Vector uncovered_pos{.row=y,.col=x};
+          std::cout << "\nUNCOVERED x:" << x << " y:" << y;
+          result = 4000000*x + y;
         }
       }
       return result;
