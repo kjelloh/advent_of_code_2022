@@ -170,7 +170,7 @@ struct Model {
   SensorBeaconPairs sb_pairs;
   Grid grid;
   Grid to_grid(SensorBeaconPairs const& sb_pairs) {
-    std::cout << "\nto_map(sb_pairs.size():" << sb_pairs.size() << ")";
+    std::cout << "\nto_grid(sb_pairs.size():" << sb_pairs.size() << ")";
     Grid result{};
     for (auto const& sb_pair : sb_pairs) {
       result.insert(sb_pair.first,'S');
@@ -229,8 +229,8 @@ namespace part1 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
-      int target_row{10};
-      if (data_model.grid.bottom_right().row > 2000000) target_row = 2000000;
+      int target_row{10}; // test
+      if (data_model.grid.bottom_right().row > 2000000) target_row = 2000000; // part 1
       std::set<Vector> covered_pos_on_target_row{};
       for (auto const& sb_pair : data_model.sb_pairs) {
         auto manhattan_distance = std::abs(sb_pair.first.row - sb_pair.second.row) + std::abs(sb_pair.first.col - sb_pair.second.col);
@@ -250,7 +250,7 @@ namespace part1 {
             else {
               if (manhattan_distance_to_target <= manhattan_distance) {
                 covered_pos_on_target_row.insert(pos);
-                // std::cout << " COVERED";
+                // std::cout << " Interval";
               }
             }
           }
@@ -261,11 +261,173 @@ namespace part1 {
   }
 }
 
+Result manhattan_distance(Vector const& pos1,Vector const& pos2) {
+  return std::abs(pos1.row-pos2.row) + std::abs(pos1.col-pos2.col);
+}
+
+struct BoundingBox {
+  BoundingBox(Vector const& sensor,Vector const& beacon) {
+    auto reach = manhattan_distance(sensor,beacon);
+    top_left.row = sensor.row - reach;
+    top_left.col = sensor.col - reach;
+    bottom_right.row = sensor.row + reach;
+    bottom_right.col = sensor.col + reach;
+  }
+  Vector top_left;
+  Vector bottom_right;
+  bool operator<(BoundingBox const& other) const {
+    if (top_left==other.top_left) return bottom_right<other.bottom_right;
+    else return top_left<other.top_left;
+  }
+};
+
+struct SensorBeaconFrame {
+  SensorBeaconFrame(Vector const& sensor_pos,Vector const& beacon_pos) 
+    :  S{sensor_pos}
+      ,B{beacon_pos}    
+      ,reach{sensor_pos,beacon_pos} {
+  }
+  bool operator<(SensorBeaconFrame const& other) const {
+    return reach < other.reach;
+  }
+  Vector S;
+  Vector B;
+  BoundingBox reach;
+};
+
+using SensorBeaconFrames = std::vector<SensorBeaconFrame>;
+
+using Interval = std::pair<Result,Result>;
+
 namespace part2 {
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      bool is_test_data = data_model.grid.bottom_right().row < 2000000;
+      int search_boundary{20}; // part 2 test
+      if (!is_test_data) search_boundary = 4000000; // part 2
+
+      SensorBeaconFrames sb_frames{};
+      for (auto const& sb : data_model.sb_pairs) {
+        sb_frames.push_back(SensorBeaconFrame(sb.first,sb.second));
+      }
+      std::sort(sb_frames.begin(),sb_frames.end(),[](auto const& sbf1, auto const& sbf2){
+        return (sbf1.reach < sbf2.reach); // sort low to high on row, for same row on col
+      });
+
+      if (true) {
+        // Log
+        for (auto const& sb_frame : sb_frames) {
+          std::cout << "\nframe:" << sb_frame.reach.top_left << " to " << sb_frame.reach.bottom_right;
+        }
+      }
+
+      if (true) {
+        // Test
+        auto intersect_count = std::vector<Result>(search_boundary+1,0);
+        Result min_count{std::numeric_limits<Result>::max()},max_count{};
+        for (int row=0;row<=search_boundary;++row) {
+          for (auto const& sb_frame : sb_frames) {
+            if (sb_frame.reach.top_left.row <= row and row <= sb_frame.reach.bottom_right.row) ++intersect_count[row];
+          }
+          min_count = std::min(min_count,intersect_count[row]);
+          max_count = std::max(max_count,intersect_count[row]);
+        }
+        if (true) {
+          int intersected_rows{};
+          for (int row=0;row<=search_boundary;++row) {
+            if (intersect_count[row]>0) ++intersected_rows;
+          }
+          std::cout << "\nintersected rows:" << intersected_rows;
+          std::cout << "\nmin_count:" << min_count << " max_count:" << max_count;
+          // For my input data i got
+          // intersected rows:4000001
+          // min_count:3 max_count:17
+          // So we may be able to reduce the search space?
+        }
+      }
+
+      std::map<Result,Result> uncovered{};
+      for (int row=0;row<=search_boundary;++row) {
+        std::vector<Interval> covered_intervals{};
+        std::vector<Result> x_boundaries{};
+        for (auto const& sb_frame : sb_frames) {
+          if (sb_frame.reach.top_left.row <= row and row <= sb_frame.reach.bottom_right.row) {
+            // intersects
+            auto overreach = (row < sb_frame.S.row)?std::abs(sb_frame.reach.top_left.row-row):std::abs(sb_frame.reach.bottom_right.row - row);
+            if (overreach<0) {std::cout << "\noverreach:" << overreach ;exit(1);}
+            Interval covered{sb_frame.S.col-overreach,sb_frame.S.col+overreach};
+            covered_intervals.push_back(covered);
+            // mark the boundaries on the x-axis (column) where the covered state changes 
+            x_boundaries.push_back(covered.first); // changes at start
+            x_boundaries.push_back(covered.second+1); // changes at one beyond end
+            std::cout << "\nrow:" << row << " covered.first:" << covered.first << " covered.second:" << covered.second;
+          }
+        }
+        // Ensure we have the boundaries in ascending order
+        std::sort(x_boundaries.begin(),x_boundaries.end());
+        // Compress x_boundaries to indexed intervals mapped to bool for mark "is covered"
+        // For inspiration, see solution to advent of code 2021 day 22 (but in a single dimension here)
+        // The idea is to map each interval in x_boundaries to a flag indicating if that interval is covered or not
+        auto boundaries_count = x_boundaries.size();
+        auto on_off_vector = std::vector(boundaries_count,false);
+        // Let's define a helper lambda to return the index in the boundaries vector of coordinate (in out case x, i.e., the column) in the boundaries vector
+        auto on_off_vector_index = [](auto const& boundaries,Result c)  {
+          // Return the index in the boundaries vector of the provided boundary c.
+          // This is the distance from the beginning of the sorted boundaries vector
+          // to the position of c in the vector
+          auto iter = std::lower_bound(boundaries.begin(),boundaries.end(),c);
+          // Note: We need to use lower_bound (and not find) as we added end+1 for the end-boundary so when
+          // called with a cuboid end boundary it will not be exactly found. the lower_bound will :)
+          return std::distance(boundaries.begin(),iter);
+        };
+
+        // Now map each covered interval to an index in the on_off_vector marking if this interval is covered or not
+        for (auto const& interval : covered_intervals) {
+          /*
+          The on_off vector has a location for each interval of coordinates with the same state.
+          Thus, a boundary vector {c0,c1,c2...cn} defines ranges [c0,c1[, [c1,c2[, [c2,*[ .. [*,cn[
+          with index 0..n                     on_off grid index    0        1        2        n-1     
+          */
+
+          auto on_off_x_first = on_off_vector_index(x_boundaries,interval.first);
+          auto on_off_x_second = on_off_vector_index(x_boundaries,interval.second+1);
+          // Now mark all covered ranges with true (is covered)
+          for (int on_off_x=on_off_x_first;on_off_x<on_off_x_second;on_off_x++) {
+            on_off_vector[on_off_x] = true; // the interval with this index is covered
+            // Note that overlapping cuboids will overwrite previous state
+            // in the overlapping region (just as they should)
+          }
+        }
+
+        if (true and is_test_data) {
+          // Log
+          if (row==11) {
+            std::cout << "\non_off_vector:";
+            for (auto is_covered : on_off_vector) {
+              std::cout << " " << is_covered;
+            }
+          }
+        }
+
+        // Now Magic has happened! The on_off_vector now represents the on/off state of this row
+        // We "just" needs to map the on-regions back to actual row (x) coordinates to get the
+        // "count" of all positions that is "on".
+        Result off_count{0};
+        for (int on_off_x=0;on_off_x < boundaries_count-1;on_off_x++) {
+          if (on_off_vector[on_off_x]==false) {
+            // Note that the interval is (..( (the last coordinate is NOT part of the range)
+            // Thus end-start IS the count of position in the range [..[
+            Result dx = (x_boundaries[on_off_x+1] - x_boundaries[on_off_x]);
+            off_count += dx;
+          }
+        }
+        if (true and is_test_data) {
+          // Log
+          std::cout << "\nrow:" << row << " off_count:" << off_count;
+        }
+      }
       return result;
   }
 }
@@ -273,9 +435,9 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
