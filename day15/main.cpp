@@ -362,7 +362,7 @@ namespace part2 {
             // mark the boundaries on the x-axis (column) where the covered state changes 
             x_boundaries.push_back(covered.first); // changes at start
             x_boundaries.push_back(covered.second+1); // changes at one beyond end
-            std::cout << "\nrow:" << row << " covered.first:" << covered.first << " covered.second:" << covered.second;
+            if (is_test_data) std::cout << "\nrow:" << row << " covered.first:" << covered.first << " covered.second:" << covered.second;
           }
         }
         // Ensure we have the boundaries in ascending order
@@ -438,6 +438,7 @@ namespace part2 {
           Vector uncovered_pos{.row=y,.col=x};
           std::cout << "\nUNCOVERED x:" << x << " y:" << y;
           result = 4000000*x + y;
+          break; // assume only one uncovered on any row
         }
       }
       return result;
@@ -449,8 +450,8 @@ int main(int argc, char *argv[])
   Answers answers{};
   // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
   }
