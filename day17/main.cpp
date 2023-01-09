@@ -69,7 +69,7 @@ struct Sprite {
     return (pos >= m_frame_top_left and pos <= m_frame_bottom_right);
   }
   char& at(Vector const& pos) {
-    std::cout << "\nat(" << pos << ")";
+    // std::cout << "\nat(" << pos << ")";
     static char NULL_CHAR{'?'};
     auto row = m_frame_top_left.row - pos.row;
     if (in_frame(pos)) {
@@ -94,14 +94,14 @@ struct Sprite {
     return *this;
   }
   Sprite& push_row(Row const& entry) {
-    std::cout << "\npush_row(" << std::quoted(entry) << ")";
+    // std::cout << "\npush_row(" << std::quoted(entry) << ")";
     m_rows.push_back(entry);
     ++m_frame_top_left.row;
-    std::cout << " m_frame_top_left:" << m_frame_top_left << " m_frame_bottom_right:" << m_frame_bottom_right;
+    // std::cout << " m_frame_top_left:" << m_frame_top_left << " m_frame_bottom_right:" << m_frame_bottom_right;
     return *this;
   }
   Sprite& operator+=(Sprite const& other) {
-    std::cout << "\nSprite::operator+=(Sprite const& other)";
+    // std::cout << "\nSprite::operator+=(Sprite const& other)";
     // merge other with us
     const std::string empty_row(m_frame_bottom_right.col - m_frame_top_left.col+1,'.');
     while (other.m_frame_top_left.row > m_frame_top_left.row) push_row(empty_row);
@@ -117,15 +117,15 @@ struct Sprite {
   bool does_collide_with(Sprite const& other) {
     static int call_count{};
     bool result{false};
-    std::cout << "\ndoes_collide_with m_frame_top_left:" << m_frame_top_left << " m_frame_bottom_right:" << m_frame_bottom_right; 
+    // std::cout << "\ndoes_collide_with m_frame_top_left:" << m_frame_top_left << " m_frame_bottom_right:" << m_frame_bottom_right; 
     for (auto row=m_frame_top_left.row;row>=m_frame_bottom_right.row and !result;--row) {
       for (auto col=m_frame_top_left.col;col<=m_frame_bottom_right.col and !result;++col) {
         Vector pos{.row=row,.col=col};
         if (this->at(pos)!='.') {
           if (other.in_frame(pos)) {
-            std::cout << "\nother.in_frame TRUE";
+            // std::cout << "\nother.in_frame TRUE";
             result = result or other.at(pos)!='.';
-            std::cout << "\npos:" << pos << " this:" << this->at(pos) << " other:" << other.at(pos) << " does_collide:" << result << std::flush;
+            // std::cout << "\npos:" << pos << " this:" << this->at(pos) << " other:" << other.at(pos) << " does_collide:" << result << std::flush;
           }
         } 
       }
@@ -180,7 +180,7 @@ public:
     return (top_left().col < rock.top_left().col) and !rock.m_sprite.does_collide_with(this->m_sprite);
   }
   bool can_move_right(Rock rock) {
-    std::cout << "\ncan_move_right(rock::bottom_right:" << rock.bottom_right() << ") this->bottom_right:" << bottom_right(); 
+    // std::cout << "\ncan_move_right(rock::bottom_right:" << rock.bottom_right() << ") this->bottom_right:" << bottom_right(); 
     rock.m_sprite += Sprite::RIGHT;
     return (rock.bottom_right().col < bottom_right().col) and !rock.m_sprite.does_collide_with(this->m_sprite);
   }
@@ -200,9 +200,9 @@ public:
     return result;
   }
   Chamber& place_rock(Rock const& rock) {
-    std::cout << "\nplace_rock(" << rock.top_left() << ")";
+    // std::cout << "\nplace_rock(" << rock.top_left() << ")";
     m_sprite += rock.m_sprite;
-    std::cout << "\nadd chamber sides";
+    // std::cout << "\nadd chamber sides";
     for (auto row=rock.top_left().row;row>=rock.bottom_right().row;--row) {
       m_sprite.at(Vector{.row=row,.col=0}) = '|';
       m_sprite.at(Vector{.row=row,.col=m_sprite.m_frame_bottom_right.col}) = '|';
@@ -214,14 +214,14 @@ public:
     auto rows = ROCKS[rock_index];
     Vector top_left{.row=static_cast<Result>(m_sprite.m_frame_top_left.row + rows.size() -1 + 4),.col=3}; // col:0 is left boundary
     Rock rock(top_left,rows);
-    std::cout << "\n" << rock.m_sprite << std::flush;
+    // std::cout << "\n" << rock.m_sprite << std::flush;
     bool is_falling{true};
     while (is_falling) {
       rock = to_moved_rock(rock,m_jets[jet_index]);
-      std::cout << "\ngusted to" << rock.m_sprite.m_frame_top_left << "\n" << rock.m_sprite << std::flush;
+      // std::cout << "\ngusted to" << rock.m_sprite.m_frame_top_left << "\n" << rock.m_sprite << std::flush;
       if (can_move_down(rock)) {
         rock.m_sprite += Sprite::DOWN;
-        std::cout << "\nfallen to" << rock.m_sprite.m_frame_top_left << "\n" << rock.m_sprite << std::flush;
+        // std::cout << "\nfallen to" << rock.m_sprite.m_frame_top_left << "\n" << rock.m_sprite << std::flush;
       }
       else {
         is_falling=false;
