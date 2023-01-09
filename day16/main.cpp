@@ -92,13 +92,18 @@ class CaveSystem {
 public:
   using Index = Graph::Index;
   CaveSystem(Connections connections) {
-    // make "AA" first
-    std::sort(connections.begin(),connections.end(),[](auto const& e1,auto const& e2){
-      return e1.first.name < e2.first.name;
-    });
+    // make the valves with a flow rate have the index range 0..
     for (auto [valve,names] : connections) {
-      m_name2index[valve.name] = index(valve.name);
-      m_valves.push_back(valve);
+      if (valve.flow_rate>0) {
+        m_name2index[valve.name] = index(valve.name);
+        m_valves.push_back(valve);
+      }
+    }
+    for (auto [valve,names] : connections) {
+      if (valve.flow_rate==0) {
+        m_name2index[valve.name] = index(valve.name);
+        m_valves.push_back(valve);
+      }
     }
     for (auto [valve,names] : connections) {
       for (auto const& name : names) {
@@ -132,7 +137,7 @@ std::ostream& operator<<(std::ostream& os,CaveSystem const& cave_system) {
     if (i>0) os << "\n";
     os << i << ":" << cave_system.name(i) << " ";
     for (auto adj : cave_system.graph().adj(i)) {
-      os << " -> " << cave_system.name(adj);
+      os << " -> " << adj << ":" << cave_system.name(adj);
     }
   }
   return os;
@@ -154,23 +159,38 @@ public:
     }
   }
   Result operator()(int start_time) {
+    for (int t=0;t<=31;++t) {
+      auto is_open = BitMap(std::string(15,'0'));
+      std::bitset<26> bitmap{to_key(0,is_open,t)};
+      std::cout << "\nkey:" << bitmap.to_string();
+    }
+    for (int i=0;i<15;++i) {
+      auto is_open = BitMap(); is_open[i] = true;
+      std::bitset<26> bitmap{to_key(63,is_open,31)};
+      std::cout << "\nkey:" << bitmap.to_string();
+    }
+    for (int i=0;i<=63;++i) {
+      auto is_open = BitMap(); is_open[14] = true;
+      std::bitset<26> bitmap{to_key(i,is_open,31)};
+      std::cout << "\nkey:" << bitmap.to_string();
+    }
     return max_to_gain(m_cave_system.index("AA"),BitMap{},start_time);
   }
 private:
   using Key = u_int32_t;
   const int KEY_BITS{26};
-  const Key KEY_RANGE{static_cast<Key>(std::pow(2,KEY_BITS+1))};
+  const Key KEY_RANGE{Key{1} << (KEY_BITS+1)};
   Key to_key(Index valve_ix,BitMap is_open,int time_left) {
     // 54 valves = 6 bits
     // 15 possible valves to open (has flowrate > 0)= 15 bits
     // 31 time_left = 5 bits
-    // Total  26 bits   2    21         0
+    // Total  26 bits        2         1
     //                  54321098765432109876543210
     //                  vvvvvvfffffffffffffffttttt
     // v = valve index
     // f = flags for open valves (0..14)
     // t = time left
-    Key result = valve_ix*std::pow(2,20) + is_open.to_ulong()*std::pow(2,5) + time_left;
+    Key result = (valve_ix<<20) + (is_open.to_ulong()<<5) + time_left;
     assert(result<=KEY_RANGE);
     return result;
   }
@@ -185,8 +205,9 @@ private:
       return 0; // nothing to gain
     }
     if (auto cached = m_cache[to_key(start_index,is_open,time_left)]>=0) return cached;
-    if (!is_open[start_index] and m_flowrate[start_index]>0) {
+    if (m_flowrate[start_index]>0 and !is_open[start_index]) {
       // try open the valve here
+      assert(start_index<is_open.size());
       auto new_is_open = is_open;
       new_is_open[start_index] = true;
       auto new_candidate = m_flowrate[start_index]*(time_left-1) + max_to_gain(start_index,new_is_open,time_left-1);
@@ -392,8 +413,8 @@ int main(int argc, char *argv[])
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  exec_times.push_back(std::chrono::system_clock::now());
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // exec_times.push_back(std::chrono::system_clock::now());
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // exec_times.push_back(std::chrono::system_clock::now());
