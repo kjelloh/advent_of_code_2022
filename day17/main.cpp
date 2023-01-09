@@ -298,6 +298,7 @@ namespace part1 {
       }
       std::cout << "\n\n" << chamber;
       std::cout << "\nchamber.top_left:" << chamber.top_left();
+      result = chamber.top_left().row;
       return result;
   }
 }
@@ -321,7 +322,6 @@ void test() {
     merged.m_sprite += r2.m_sprite;
     std::cout << "\n\n" << merged.m_sprite; 
   }
-
   exit(0);
 }
 
