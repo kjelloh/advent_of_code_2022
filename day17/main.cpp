@@ -214,15 +214,14 @@ public:
       m_sprite.at(Vector{.row=row,.col=0}) = '|';
       m_sprite.at(Vector{.row=row,.col=m_sprite.m_frame_bottom_right.col}) = '|';
     }
-    if (drop_count>1000) {
-      m_state = State{.jet_index=jet_index,.rock_index=rock_index,.pile_key=pile_key(),.drop_count=drop_count,.top_left=m_sprite.m_frame_top_left};
-      if (m_seen.count(m_state)>1) {std::cerr << "\nSEEN " << m_state.top_left << std::flush;}
-      m_seen.insert(m_state);
+    if (top_left().row>PATTERN_BUFFER_LENGTH) {
+      // ensure we have enough on the rock pile to calculate a pile_key
+      m_state = State{.jet_index=jet_index,.rock_index=rock_index,.pile_key=pile_key(),.drop_count=drop_count,.top_left=top_left()};
     }
     return *this;
   }
   Chamber& drop() {
-    rock_index = (drop_count++ % ROCKS.size());
+    rock_index = (drop_count % ROCKS.size());
     auto rows = ROCKS[rock_index];
     Vector top_left{.row=static_cast<Result>(m_sprite.m_frame_top_left.row + rows.size() -1 + 4),.col=3}; // col:0 is left boundary
     Rock rock(top_left,rows);
@@ -241,6 +240,7 @@ public:
       }
       jet_index = (jet_index+1) % m_jets.size();
     }
+    ++drop_count;
     return *this;
   }
   using Key = std::size_t;
@@ -249,6 +249,7 @@ public:
     Result start_row = (m_sprite.m_rows.size()>PATTERN_BUFFER_LENGTH)?m_sprite.m_rows.size()-PATTERN_BUFFER_LENGTH:0;
     for (Result row=start_row;row<m_sprite.m_rows.size();++row) {
       result = std::rotl(result,1) ^ std::hash<std::string>{}(m_sprite.m_rows[row]);
+      // result ^= std::hash<std::string>{}(m_sprite.m_rows[row]);
     }
     return result;
   }
@@ -259,10 +260,12 @@ public:
     Key pile_key;
     Result drop_count;
     Vector top_left;
-    bool operator==(State const& other) const {
-      return      jet_index==other.jet_index 
-              and rock_index==other.rock_index 
-              and pile_key==other.pile_key;
+    bool operator<(State const& other) const {
+      if (jet_index==other.jet_index) {
+        if (rock_index==other.rock_index) return pile_key<other.pile_key;
+        else return rock_index<other.rock_index;
+      }
+      else return jet_index<other.jet_index;
     }
   };
 
@@ -271,27 +274,18 @@ public:
     Result pile_gain;
   };
 
-  struct StateHash {
-    std::size_t operator()(State const& state) const noexcept {
-      std::size_t result{};
-      result = std::hash<int>{}(state.jet_index);
-      result ^= std::hash<int>{}(state.rock_index);
-      result ^= std::hash<Key>{}(state.pile_key);
-      // Note: we hash only those we expect to repeat. The other state properties are there for client logic
-      return result;
-    }
-  };
-
   State m_state{};
-  std::unordered_set<State,StateHash> m_seen{};
+  std::set<State> m_seen{};
 
   std::optional<Cycle> cycle() {
     std::optional<Cycle> result{};
-    if (m_seen.count(m_state)>1) {
-      auto ip = m_seen.equal_range(m_state);
-      assert(std::distance(ip.first,ip.second)==2);
-      result=Cycle{.drop_count=ip.second->drop_count - ip.first->drop_count,.pile_gain=ip.second->top_left.row-ip.first->top_left.row};
-      exit(1);
+    if (drop_count>1000) {
+      if (auto iter = m_seen.find(m_state);iter!=m_seen.end()) {
+        std::cout << "\n SEEN " << drop_count << " " << m_state.rock_index << " " << m_state.top_left << " " << m_state.pile_key << std::flush;
+        std::cout << "\n PREV " << iter->drop_count << " " << iter->rock_index << " " << iter->top_left << " " << iter->pile_key << std::flush;
+        result=Cycle{.drop_count=m_state.drop_count - iter->drop_count,.pile_gain=m_state.top_left.row - iter->top_left.row};
+      }
+      else m_seen.insert(m_state);
     }
     return result;
   }
@@ -376,19 +370,27 @@ namespace part2 {
       Chamber chamber{data_model};
       std::cout << "\n" << chamber << std::flush;
       const Result TARGET_COUNT{1000000000000};
+      // const Result TARGET_COUNT{1040};
+      bool cycled{false};
       for (Result i=1;i<=TARGET_COUNT;++i) {
-        if ((i-1)%1000==0) std::cout << "\n" << i;
+        if ((i-1)%1==0) std::cout << "\n" << i;
         chamber.drop();
-        if (auto cycle = chamber.cycle()) {
-        //   auto cycle_counts = (TARGET_COUNT / cycle->drop_count) - 1;
-        //   auto delta = cycle_counts*cycle->drop_count;
-        //   i += delta;
-        //   chamber.advance_pile(cycle_counts*cycle->pile_gain);
-        //   assert(i<TARGET_COUNT);
-        //   assert(TARGET_COUNT-i > delta);
+        if (!cycled) {
+          if (auto cycle = chamber.cycle()) {
+            std::cout << "\nDROP CYCLE:" << cycle->drop_count;
+            std::cout << "\nPILE CYCLE:" << cycle->pile_gain;
+            auto cycle_counts = ((TARGET_COUNT-i) / cycle->drop_count);
+            auto delta = cycle_counts*cycle->drop_count;
+            i += delta;
+            std::cout << "\nnew i " << i;
+            chamber.advance_pile(cycle_counts*cycle->pile_gain);
+            // exit(1);
+            assert(i<TARGET_COUNT);
+            cycled=true;
+          }
         }
-
       }
+      // result = chamber.top_left().row;
       return result;
   }
 }
