@@ -18,6 +18,7 @@
 #include <chrono>
 #include <cassert>
 #include <bitset>
+#include <cmath> // pow
 
 extern char const* pTest;
 extern char const* pData;
@@ -98,7 +99,8 @@ public:
     for (auto [valve,names] : connections) {
       m_name2index[valve.name] = index(valve.name);
       m_valves.push_back(valve);
-      std::sort(names.begin(),names.end());
+    }
+    for (auto [valve,names] : connections) {
       for (auto const& name : names) {
         m_name2index[name] = index(name);
         m_graph.insert(index(valve.name),index(name));
@@ -140,29 +142,67 @@ class MaxFlow {
 public:
   using Index = CaveSystem::Index;
   using BitMap = std::bitset<15>;
-  MaxFlow(CaveSystem const& cave_system) : m_cave_system{cave_system} {
+  MaxFlow(CaveSystem const& cave_system) 
+    : m_cave_system{cave_system}
+      ,m_cache(KEY_RANGE,-1) {
     m_flowrate.resize(cave_system.size());
     for (auto const& valve : m_cave_system.valves()) {
       m_flowrate[m_cave_system.index(valve.name)] = valve.flow_rate;
     }
+    for (int index=0;index<m_flowrate.size();++index) {
+      std::cout << "\n" << index << ":" << m_cave_system.name(index) << " flowrate:" << m_flowrate[index];
+    }
   }
-  Result operator()(int start_time) {return max_to_gain(m_cave_system.index("AA"),BitMap{},start_time);}
+  Result operator()(int start_time) {
+    return max_to_gain(m_cave_system.index("AA"),BitMap{},start_time);
+  }
 private:
+  using Key = u_int32_t;
+  const int KEY_BITS{26};
+  const Key KEY_RANGE{static_cast<Key>(std::pow(2,KEY_BITS+1))};
+  Key to_key(Index valve_ix,BitMap is_open,int time_left) {
+    // 54 valves = 6 bits
+    // 15 possible valves to open (has flowrate > 0)= 15 bits
+    // 31 time_left = 5 bits
+    // Total  26 bits   2    21         0
+    //                  54321098765432109876543210
+    //                  vvvvvvfffffffffffffffttttt
+    // v = valve index
+    // f = flags for open valves (0..14)
+    // t = time left
+    Key result = valve_ix*std::pow(2,20) + is_open.to_ulong()*std::pow(2,5) + time_left;
+    assert(result<=KEY_RANGE);
+    return result;
+  }
+  std::vector<Result> m_cache{};
+
   // find the maximal possible flow to gain
   // from cave with start index, provided open valves and the time left to 0
-  Result max_to_gain(Index start_index,BitMap is_open,int time_left) {
+  Result max_to_gain(Index start_index,BitMap const& is_open,int time_left) {
     static int call_count{};
-    if (call_count++ % 10000 == 0) std::cout << "\n" << is_open.to_string();
-    Result result;
-    if (time_left==0) return 0; // nothing to gain
+    Result result{};
+    if (time_left==0) {
+      return 0; // nothing to gain
+    }
+    if (auto cached = m_cache[to_key(start_index,is_open,time_left)]>=0) return cached;
     if (!is_open[start_index] and m_flowrate[start_index]>0) {
       // try open the valve here
-      is_open[start_index] = true;
-      result = std::max(result,m_flowrate[start_index]*(time_left-1) + max_to_gain(start_index,is_open,time_left-1));
+      auto new_is_open = is_open;
+      new_is_open[start_index] = true;
+      auto new_candidate = m_flowrate[start_index]*(time_left-1) + max_to_gain(start_index,new_is_open,time_left-1);
+      if (new_candidate>result) {
+        result = new_candidate;        
+      }
     }
     for (auto adj : m_cave_system.graph().adj(start_index)) {
-      result = std::max(result,max_to_gain(adj,is_open,time_left-1));
+      // try going to adjacent valve
+      auto new_candidate = max_to_gain(adj,is_open,time_left-1);
+      if (new_candidate>result) {
+        result = new_candidate;
+      }
     }
+    m_cache[to_key(start_index,is_open,time_left)] = result;
+    if (call_count++ % 1000 == 0) std::cout << "\n" << is_open.to_string() << " best:" << result << std::flush;
     return result;
   }
   CaveSystem const& m_cave_system;
@@ -203,6 +243,7 @@ Model parse(auto& in) {
 }
 
 namespace jonathanpaulsson {
+
   // Based on https://github.com/jonathanpaulson/AdventOfCode/blob/master/2022/16.cc 
   // Thank you Jonathan! I needed guidance to get all the quirks right for this problem!
   using namespace std;
@@ -214,9 +255,9 @@ namespace jonathanpaulsson {
 
   ll best = 0;
   vector<ll> DP;
-  ll f(ll p1, ll U, ll time, ll other_players) {
+  ll f(ll from, ll p1, ll U, ll time, ll other_players) {
     if(time == 0) {
-      return other_players>0 ? f(0,U,26,other_players-1) : 0LL;
+      return other_players>0 ? f(-1,0,U,26,other_players-1) : 0LL;
     }
 
     auto key = U*R.size()*31*2 + p1*31*2 + time*2 + other_players;
@@ -229,10 +270,10 @@ namespace jonathanpaulsson {
     if(no_p1 && R[p1]>0) {
       ll newU = U | (1LL<<p1);
       assert(newU > U);
-      ans = max(ans, (time-1)*R[p1] + f(p1, newU, time-1, other_players));
+      ans = max(ans, (time-1)*R[p1] + f(p1,p1, newU, time-1, other_players));
     }
     for(auto& y : E[p1]) {
-      ans = max(ans, f(y, U, time-1, other_players));
+      ans = max(ans, f(p1,y, U, time-1, other_players));
     }
     DP[key] = ans;
     /*if(DP.size() % 100000 == 0) {
@@ -309,8 +350,8 @@ namespace jonathanpaulsson {
 
     DP = vector<ll>((1L<<nonzero) * n * 31 * 2, -1);
     //cerr << "DP size=" << DP.size() << endl;
-    ll p1 = f(0,0,30,false);
-    ll p2 = f(0,0,26,true);
+    ll p1 = f(-1,0,0,30,false);
+    ll p2 = f(-1,0,0,26,true);
     cout << p1 << endl;
     cout << p2 << endl;
   }  
@@ -320,13 +361,16 @@ namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
-      auto data_model = parse(in);
-      std::cout << "\n" << data_model;
-      MaxFlow max_flow{data_model};
-      result = max_flow(30);
-      // duration:4703374ms answer[Part 1     ] 1991
-
-      // jonathanpaulsson::main(in);
+      if (true) {
+        auto data_model = parse(in);
+        std::cout << "\n" << data_model;
+        MaxFlow max_flow{data_model};
+        int time_left=30;
+        result = max_flow(time_left);
+      }
+      else {
+        jonathanpaulsson::main(in);
+      }
       return result;
   }
 }
@@ -348,8 +392,8 @@ int main(int argc, char *argv[])
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
   answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // exec_times.push_back(std::chrono::system_clock::now());
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  exec_times.push_back(std::chrono::system_clock::now());
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // exec_times.push_back(std::chrono::system_clock::now());
