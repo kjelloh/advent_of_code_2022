@@ -14,11 +14,12 @@
 #include <algorithm> // E.g., std::find, std::all_of,...
 #include <numeric> // E.g., std::accumulate
 #include <limits> // E.g., std::numeric_limits
+#include <cassert>
 
 extern char const* pTest;
 extern char const* pData;
 
-using Result = long int;
+using Result = long long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 using Jets = std::string;
@@ -172,6 +173,7 @@ const std::vector<Sprite::Rows> ROCKS {
 
 class Chamber {
 public:
+  static const int PATTERN_BUFFER_LENGTH{100};
   auto const& top_left() const {return m_sprite.m_frame_top_left;}
   auto const& bottom_right() const {return m_sprite.m_frame_bottom_right;}
   Chamber(Jets const& jets) : m_jets{jets} {}
@@ -231,6 +233,14 @@ public:
     }
     return *this;
   }
+  using Key = Result;
+  Key state_id() const {
+    Key result{};
+    for (Result row=m_sprite.m_rows.size()-PATTERN_BUFFER_LENGTH;row<m_sprite.m_rows.size();++row) {
+      result ^= (std::hash<std::string>{}(m_sprite.m_rows[row]) << 1);
+    }
+    return result;
+  }
 private:
   friend std::ostream& operator<<(std::ostream& os,Chamber const& chamber);
 
@@ -288,13 +298,8 @@ namespace part1 {
       auto data_model = parse(in);
       Chamber chamber{data_model};
       std::cout << "\n" << chamber;
-      // for (auto const& rows : ROCKS) {
-      //   Rock rock{Vector{0,0},rows};
-      //   std::cout << "\n" << rock.m_sprite;
-      // }
       for (int i=1;i<=2022;++i) {
         chamber.drop();
-        // std::cout << "\n" << chamber;
       }
       std::cout << "\n\n" << chamber;
       std::cout << "\nchamber.top_left:" << chamber.top_left();
@@ -308,6 +313,43 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      Chamber chamber{data_model};
+      std::cout << "\n" << chamber;
+      Result pattern{-1};
+      const Result SUFFICIENT_DROPS_CYCLE = Chamber::PATTERN_BUFFER_LENGTH*2;  
+      std::pair<Result,Result> cycle{0,Chamber::PATTERN_BUFFER_LENGTH+1};
+      const Result TARGET_COUNT{1000000000000};
+      for (Result i=1;i<=TARGET_COUNT;++i) {
+        if (i==SUFFICIENT_DROPS_CYCLE) {
+          pattern = chamber.state_id();
+          std::cout << "\n" << i << " FIRST PATTERN " << pattern;
+          cycle.first = i;
+          cycle.second = i + SUFFICIENT_DROPS_CYCLE;
+        }
+
+        chamber.drop();
+
+        if (i>cycle.second and pattern == chamber.state_id()) {
+          std::cout << "\n" << i << " SECOND PATTERN " << pattern;
+          // We found a repetition in the "pattern" of the top Chamber::PATTERN_BUFFER_LENGTH
+          cycle.second = i;
+          auto cycle_length = (cycle.second-cycle.first);
+          // We set patter.first at drop Chamber::PATTERN_BUFFER_LENGTH. 
+          // Now at cycle.second we have the "same" pattern again.
+          // So each time we add (cycle.second-cycle.first) drops we expect to get the "pattern" again.
+          auto cycle_counts = TARGET_COUNT / cycle_length;
+          std::cout << "\n\tcycle_length:" << cycle_length << " cycle_counts:" << cycle_counts << std::flush;
+          // i0-i = cycle_length
+          // i0 = i + cycle_length
+          // i_next = i + cycle_length * x
+          auto delta = (cycle_counts-2)*cycle_length;
+          i += delta;
+          std::cout << "\n\tnew i:" << i << std::flush;
+          assert(i<TARGET_COUNT);
+          assert(TARGET_COUNT-i > delta);
+        }
+
+      }
       return result;
   }
 }
@@ -330,8 +372,8 @@ int main(int argc, char *argv[])
   // test();
   Answers answers{};
   // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
