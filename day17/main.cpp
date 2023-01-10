@@ -77,7 +77,7 @@ struct Sprite {
     // std::cout << "\nSprite(pixel_top_left:" << pixel_top_left << " row[0]:" << m_rows[0] << ") frame_top_left:" << m_frame_top_left << " m_frame_bottom_right:" << m_frame_bottom_right;
   }
   bool in_frame(Vector const& pos) const {
-    return (pos >= m_frame_top_left + Vector{.row=m_virtual_rows_count,.col=0} and pos <= m_frame_bottom_right);
+    return (pos >= m_frame_top_left and pos <= m_frame_bottom_right);
   }
   char& at(Vector const& pos) {
     // std::cout << "\nat(" << pos << ")";
@@ -124,13 +124,18 @@ struct Sprite {
         if (auto other_ch = other.at(pos);other_ch!='.') this->at(pos) = other_ch;
       }
     }
-
     return *this;
   }
   bool does_collide_with(Sprite const& other) {
-    static int call_count{};
     bool result{false};
-    // std::cout << "\ndoes_collide_with m_frame_top_left:" << m_frame_top_left << " m_frame_bottom_right:" << m_frame_bottom_right; 
+    if (m_frame_top_left.row>=2021) {
+      std::cout << "\ndoes_collide_with m_frame_top_left:" << m_frame_top_left << " m_frame_bottom_right:" << m_frame_bottom_right;
+      std::cout << "\nthis";
+      this->print_top(10);
+      std::cout << "\nother";
+      other.print_top(10);
+    }
+
     for (auto row=m_frame_top_left.row;row>=m_frame_bottom_right.row and !result;--row) {
       for (auto col=m_frame_top_left.col;col<=m_frame_bottom_right.col and !result;++col) {
         Vector pos{.row=row,.col=col};
@@ -138,7 +143,7 @@ struct Sprite {
           if (other.in_frame(pos)) {
             // std::cout << "\nother.in_frame TRUE";
             result = result or other.at(pos)!='.';
-            // std::cout << "\npos:" << pos << " this:" << this->at(pos) << " other:" << other.at(pos) << " does_collide:" << result << std::flush;
+            std::cout << "\npos:" << pos << " this:" << this->at(pos) << " other:" << other.at(pos) << " does_collide:" << result << std::flush;
           }
         } 
       }
@@ -150,6 +155,23 @@ struct Sprite {
     m_virtual_rows_count += delta;
     m_frame_top_left.row += delta;
     return *this;
+  }
+  void print_top(int height) const {
+    for (int i=0;i<height;++i) {
+      auto row = m_frame_top_left.row-i;
+      auto line = std::string(m_rows.back().size(),' ');
+      for (auto col=m_frame_top_left.col;col<=m_frame_bottom_right.col;++col) {
+        Vector pos{.row=row,.col=col};
+        line.push_back(this->at(pos));
+      }
+      line += " ";
+      line += std::to_string(row);
+      std::cout << "\n" << line;
+    }
+
+    // for (int row=m_rows.size();row>m_rows.size()-height;--row) {
+    //   std::cout << "\n" << m_rows[row];
+    // }
   }
   Vector m_frame_top_left;
   Vector m_frame_bottom_right;
@@ -201,12 +223,14 @@ public:
   auto const& top_left() const {return m_sprite.m_frame_top_left;}
   auto const& bottom_right() const {return m_sprite.m_frame_bottom_right;}
   Chamber(Jets const& jets) : m_jets{jets} {}
+  void print_top(int height) {m_sprite.print_top(height);}
   bool can_move_left(Rock rock) {
+    if (top_left().row>=2021) std::cout << "\ncan_move_left(rock::bottom_right:" << rock.bottom_right() << ") this->bottom_right:" << bottom_right(); 
     rock.m_sprite += Sprite::LEFT;
     return (top_left().col < rock.top_left().col) and !rock.m_sprite.does_collide_with(this->m_sprite);
   }
   bool can_move_right(Rock rock) {
-    // std::cout << "\ncan_move_right(rock::bottom_right:" << rock.bottom_right() << ") this->bottom_right:" << bottom_right(); 
+    if (top_left().row>=2021) std::cout << "\ncan_move_right(rock::bottom_right:" << rock.bottom_right() << ") this->bottom_right:" << bottom_right(); 
     rock.m_sprite += Sprite::RIGHT;
     return (rock.bottom_right().col < bottom_right().col) and !rock.m_sprite.does_collide_with(this->m_sprite);
   }
@@ -226,12 +250,15 @@ public:
     return result;
   }
   Chamber& place_rock(Rock const& rock) {
-    // std::cout << "\nplace_rock(" << rock.top_left() << ")";
     m_sprite += rock.m_sprite;
     // std::cout << "\nadd chamber sides";
     for (auto row=rock.top_left().row;row>=rock.bottom_right().row;--row) {
       m_sprite.at(Vector{.row=row,.col=0}) = '|';
       m_sprite.at(Vector{.row=row,.col=m_sprite.m_frame_bottom_right.col}) = '|';
+    }
+    if (top_left().row>=2021) {
+      std::cout << "\nplace_rock(" << rock.top_left() << ")";
+      print_top(10);
     }
     return *this;
   }
@@ -240,14 +267,16 @@ public:
     auto rock_rows = ROCKS[rock_index];
     Vector rock_top_left{.row=static_cast<Result>(top_left().row + rock_rows.size() -1 + 4),.col=3}; // col:0 is left boundary
     Rock rock(rock_top_left,rock_rows);
-    // std::cout << "\n" << rock.m_sprite << std::flush;
+    if (top_left().row>=2021) std::cout << "\n" << rock.m_sprite << std::flush;
     bool is_falling{true};
     while (is_falling) {
       rock = to_moved_rock(rock,m_jets[jet_index]);
-      // std::cout << "\ngusted to" << rock.m_sprite.m_frame_top_left << "\n" << rock.m_sprite << std::flush;
+      if (top_left().row>=2021) {
+        std::cout << "\ngusted to" << rock.m_sprite.m_frame_top_left << "\n" << rock.m_sprite << std::flush;
+      }
       if (can_move_down(rock)) {
         rock.m_sprite += Sprite::DOWN;
-        // std::cout << "\nfallen to" << rock.m_sprite.m_frame_top_left << "\n" << rock.m_sprite << std::flush;
+        if (top_left().row>=2021) std::cout << "\nfallen to" << rock.m_sprite.m_frame_top_left << "\n" << rock.m_sprite << std::flush;
       }
       else {
         is_falling=false;
@@ -322,9 +351,13 @@ public:
   }
 
   void advance(Result rocks_count,Result pile_gain) {
+    std::cout << "\nbefore advance";
+    m_sprite.print_top(10);
     m_rocks_count += rocks_count;
     m_sprite.add_virtual_rows(pile_gain);
     m_state = State{.jet_index=jet_index,.rock_index=rock_index,.pile_key=pile_key(),.rocks_count=m_rocks_count,.top_left=top_left()};
+    std::cout << "\nafter advance";
+    m_sprite.print_top(10);
   }
 
 private:
@@ -413,10 +446,10 @@ namespace part2 {
       Chamber chamber{data_model};
       std::cout << "\n" << chamber << std::flush;
       // const Result TARGET_ROCKS_COUNT{1000000000000};
-      // const Result TARGET_ROCKS_COUNT{2022};
-      const Result TARGET_ROCKS_COUNT{96 + 35*2};
+      const Result TARGET_ROCKS_COUNT{2022};
+      // const Result TARGET_ROCKS_COUNT{96 + 35+1};
       bool cycled{false};
-      // for (Result i=1;i<=TARGET_ROCKS_COUNT;++i) {
+      // bool cycled{true};
       while (chamber.rocks_count()<TARGET_ROCKS_COUNT) {
         chamber.drop();
         auto i = chamber.rocks_count(); // drop count is the count of rocks on the pile
@@ -427,6 +460,7 @@ namespace part2 {
             std::cout << "\ni:" << i << "  ROCKS COUNT CYCLE:" << cycle->rocks_count;
             std::cout << "\ni:" << i << "    PILE ROWS CYCLE:" << cycle->pile_gain;
 /*
+-------------------------------------------
  jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:96 top_left:[row:150,col:0]
  SEEN  jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:96 top_left:[row:150,col:0]
  PREV  jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:61 top_left:[row:97,col:0]
@@ -435,8 +469,96 @@ i:96    PILE ROWS CYCLE:53
 i:96        CYCLES LEFT:1
 
 ...
+
  expected: jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:131 top_left:[row:203,col:0]
  end state  jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:131 top_left:[row:203,col:0] OK
+-------------------------------------------
+ jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:96 top_left:[row:150,col:0]
+ jet_index:23 rock_index:1 Key pile_key:4090754448841431190 rocks_count:97 top_left:[row:153,col:0]
+
+...
+
+expected
+ jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:131 top_left:[row:203,col:0]
+ jet_index:23 rock_index:1 Key pile_key:4090754448841431190 rocks_count:132 top_left:[row:206,col:0]
+
+ jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:131 top_left:[row:203,col:0] OK
+ jet_index:23 rock_index:1 Key pile_key:4090754448841431190 rocks_count:132 top_left:[row:206,col:0] OK
+
+-------------------------------------------
+2020 drops without advancing
+
+ jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:2021 top_left:[row:3065,col:0]
+ jet_index:23 rock_index:1 Key pile_key:4090754448841431190 rocks_count:2022 top_left:[row:3068,col:0]
+end state  jet_index:23 rock_index:1 Key pile_key:4090754448841431190 rocks_count:2022 top_left:[row:3068,col:0]
+
+...
+2020 drop WITH advancing
+
+ jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:96 top_left:[row:150,col:0]
+ SEEN  jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:96 top_left:[row:150,col:0]
+ PREV  jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:61 top_left:[row:97,col:0]
+i:96  ROCKS COUNT CYCLE:35
+i:96    PILE ROWS CYCLE:53
+i:96        CYCLES LEFT:55
+advanced state: jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:2021 top_left:[row:3065,col:0]
+ jet_index:20 rock_index:1 Key pile_key:425981546913306325 rocks_count:2022 top_left:[row:3071,col:0]
+end state  jet_index:20 rock_index:1 Key pile_key:425981546913306325 rocks_count:2022 top_left:[row:3071,col:0]
+
+==> Oh, dropping rock 1 to get rock count 2022 in brute force version gains 3 rows on pile from previous drop
+    But dropping rock 1 to get rock count 2022 in "fast forward" version gains only 1 row on the pile?
+
+    But the pile seems to be ok after advance (same pile_id)
+    So then maybe we drop rock 1 after advance from the wrong starting position (sp that it does not land where it is supposed to)?
+
+Visual inspection
+
+|..####.| : 203
+|.##....| : 202
+|.##...#| : 201
+|..#...#| : 200
+|..#.###| : 199
+|..#..#.| : 198
+|..#.###| : 197
+|.#####.| : 196
+|....#..| : 195
+|....#..| : 194
+|....#..| : 193
+|....#..| : 192
+|.##.#..| : 191
+|.##.#..| : 190
+|..###..| : 189
+|...#...| : 188
+|..###..| : 187
+|...#...| : 186
+|..####.| : 185
+|..###..| : 184
+|..###..| : 183
+
+
+|..####.| : 150
+|.##....| : 149
+|.##...#| : 148
+|..#...#| : 147
+|..#.###| : 146
+|..#..#.| : 145
+|..#.###| : 144
+|.#####.| : 143
+|....#..| : 142
+|....#..| : 141
+|....#..| : 140
+|....#..| : 139
+|.##.#..| : 138
+|.##.#..| : 137
+|..###..| : 136
+|...#...| : 135
+|..###..| : 134
+|...#...| : 133
+|..####.| : 132
+|..###..| : 131
+|..###..| : 130
+
+YEP!
 
 */            
             auto cycle_counts = ((TARGET_ROCKS_COUNT-i) / cycle->rocks_count);
@@ -446,17 +568,17 @@ i:96        CYCLES LEFT:1
             if (i+delta<=TARGET_ROCKS_COUNT) {
               // It is ok to jump to 
               chamber.advance(delta,cycle_counts*cycle->pile_gain);
-              std::cout << "\n   new pile top:" << chamber.top_left().row;
-              std::cout << "\nnew rocks count:" << chamber.rocks_count();
+              std::cout << "\nadvanced state:" << chamber.m_state;
             }
-            // // exit(1);
-            // assert(i<=TARGET_ROCKS_COUNT);
-            // cycled=true;
+            // exit(1);
+            assert(i<=TARGET_ROCKS_COUNT);
+            cycled=true;
           }
         }
       }
       // std::cout << "\n" << chamber;
       std::cout << "\nend state " << chamber.m_state;
+      chamber.print_top(10);
       result = chamber.top_left().row;
       return result;
   }
