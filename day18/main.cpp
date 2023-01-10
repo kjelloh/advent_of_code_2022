@@ -176,6 +176,10 @@ public:
     return result;
   }
 
+  bool contains(Vector const& pos) const {
+    return to_vertex(pos).has_value();
+  }
+
   Vertices vertices() const {
     Vertices result{};
     for (auto const& [pos,v] : m_map) {
@@ -219,6 +223,7 @@ private:
   }
 };
 
+// Connected Components
 class CC {
 public:
   using Vertex = int;
@@ -296,9 +301,12 @@ namespace part1 {
       std::cout << "\n cc.count:" << cc.count();
       Result unconnected_faces{0};
       for (int id=0;id<cc.count();++id) {
-        if (id>0) std::cout << "\n";
-        for (auto const& v : grid.vertices()) {
-          if (id == cc.id(v)) std::cout << " " << v << ":" << *grid.to_pos(v);
+        if (true) {
+          // LOG
+          if (id>0) std::cout << "\n";
+          for (auto const& v : grid.vertices()) {
+            if (id == cc.id(v)) std::cout << " " << v << ":" << *grid.to_pos(v);
+          }
         }
         for (auto const& v : grid.vertices()) {
           if (id == cc.id(v)) {
@@ -318,6 +326,63 @@ namespace part2 {
       std::stringstream in{ pData };
       auto data_model = parse(in);
       // TODO: Part 2 is probably a flood-fill of water from the "outside" of the grid?
+      Grid grid{};
+      Vector top_left_front{data_model.back()};
+      Vector bottom_right_back{data_model.back()};
+      for (auto const& droplet : data_model) {
+        std::cout << "\ninsert " << droplet;
+        grid.insert(droplet);
+        top_left_front.x = std::min(top_left_front.x,droplet.x);
+        top_left_front.y = std::min(top_left_front.y,droplet.y);
+        top_left_front.z = std::min(top_left_front.z,droplet.z);
+        bottom_right_back.x = std::max(bottom_right_back.x,droplet.x);
+        bottom_right_back.y = std::max(bottom_right_back.y,droplet.y);
+        bottom_right_back.z = std::max(bottom_right_back.z,droplet.z);
+      }
+      std::cout << "\ntop_left_front:" << top_left_front << " bottom_right_back:" << bottom_right_back;
+      --top_left_front.x;
+      --top_left_front.y;
+      --top_left_front.z;
+      ++bottom_right_back.x;
+      ++bottom_right_back.y;
+      ++bottom_right_back.z;
+      auto dx = bottom_right_back.x - top_left_front.x + 1;
+      auto dy = bottom_right_back.y - top_left_front.y + 1;
+      auto dz = bottom_right_back.z - top_left_front.z + 1;
+      Grid enclosing{};
+      for (Result x=top_left_front.x;x<=bottom_right_back.x;++x) {
+        for (Result y=top_left_front.y;y<=bottom_right_back.y;++y) {
+          for (Result z=top_left_front.z;z<=bottom_right_back.z;++z) {
+            Vector pos{.x=x,.y=y,.z=z};
+            if (!grid.contains(pos)) enclosing.insert(pos);
+          }
+        }
+      }
+      CC cc{enclosing};
+      std::cout << "\ncc.count:" << cc.count();
+      if (true) {
+        // LOG
+        for (auto const& v : enclosing.vertices()) {
+          std::cout << "\nid:" << cc.id(v) << " " << *enclosing.to_pos(v);
+        }
+      }
+
+      std::vector<Result> unconnected_faces{};
+      for (int id=0;id<cc.count();++id) {
+        std::cout << "\nid:" << id;
+        unconnected_faces.push_back(0);
+        if (id>0) std::cout << "\n";
+        for (auto const& v : enclosing.vertices()) {
+          if (id == cc.id(v)) {
+            unconnected_faces.back() += enclosing.unconnected_faces(v);
+            std::cout << "\n\tunconnected_faces:" << unconnected_faces.back(); 
+          } 
+        }
+      }
+      std::cout << "\nenclosing area:" << unconnected_faces.front();
+      std::cout << "\noutside area:" << 2*(dx*dy + dy*dz + dx*dz);
+      result = unconnected_faces.front() - 2*(dx*dy + dy*dz + dx*dz);
+      std::cout << "\nenclosing - outside area = enclosed surface area:" << result; 
       return result;
   }
 }
@@ -325,9 +390,9 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
