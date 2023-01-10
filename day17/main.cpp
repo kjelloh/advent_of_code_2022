@@ -128,13 +128,13 @@ struct Sprite {
   }
   bool does_collide_with(Sprite const& other) {
     bool result{false};
-    if (m_frame_top_left.row>=2021) {
-      std::cout << "\ndoes_collide_with m_frame_top_left:" << m_frame_top_left << " m_frame_bottom_right:" << m_frame_bottom_right;
-      std::cout << "\nthis";
-      this->print_top(10);
-      std::cout << "\nother";
-      other.print_top(10);
-    }
+    // if (m_frame_top_left.row>=2021) {
+    //   std::cout << "\ndoes_collide_with m_frame_top_left:" << m_frame_top_left << " m_frame_bottom_right:" << m_frame_bottom_right;
+    //   std::cout << "\nthis";
+    //   this->print_top(10);
+    //   std::cout << "\nother";
+    //   other.print_top(10);
+    // }
 
     for (auto row=m_frame_top_left.row;row>=m_frame_bottom_right.row and !result;--row) {
       for (auto col=m_frame_top_left.col;col<=m_frame_bottom_right.col and !result;++col) {
@@ -143,7 +143,7 @@ struct Sprite {
           if (other.in_frame(pos)) {
             // std::cout << "\nother.in_frame TRUE";
             result = result or other.at(pos)!='.';
-            std::cout << "\npos:" << pos << " this:" << this->at(pos) << " other:" << other.at(pos) << " does_collide:" << result << std::flush;
+            // std::cout << "\npos:" << pos << " this:" << this->at(pos) << " other:" << other.at(pos) << " does_collide:" << result << std::flush;
           }
         } 
       }
@@ -157,9 +157,10 @@ struct Sprite {
     return *this;
   }
   void print_top(int height) const {
+    height = (height>m_frame_top_left.row)?m_frame_top_left.row:height;
     for (int i=0;i<height;++i) {
       auto row = m_frame_top_left.row-i;
-      auto line = std::string(m_rows.back().size(),' ');
+      std::string line{};
       for (auto col=m_frame_top_left.col;col<=m_frame_bottom_right.col;++col) {
         Vector pos{.row=row,.col=col};
         line.push_back(this->at(pos));
@@ -168,6 +169,7 @@ struct Sprite {
       line += std::to_string(row);
       std::cout << "\n" << line;
     }
+    if (height<m_frame_top_left.row) std::cout << "\n...";
 
     // for (int row=m_rows.size();row>m_rows.size()-height;--row) {
     //   std::cout << "\n" << m_rows[row];
@@ -225,12 +227,12 @@ public:
   Chamber(Jets const& jets) : m_jets{jets} {}
   void print_top(int height) {m_sprite.print_top(height);}
   bool can_move_left(Rock rock) {
-    if (top_left().row>=2021) std::cout << "\ncan_move_left(rock::bottom_right:" << rock.bottom_right() << ") this->bottom_right:" << bottom_right(); 
+    // if (top_left().row>=2021) std::cout << "\ncan_move_left(rock::bottom_right:" << rock.bottom_right() << ") this->bottom_right:" << bottom_right(); 
     rock.m_sprite += Sprite::LEFT;
     return (top_left().col < rock.top_left().col) and !rock.m_sprite.does_collide_with(this->m_sprite);
   }
   bool can_move_right(Rock rock) {
-    if (top_left().row>=2021) std::cout << "\ncan_move_right(rock::bottom_right:" << rock.bottom_right() << ") this->bottom_right:" << bottom_right(); 
+    // if (top_left().row>=2021) std::cout << "\ncan_move_right(rock::bottom_right:" << rock.bottom_right() << ") this->bottom_right:" << bottom_right(); 
     rock.m_sprite += Sprite::RIGHT;
     return (rock.bottom_right().col < bottom_right().col) and !rock.m_sprite.does_collide_with(this->m_sprite);
   }
@@ -256,10 +258,10 @@ public:
       m_sprite.at(Vector{.row=row,.col=0}) = '|';
       m_sprite.at(Vector{.row=row,.col=m_sprite.m_frame_bottom_right.col}) = '|';
     }
-    if (top_left().row>=2021) {
-      std::cout << "\nplace_rock(" << rock.top_left() << ")";
-      print_top(10);
-    }
+    // if (top_left().row>=2021) {
+    //   std::cout << "\nplace_rock(" << rock.top_left() << ")";
+    //   print_top(10);
+    // }
     return *this;
   }
   Chamber& drop() {
@@ -267,16 +269,16 @@ public:
     auto rock_rows = ROCKS[rock_index];
     Vector rock_top_left{.row=static_cast<Result>(top_left().row + rock_rows.size() -1 + 4),.col=3}; // col:0 is left boundary
     Rock rock(rock_top_left,rock_rows);
-    if (top_left().row>=2021) std::cout << "\n" << rock.m_sprite << std::flush;
+    // if (top_left().row>=2021) std::cout << "\n" << rock.m_sprite << std::flush;
     bool is_falling{true};
     while (is_falling) {
       rock = to_moved_rock(rock,m_jets[jet_index]);
-      if (top_left().row>=2021) {
-        std::cout << "\ngusted to" << rock.m_sprite.m_frame_top_left << "\n" << rock.m_sprite << std::flush;
-      }
+      // if (top_left().row>=2021) {
+      //   std::cout << "\ngusted to" << rock.m_sprite.m_frame_top_left << "\n" << rock.m_sprite << std::flush;
+      // }
       if (can_move_down(rock)) {
         rock.m_sprite += Sprite::DOWN;
-        if (top_left().row>=2021) std::cout << "\nfallen to" << rock.m_sprite.m_frame_top_left << "\n" << rock.m_sprite << std::flush;
+        // if (top_left().row>=2021) std::cout << "\nfallen to" << rock.m_sprite.m_frame_top_left << "\n" << rock.m_sprite << std::flush;
       }
       else {
         is_falling=false;
@@ -423,16 +425,18 @@ std::ostream& operator<<(std::ostream& os,Chamber const& chamber) {
 
 namespace part1 {
   Result solve_for(char const* pData) {
+      std::cout << "\nPART 2";
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
       Chamber chamber{data_model};
+      std::cout << "\nbefore";
       std::cout << "\n" << chamber;
       for (int i=1;i<=2022;++i) {
         chamber.drop();
       }
-      std::cout << "\n\n" << chamber;
-      std::cout << "\nchamber.top_left:" << chamber.top_left();
+      std::cout << "\nafter";
+      chamber.print_top(50);
       result = chamber.top_left().row;
       return result;
   }
@@ -440,6 +444,7 @@ namespace part1 {
 
 namespace part2 {
   Result solve_for(char const* pData) {
+      std::cout << "\nPART 2";
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
@@ -452,131 +457,22 @@ namespace part2 {
       // bool cycled{true};
       while (chamber.rocks_count()<TARGET_ROCKS_COUNT) {
         chamber.drop();
-        auto i = chamber.rocks_count(); // drop count is the count of rocks on the pile
-        std::cout << "\n" << chamber.m_state;
+        if ((chamber.rocks_count()-1) % 200 == 0) std::cout << "\n" << chamber.m_state;
         if (!cycled) {
         // if (true) {
           if (auto cycle = chamber.cycle()) {
-            std::cout << "\ni:" << i << "  ROCKS COUNT CYCLE:" << cycle->rocks_count;
-            std::cout << "\ni:" << i << "    PILE ROWS CYCLE:" << cycle->pile_gain;
-/*
--------------------------------------------
- jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:96 top_left:[row:150,col:0]
- SEEN  jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:96 top_left:[row:150,col:0]
- PREV  jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:61 top_left:[row:97,col:0]
-i:96  ROCKS COUNT CYCLE:35
-i:96    PILE ROWS CYCLE:53
-i:96        CYCLES LEFT:1
-
-...
-
- expected: jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:131 top_left:[row:203,col:0]
- end state  jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:131 top_left:[row:203,col:0] OK
--------------------------------------------
- jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:96 top_left:[row:150,col:0]
- jet_index:23 rock_index:1 Key pile_key:4090754448841431190 rocks_count:97 top_left:[row:153,col:0]
-
-...
-
-expected
- jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:131 top_left:[row:203,col:0]
- jet_index:23 rock_index:1 Key pile_key:4090754448841431190 rocks_count:132 top_left:[row:206,col:0]
-
- jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:131 top_left:[row:203,col:0] OK
- jet_index:23 rock_index:1 Key pile_key:4090754448841431190 rocks_count:132 top_left:[row:206,col:0] OK
-
--------------------------------------------
-2020 drops without advancing
-
- jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:2021 top_left:[row:3065,col:0]
- jet_index:23 rock_index:1 Key pile_key:4090754448841431190 rocks_count:2022 top_left:[row:3068,col:0]
-end state  jet_index:23 rock_index:1 Key pile_key:4090754448841431190 rocks_count:2022 top_left:[row:3068,col:0]
-
-...
-2020 drop WITH advancing
-
- jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:96 top_left:[row:150,col:0]
- SEEN  jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:96 top_left:[row:150,col:0]
- PREV  jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:61 top_left:[row:97,col:0]
-i:96  ROCKS COUNT CYCLE:35
-i:96    PILE ROWS CYCLE:53
-i:96        CYCLES LEFT:55
-advanced state: jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:2021 top_left:[row:3065,col:0]
- jet_index:20 rock_index:1 Key pile_key:425981546913306325 rocks_count:2022 top_left:[row:3071,col:0]
-end state  jet_index:20 rock_index:1 Key pile_key:425981546913306325 rocks_count:2022 top_left:[row:3071,col:0]
-
-==> Oh, dropping rock 1 to get rock count 2022 in brute force version gains 3 rows on pile from previous drop
-    But dropping rock 1 to get rock count 2022 in "fast forward" version gains only 1 row on the pile?
-
-    But the pile seems to be ok after advance (same pile_id)
-    So then maybe we drop rock 1 after advance from the wrong starting position (sp that it does not land where it is supposed to)?
-
-Visual inspection
-
-|..####.| : 203
-|.##....| : 202
-|.##...#| : 201
-|..#...#| : 200
-|..#.###| : 199
-|..#..#.| : 198
-|..#.###| : 197
-|.#####.| : 196
-|....#..| : 195
-|....#..| : 194
-|....#..| : 193
-|....#..| : 192
-|.##.#..| : 191
-|.##.#..| : 190
-|..###..| : 189
-|...#...| : 188
-|..###..| : 187
-|...#...| : 186
-|..####.| : 185
-|..###..| : 184
-|..###..| : 183
-
-
-|..####.| : 150
-|.##....| : 149
-|.##...#| : 148
-|..#...#| : 147
-|..#.###| : 146
-|..#..#.| : 145
-|..#.###| : 144
-|.#####.| : 143
-|....#..| : 142
-|....#..| : 141
-|....#..| : 140
-|....#..| : 139
-|.##.#..| : 138
-|.##.#..| : 137
-|..###..| : 136
-|...#...| : 135
-|..###..| : 134
-|...#...| : 133
-|..####.| : 132
-|..###..| : 131
-|..###..| : 130
-
-YEP!
-
-*/            
-            auto cycle_counts = ((TARGET_ROCKS_COUNT-i) / cycle->rocks_count);
-            // auto cycle_counts = 1;
-            std::cout << "\ni:" << i << "        CYCLES LEFT:" << cycle_counts;
+            std::cout << "\nrocks count:" << chamber.rocks_count() << "  ROCKS COUNT CYCLE:" << cycle->rocks_count;
+            std::cout << "\nrocks count:" << chamber.rocks_count() << "    PILE ROWS CYCLE:" << cycle->pile_gain;
+            auto cycle_counts = ((TARGET_ROCKS_COUNT-chamber.rocks_count()) / cycle->rocks_count);
+            std::cout << "\nrocks count:" << chamber.rocks_count() << "        CYCLES LEFT:" << cycle_counts;
             auto delta = cycle_counts*cycle->rocks_count;
-            if (i+delta<=TARGET_ROCKS_COUNT) {
-              // It is ok to jump to 
-              chamber.advance(delta,cycle_counts*cycle->pile_gain);
-              std::cout << "\nadvanced state:" << chamber.m_state;
-            }
-            // exit(1);
-            assert(i<=TARGET_ROCKS_COUNT);
+            assert(chamber.rocks_count()+delta<=TARGET_ROCKS_COUNT);
+            chamber.advance(delta,cycle_counts*cycle->pile_gain);
+            std::cout << "\nfast forwarded state:" << chamber.m_state;
             cycled=true;
           }
         }
       }
-      // std::cout << "\n" << chamber;
       std::cout << "\nend state " << chamber.m_state;
       chamber.print_top(10);
       result = chamber.top_left().row;
@@ -601,9 +497,9 @@ int main(int argc, char *argv[])
 {
   // test();
   Answers answers{};
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
