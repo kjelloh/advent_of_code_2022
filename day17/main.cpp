@@ -445,8 +445,8 @@ namespace part2 {
       auto data_model = parse(in);
       Chamber chamber{data_model};
       std::cout << "\n" << chamber << std::flush;
-      // const Result TARGET_ROCKS_COUNT{1000000000000};
-      const Result TARGET_ROCKS_COUNT{2022};
+      const Result TARGET_ROCKS_COUNT{1000000000000};
+      // const Result TARGET_ROCKS_COUNT{2022};
       // const Result TARGET_ROCKS_COUNT{96 + 35+1};
       bool cycled{false};
       // bool cycled{true};
