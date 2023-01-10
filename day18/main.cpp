@@ -205,9 +205,6 @@ public:
     return result;
   } 
 
-private:
-  using Map = std::vector<std::pair<Vector,Vertex>>;
-  Map m_map{};
   std::optional<Vertex> to_vertex(Vector pos) const {
     std::cout << "\nto_vertex(" << pos << ")";
     std::optional<Vertex> result{};
@@ -221,6 +218,10 @@ private:
     else std::cout << "null";
     return result;
   }
+
+private:
+  using Map = std::vector<std::pair<Vector,Vertex>>;
+  Map m_map{};
 };
 
 // Connected Components
@@ -367,22 +368,25 @@ namespace part2 {
         }
       }
 
-      std::vector<Result> unconnected_faces{};
-      for (int id=0;id<cc.count();++id) {
-        std::cout << "\nid:" << id;
-        unconnected_faces.push_back(0);
-        if (id>0) std::cout << "\n";
+      if (auto opt_v = enclosing.to_vertex(top_left_front)) {
+        auto v0 = *opt_v;
+        Result unconnected_faces{};
         for (auto const& v : enclosing.vertices()) {
-          if (id == cc.id(v)) {
-            unconnected_faces.back() += enclosing.unconnected_faces(v);
-            std::cout << "\n\tunconnected_faces:" << unconnected_faces.back(); 
+          if (cc.id(v)==cc.id(v0)) {
+            unconnected_faces += enclosing.unconnected_faces(v);
+            std::cout << "\n\tunconnected_faces:" << unconnected_faces; 
           } 
         }
+        std::cout << "\nenclosing top_left_front v:pos = " << v0 << ":" << top_left_front;
+        std::cout << "\nenclosing component id:" << cc.id(v0);
+        std::cout << "\nenclosing area for component id:" << cc.id(v0) << " = " << unconnected_faces;
+        std::cout << "\noutside area:" << 2*(dx*dy + dy*dz + dx*dz);
+        result = unconnected_faces - 2*(dx*dy + dy*dz + dx*dz);
+        std::cout << "\nenclosing - outside area = enclosed surface area:" << result; 
       }
-      std::cout << "\nenclosing area:" << unconnected_faces.front();
-      std::cout << "\noutside area:" << 2*(dx*dy + dy*dz + dx*dz);
-      result = unconnected_faces.front() - 2*(dx*dy + dy*dz + dx*dz);
-      std::cout << "\nenclosing - outside area = enclosed surface area:" << result; 
+      else {
+        std::cerr << "\nERROR, NOT in enclosing top_left_front " << top_left_front;
+      }      
       return result;
   }
 }
@@ -392,8 +396,8 @@ int main(int argc, char *argv[])
   Answers answers{};
   // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
   }
