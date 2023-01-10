@@ -414,7 +414,7 @@ namespace part2 {
       std::cout << "\n" << chamber << std::flush;
       // const Result TARGET_ROCKS_COUNT{1000000000000};
       // const Result TARGET_ROCKS_COUNT{2022};
-      const Result TARGET_ROCKS_COUNT{131};
+      const Result TARGET_ROCKS_COUNT{96 + 35*2};
       bool cycled{false};
       // for (Result i=1;i<=TARGET_ROCKS_COUNT;++i) {
       while (chamber.rocks_count()<TARGET_ROCKS_COUNT) {
@@ -439,8 +439,8 @@ i:96        CYCLES LEFT:1
  end state  jet_index:19 rock_index:0 Key pile_key:12385374603614952172 rocks_count:131 top_left:[row:203,col:0] OK
 
 */            
-            // auto cycle_counts = ((TARGET_ROCKS_COUNT-i) / cycle->rocks_count);
-            auto cycle_counts = 1;
+            auto cycle_counts = ((TARGET_ROCKS_COUNT-i) / cycle->rocks_count);
+            // auto cycle_counts = 1;
             std::cout << "\ni:" << i << "        CYCLES LEFT:" << cycle_counts;
             auto delta = cycle_counts*cycle->rocks_count;
             if (i+delta<=TARGET_ROCKS_COUNT) {
