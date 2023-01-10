@@ -48,6 +48,11 @@ struct Vector {
     col += delta.col;
     return *this;
   }
+  Vector operator+(Vector const& other) const {
+    Vector result{*this};
+    result += other;
+    return result;
+  }
 };
 
 std::ostream& operator<<(std::ostream& os,Vector const& v) {
@@ -72,14 +77,14 @@ struct Sprite {
     // std::cout << "\nSprite(pixel_top_left:" << pixel_top_left << " row[0]:" << m_rows[0] << ") frame_top_left:" << m_frame_top_left << " m_frame_bottom_right:" << m_frame_bottom_right;
   }
   bool in_frame(Vector const& pos) const {
-    return (pos >= m_frame_top_left and pos <= m_frame_bottom_right);
+    return (pos >= m_frame_top_left + Vector{.row=m_virtual_rows_count,.col=0} and pos <= m_frame_bottom_right);
   }
   char& at(Vector const& pos) {
     // std::cout << "\nat(" << pos << ")";
     static char NULL_CHAR{'?'};
     auto row = m_frame_top_left.row - pos.row;
     if (in_frame(pos)) {
-      return m_rows[pos.row - m_frame_bottom_right.row][pos.col - m_frame_top_left.col]; // rows max..0, cols 0..max
+      return m_rows[pos.row - m_virtual_rows_count - m_frame_bottom_right.row][pos.col - m_frame_top_left.col]; // rows max..0, cols 0..max
     }
     else {
       std::cerr << "\nSprite::at(" << pos << ") ERROR, out-of-bounds top_left:" << m_frame_top_left << " bottom_right:" << m_frame_bottom_right;
@@ -109,6 +114,8 @@ struct Sprite {
   Sprite& operator+=(Sprite const& other) {
     // std::cout << "\nSprite::operator+=(Sprite const& other)";
     // merge other with us
+    // NOTE: Assumes other does NOT have virtual rows
+    assert(other.m_virtual_rows_count==0);
     const std::string empty_row(m_frame_bottom_right.col - m_frame_top_left.col+1,'.');
     while (other.m_frame_top_left.row > m_frame_top_left.row) push_row(empty_row);
     for (auto row=other.m_frame_top_left.row;row>=other.m_frame_bottom_right.row;--row) {
@@ -138,17 +145,29 @@ struct Sprite {
     }
     return result;
   }
+  Sprite& add_virtual_rows(Result delta) {
+    // move top_left without moving bottom_right
+    m_virtual_rows_count += delta;
+    m_frame_top_left.row += delta;
+    return *this;
+  }
   Vector m_frame_top_left;
   Vector m_frame_bottom_right;
   Rows m_rows;
+  Result m_virtual_rows_count{0};
 };
 
 std::ostream& operator<<(std::ostream& os,Sprite const& sprite) {
-  int row = sprite.m_rows.size()-1;
-  for (auto iter=sprite.m_rows.rbegin();iter != sprite.m_rows.rend();++iter) {
-    if (iter!=sprite.m_rows.rbegin()) std::cout << "\n";
-    std::string indent(sprite.m_frame_top_left.col,'.');
-    os << indent << *iter << " : " << row--;
+  if (sprite.m_virtual_rows_count==0) {
+    int row = sprite.m_rows.size()-1;
+    for (auto iter=sprite.m_rows.rbegin();iter != sprite.m_rows.rend();++iter) {
+      if (iter!=sprite.m_rows.rbegin()) std::cout << "\n";
+      std::string indent(sprite.m_frame_top_left.col,'.');
+      os << indent << *iter << " : " << row--;
+    }
+  }
+  else {
+    os << "\noperator<< can't print sprite with virtual rows";
   }
   return os;
 }
@@ -178,7 +197,7 @@ const std::vector<Sprite::Rows> ROCKS {
 
 class Chamber {
 public:
-  static const int PATTERN_BUFFER_LENGTH{100};
+  static const int PATTERN_BUFFER_LENGTH{30};
   auto const& top_left() const {return m_sprite.m_frame_top_left;}
   auto const& bottom_right() const {return m_sprite.m_frame_bottom_right;}
   Chamber(Jets const& jets) : m_jets{jets} {}
@@ -216,12 +235,12 @@ public:
     }
     if (top_left().row>PATTERN_BUFFER_LENGTH) {
       // ensure we have enough on the rock pile to calculate a pile_key
-      m_state = State{.jet_index=jet_index,.rock_index=rock_index,.pile_key=pile_key(),.drop_count=drop_count,.top_left=top_left()};
+      m_state = State{.jet_index=jet_index,.rock_index=rock_index,.pile_key=pile_key(),.drop_count=m_drop_count,.top_left=top_left()};
     }
     return *this;
   }
   Chamber& drop() {
-    rock_index = (drop_count % ROCKS.size());
+    rock_index = (m_drop_count % ROCKS.size());
     auto rows = ROCKS[rock_index];
     Vector top_left{.row=static_cast<Result>(m_sprite.m_frame_top_left.row + rows.size() -1 + 4),.col=3}; // col:0 is left boundary
     Rock rock(top_left,rows);
@@ -238,11 +257,12 @@ public:
         is_falling=false;
         place_rock(rock);
       }
-      jet_index = (jet_index+1) % m_jets.size();
+      jet_index = (jet_index+1) % m_jets.size(); // next
     }
-    ++drop_count;
+    ++m_drop_count; // next
     return *this;
   }
+  Result drop_count() const {return m_drop_count;}
   using Key = std::size_t;
   Key pile_key() const {
     Key result{};
@@ -269,9 +289,15 @@ public:
     }
   };
 
+  friend std::ostream& operator<<(std::ostream& os,Chamber::State const& state);
+
   struct Cycle {
     Result drop_count;
     Result pile_gain;
+    bool operator<(Cycle const& other) const {
+      if (drop_count<other.drop_count) return pile_gain<other.pile_gain;
+      else return drop_count<other.drop_count;
+    }
   };
 
   State m_state{};
@@ -279,10 +305,12 @@ public:
 
   std::optional<Cycle> cycle() {
     std::optional<Cycle> result{};
-    if (drop_count>1000) {
+    if (m_state.drop_count>1000) {
       if (auto iter = m_seen.find(m_state);iter!=m_seen.end()) {
-        std::cout << "\n SEEN " << drop_count << " " << m_state.rock_index << " " << m_state.top_left << " " << m_state.pile_key << std::flush;
-        std::cout << "\n PREV " << iter->drop_count << " " << iter->rock_index << " " << iter->top_left << " " << iter->pile_key << std::flush;
+        // std::cout << "\n SEEN " << m_drop_count << " " << m_state.rock_index << " " << m_state.top_left << " " << m_state.pile_key << std::flush;
+        // std::cout << "\n PREV " << iter->m_drop_count << " " << iter->rock_index << " " << iter->top_left << " " << iter->pile_key << std::flush;
+        std::cout << "\n SEEN " << m_state;
+        std::cout << "\n PREV " << *iter;
         result=Cycle{.drop_count=m_state.drop_count - iter->drop_count,.pile_gain=m_state.top_left.row - iter->top_left.row};
       }
       else m_seen.insert(m_state);
@@ -290,19 +318,31 @@ public:
     return result;
   }
 
-  void advance_pile(Result pile_gain) {
-    m_sprite.m_frame_top_left.row += pile_gain;
+  void advance(Result drop_count,Result pile_gain) {
+    m_drop_count += drop_count;
+    m_sprite.add_virtual_rows(pile_gain);
+    m_state = State{.jet_index=jet_index,.rock_index=rock_index,.pile_key=pile_key(),.drop_count=m_drop_count,.top_left=top_left()};
   }
 
 private:
   friend std::ostream& operator<<(std::ostream& os,Chamber const& chamber);
 
   Sprite m_sprite{Vector{.row=0,.col=0},Sprite::Rows{1,"|-------|"}};
-  Result drop_count{};
+  Result m_drop_count{};
   Jets m_jets{};
   int jet_index{0};
   int rock_index{};
 };
+
+std::ostream& operator<<(std::ostream& os,Chamber::State const& state) {
+  os << " jet_index:" << state.jet_index;
+  os << " rock_index:" << state.rock_index;
+  os << " Key pile_key:" << state.pile_key;
+  os << " drop_count:" << state.drop_count;
+  os << " top_left:" << state.top_left;
+  return os;
+}
+
 
 Model parse(auto& in) {
     Model result{};
@@ -369,28 +409,38 @@ namespace part2 {
       auto data_model = parse(in);
       Chamber chamber{data_model};
       std::cout << "\n" << chamber << std::flush;
-      const Result TARGET_COUNT{1000000000000};
-      // const Result TARGET_COUNT{1040};
+      const Result TARGET_COUNT{2022};
+      // const Result TARGET_COUNT{1000000000000};
+      // const Result TARGET_COUNT{1106};
+      // const Result TARGET_COUNT{10000};
       bool cycled{false};
-      for (Result i=1;i<=TARGET_COUNT;++i) {
-        if ((i-1)%1==0) std::cout << "\n" << i;
+      // for (Result i=1;i<=TARGET_COUNT;++i) {
+      while (chamber.drop_count()<TARGET_COUNT) {
+        auto i = chamber.drop_count(); // use count for rock to be dropped
         chamber.drop();
+        if (cycled) std::cout << "\n" << chamber.m_state;
         if (!cycled) {
+        // if (true) {
           if (auto cycle = chamber.cycle()) {
-            std::cout << "\nDROP CYCLE:" << cycle->drop_count;
-            std::cout << "\nPILE CYCLE:" << cycle->pile_gain;
-            auto cycle_counts = ((TARGET_COUNT-i) / cycle->drop_count);
+            std::cout << "\ni:" << i << "  DROP CYCLE:" << cycle->drop_count;
+            std::cout << "\ni:" << i << "  PILE CYCLE:" << cycle->pile_gain;
+            // auto cycle_counts = ((TARGET_COUNT-i) / cycle->drop_count);
+            auto cycle_counts = 1;
+            std::cout << "\ni:" << i << " CYCLES LEFT:" << cycle_counts;
             auto delta = cycle_counts*cycle->drop_count;
-            i += delta;
-            std::cout << "\nnew i " << i;
-            chamber.advance_pile(cycle_counts*cycle->pile_gain);
+            if (i+delta <TARGET_COUNT) {
+              chamber.advance(delta,cycle_counts*cycle->pile_gain);
+              std::cout << "\n    new pile top:" << chamber.top_left().row;
+              std::cout << "\nnext drop count::" << chamber.drop_count();
+            }
             // exit(1);
-            assert(i<TARGET_COUNT);
+            assert(i<=TARGET_COUNT);
             cycled=true;
           }
         }
       }
-      // result = chamber.top_left().row;
+      // std::cout << "\n" << chamber;
+      result = chamber.top_left().row;
       return result;
   }
 }
@@ -412,9 +462,9 @@ int main(int argc, char *argv[])
 {
   // test();
   Answers answers{};
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
