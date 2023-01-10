@@ -69,7 +69,7 @@ std::ostream& operator<<(std::ostream& os,Vector const& v) {
 }
 
 Vectors to_adjacent_dirs() {
-  std::cout << "\nto_adjacent_dirs()";
+  // std::cout << "\nto_adjacent_dirs()";
   Vectors result{};
   for (int x : {-1,0,1}) {
     for (int y : {-1,0,1}) {
@@ -81,7 +81,7 @@ Vectors to_adjacent_dirs() {
         if (std::abs(x)==0 and std::abs(y)==1 and std::abs(z)==1) continue; // exclude diagonals
         Vector delta{.x=x,.y=y,.z=z};
         result.push_back(delta);
-        std::cout << " delta:" << delta;
+        // std::cout << " delta:" << delta;
       }
     }
   }
@@ -154,14 +154,14 @@ public:
   using Vertices = std::vector<Vertex>;
   auto V() {return m_map.size();}
   void insert(Vector const& pos) {
-    std::cout << "\nGrid::insert(" << pos << ")";
+    // std::cout << "\nGrid::insert(" << pos << ")";
     auto iter = std::find_if(m_map.begin(),m_map.end(),[&pos](auto const& entry){
       return entry.first == pos;
     });
     if (iter == m_map.end()) {
       iter = m_map.insert(iter,{pos,m_map.size()});
     }
-    std::cout << " V:" << V(); 
+    // std::cout << " V:" << V(); 
   }
   Vertices adj(Vertex v) const {
     Vertices result{};
@@ -200,13 +200,13 @@ public:
   Result unconnected_faces(Vertex v) {
     Result result{};
     result = (6-adj(v).size());
-    std::cout << "\nunconnected_faces(" << v << ")";
-    std::cout << " :result:" << result;
+    // std::cout << "\nunconnected_faces(" << v << ")";
+    // std::cout << " :result:" << result;
     return result;
   } 
 
   std::optional<Vertex> to_vertex(Vector pos) const {
-    std::cout << "\nto_vertex(" << pos << ")";
+    // std::cout << "\nto_vertex(" << pos << ")";
     std::optional<Vertex> result{};
     auto iter = std::find_if(m_map.begin(),m_map.end(),[&pos](auto const& entry){
       return entry.first == pos;
@@ -214,8 +214,8 @@ public:
     if (iter != m_map.end()) {
       result = iter->second;
     }
-    if (result) std::cout << " result:" << *result;
-    else std::cout << "null";
+    // if (result) std::cout << " result:" << *result;
+    // else std::cout << "null";
     return result;
   }
 
@@ -252,7 +252,7 @@ private:
   int m_count{};
   Grid m_grid{};
   void dfs(Grid const& grid,Vertex v) {
-    std::cout << "\n\tdfs(v:" << v << " pos:" << *m_grid.to_pos(v) << ")"; 
+    // std::cout << "\n\tdfs(v:" << v << " pos:" << *m_grid.to_pos(v) << ")"; 
     m_marked[v] = true;
     m_id[v] = m_count;
     for (auto w : m_grid.adj(v)) {
@@ -299,23 +299,29 @@ namespace part1 {
       Grid grid{};
       for (auto const& droplet : data_model) grid.insert(droplet);
       CC cc{grid};
-      std::cout << "\n cc.count:" << cc.count();
-      Result unconnected_faces{0};
-      for (int id=0;id<cc.count();++id) {
-        if (true) {
-          // LOG
-          if (id>0) std::cout << "\n";
-          for (auto const& v : grid.vertices()) {
-            if (id == cc.id(v)) std::cout << " " << v << ":" << *grid.to_pos(v);
+      if (true) {
+        // LOG
+        std::cout << "\ncc.count:" << cc.count();
+        std::map<int,std::vector<Vector>> m_components{};
+        for (auto const& v : grid.vertices()) {
+          m_components[cc.id(v)].push_back(*grid.to_pos(v));
+        }
+        for (auto const& [id,vs] : m_components) {
+          std::cout << "\nid:" << id;
+          for (int i = 0;i<vs.size();++i) {
+            if (i % 12 == 0) std::cout << "\n\t";
+            else std::cout << ",";
+            std::cout << " : " << vs[i];
           }
         }
-        for (auto const& v : grid.vertices()) {
-          if (id == cc.id(v)) {
-            unconnected_faces += grid.unconnected_faces(v);
-            std::cout << "\n\tunconnected_faces:" << unconnected_faces; 
-          } 
-        }
       }
+
+      Result unconnected_faces{};
+      for (auto const& v : grid.vertices()) {
+        unconnected_faces += grid.unconnected_faces(v);
+      }
+      std::cout << "\nsurface area " << unconnected_faces;
+
       result = unconnected_faces;
       return result;
   }
@@ -331,7 +337,7 @@ namespace part2 {
       Vector top_left_front{data_model.back()};
       Vector bottom_right_back{data_model.back()};
       for (auto const& droplet : data_model) {
-        std::cout << "\ninsert " << droplet;
+        // std::cout << "\ninsert " << droplet;
         grid.insert(droplet);
         top_left_front.x = std::min(top_left_front.x,droplet.x);
         top_left_front.y = std::min(top_left_front.y,droplet.y);
@@ -360,11 +366,20 @@ namespace part2 {
         }
       }
       CC cc{enclosing};
-      std::cout << "\ncc.count:" << cc.count();
       if (true) {
         // LOG
+        std::cout << "\ncc.count:" << cc.count();
+        std::map<int,std::vector<Vector>> m_components{};
         for (auto const& v : enclosing.vertices()) {
-          std::cout << "\nid:" << cc.id(v) << " " << *enclosing.to_pos(v);
+          m_components[cc.id(v)].push_back(*enclosing.to_pos(v));
+        }
+        for (auto const& [id,vs] : m_components) {
+          std::cout << "\nid:" << id;
+          for (int i = 0;i<vs.size();++i) {
+            if (i % 12 == 0) std::cout << "\n\t";
+            else std::cout << ",";
+            std::cout << " : " << vs[i];
+          }
         }
       }
 
@@ -374,7 +389,7 @@ namespace part2 {
         for (auto const& v : enclosing.vertices()) {
           if (cc.id(v)==cc.id(v0)) {
             unconnected_faces += enclosing.unconnected_faces(v);
-            std::cout << "\n\tunconnected_faces:" << unconnected_faces; 
+            // std::cout << "\n\tunconnected_faces:" << unconnected_faces; 
           } 
         }
         std::cout << "\nenclosing top_left_front v:pos = " << v0 << ":" << top_left_front;
@@ -394,9 +409,9 @@ namespace part2 {
 int main(int argc, char *argv[])
 {
   Answers answers{};
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
