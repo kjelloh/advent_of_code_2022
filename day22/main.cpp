@@ -394,10 +394,82 @@ namespace part1 {
 }
 
 namespace part2 {
+  /*
+  Define the cube with one corner at top_left_front (tlf) and a diagonally opposite corner bottom_right_back (brb).
+
+                /-------------
+               /|            /|               sheet (z)
+              / |    1      / |              /
+             /  |      5   /  |             /
+          tlf-------------- 3 |            tlf ---> col (x)
+            | 2 |---------|-- brb           |
+            |  /   0      |  /              |
+            | /      4    | /               v
+            |/            |/               row (y)
+             --------------
+
+    - Number the faces counter clockwise from tlf with face 0 in row,col plane.
+    - Number opposite faces so that the sum is 5
+    - Place the coordinate system at tlf with column as x, row as y and sheet as z
+
+    NOTE: In the puzzle example the numbering used is the order of faces found, NOT as above.
+
+    - going right will travel faces 0,3,5,2,0...
+    - going left will travel faces in the opposite order of going right
+    - going up will travel faces 0,1,5,4,0...
+    - going down will faces in the opposite order of going up 1,5,6,2,1,...
+
+    - Define orbit1 = faces 0,3,5,2,0...
+    - Define orbit2 = 0,1,5,4,0...
+    - define rotation_direction = clockwise or counter clockwise.
+
+  */
+
+  using Faces = std::vector<std::vector<std::string>>;
+
+  Faces to_faces(RowsGrid const& grid) {
+    Faces result{};
+    // map row,col on grid to the faces of the cube
+    // We need to figure out what faces we encounter and in what order.
+    // The leftmost map character in the input is on face 0
+    int face{0};
+    auto widths = std::deque<int>(1,0);
+    auto cols = std::deque<int>(1,0);
+    for (int grid_row=0;grid_row<grid.map().size();++grid_row) {      
+      auto line = grid.map()[grid_row]; line += " ";
+      auto first = line.find_first_not_of(' ',0);
+      auto end = line.find_first_of(' ',first);
+      auto width = end-first;
+      std::cout << "\ngrid_row:" << grid_row << " first:" << first << " end:" << end;
+      if (widths.back()!=width) {
+        widths.push_back(0);
+        cols.push_back(0);
+        widths.back() = width;
+        cols.back() = first;
+      }
+    }
+    widths.pop_front();
+    cols.pop_front();
+    if (true) {
+      // LOG
+      std::cout << "\nGRID PARTITION";
+      for (int i=0;i<widths.size();++i) {
+        std::cout << "\n" << cols[i] << " " << widths[i];
+      }
+    }
+    int cube_side{widths.front()};
+    for (int i=1;i<widths.size();++i) {
+      cube_side = std::gcd(cube_side,widths[i]);
+    }
+    std::cout << "\nCUBE SIZED SIZE " << cube_side;
+    return result;
+  }
+
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
-      auto data_model = parse(in);
+      auto [grid,path] = parse(in);
+      auto faces = to_faces(grid);
       return result;
   }
 }
@@ -406,8 +478,8 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
