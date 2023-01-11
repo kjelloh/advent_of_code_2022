@@ -419,49 +419,69 @@ namespace part2 {
     - going up will travel faces 0,1,5,4,0...
     - going down will faces in the opposite order of going up 1,5,6,2,1,...
 
-    - Define orbit1 = faces 0,3,5,2,0...
-    - Define orbit2 = 0,1,5,4,0...
+    - Define Horizontal Orbit = faces 0,3,5,2,0...
+    - Define Vertical Orbit = 0,1,5,4,0...
     - define rotation_direction = clockwise or counter clockwise.
 
   */
 
+  const std::map<int,int> H_ORBIT{{0,3},{3,5},{5,2},{2,0}}; // Horizontal Orbit
+  const std::map<int,int> V_ORBIT{{0,1},{1,5},{5,4},{4,0}}; // Horizontal Orbit
+  
   using Faces = std::vector<std::vector<std::string>>;
 
   Faces to_faces(RowsGrid const& grid) {
-    Faces result{};
+    auto result = Faces(6);
     // map row,col on grid to the faces of the cube
     // We need to figure out what faces we encounter and in what order.
     // The leftmost map character in the input is on face 0
-    int face{0};
-    auto widths = std::deque<int>(1,0);
-    auto cols = std::deque<int>(1,0);
+    auto face_candidates = std::vector<std::tuple<int,int,std::string>>{}; // col, width, string
     for (int grid_row=0;grid_row<grid.map().size();++grid_row) {      
       auto line = grid.map()[grid_row]; line += " ";
       auto first = line.find_first_not_of(' ',0);
       auto end = line.find_first_of(' ',first);
       auto width = end-first;
+      face_candidates.push_back({first,width,line.substr(first,width)});
       std::cout << "\ngrid_row:" << grid_row << " first:" << first << " end:" << end;
-      if (widths.back()!=width) {
-        widths.push_back(0);
-        cols.push_back(0);
-        widths.back() = width;
-        cols.back() = first;
-      }
     }
-    widths.pop_front();
-    cols.pop_front();
     if (true) {
       // LOG
       std::cout << "\nGRID PARTITION";
-      for (int i=0;i<widths.size();++i) {
-        std::cout << "\n" << cols[i] << " " << widths[i];
+      for (int i=0;i<face_candidates.size();++i) {
+        std::cout << "\n" << std::get<0>(face_candidates[i]) << " " << std::get<1>(face_candidates[i]) << " " << std::get<2>(face_candidates[i]);
       }
     }
-    int cube_side{widths.front()};
-    for (int i=1;i<widths.size();++i) {
-      cube_side = std::gcd(cube_side,widths[i]);
+    int cube_side{std::get<0>(face_candidates.front())};
+    for (int i=1;i<face_candidates.size();++i) {
+      cube_side = std::gcd(cube_side,std::get<1>(face_candidates[i]));
     }
     std::cout << "\nCUBE SIZED SIZE " << cube_side;
+
+    int face{};
+    for (int i=0;i<3;++i) {
+      std::cout << "\ni:" << i;
+      auto face_count = (std::get<1>(face_candidates[i*cube_side]) / cube_side);
+      std::cout << "\n\tface_count:" << face_count;
+      for (int j=0;j<face_count;++j) {
+        std::cout << "\n\tj:" << j;
+        for ( int grid_row=i*cube_side;grid_row<(i+1)*cube_side;++grid_row) {
+          auto [first,width,line] = face_candidates[grid_row];
+          std::cout << "\n\t" << first << " " << width << " " << line;
+          auto face_row = line.substr(j*cube_side,cube_side);
+          std::cout << " " << face_row;
+          result[face].push_back(face_row);
+        }
+        ++face;
+      }
+    }
+    if (true) {
+      for (int face_id=0;face_id<result.size();++face_id) {
+        std::cout << "\nface_id:" << face_id;
+        for (auto const& line : result[face_id]) {
+          std::cout << "\n\t" << std::quoted(line);
+        }
+      }
+    }
     return result;
   }
 
