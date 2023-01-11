@@ -459,19 +459,20 @@ namespace part2 {
     std::cout << "\nCUBE SIDE SIZE " << cube_side;
 
     int face_id{};
-    std::array<std::array<int,5>,5> face_id_grid{{
-       {{5,2,0,3,5}}
-      ,{{1,2,4,3,1}}
-      ,{{-1,2,5,3,-1}}}}; // face id relative face 0 in possible unfolds
+    std::array<std::array<int,5>,4> face_id_grid{{
+       {{5 ,2,0,3, 5}}
+      ,{{1 ,2,4,3, 1}}
+      ,{{-1,2,5,3,-1}}
+      ,{{-1,1,-1,-1, -1}}}}; // face id relative face 0 in possible unfolds
     int lookup_col_offset{0};
-    for (int face_id_grid_row=0;face_id_grid_row<3;++face_id_grid_row) {
+    for (int face_id_grid_row=0;face_id_grid_row<face_id_grid.size();++face_id_grid_row) {
       std::cout << "\nface_id_grid_row:" << face_id_grid_row;
       auto face_count = (std::get<1>(face_rows[face_id_grid_row*cube_side]) / cube_side);
       std::cout << "\n\tface_count:" << face_count;
       for (int face_id_grid_col=0;face_id_grid_col<5;++face_id_grid_col) {
         // Loop col 0..4 assuming faces are in the input as in face_id_grid
         std::cout << "\n\tj:" << face_id_grid_col;
-        for ( int grid_row=face_id_grid_row*cube_side;grid_row<(face_id_grid_row+1)*cube_side;++grid_row) {
+        for ( int grid_row=face_id_grid_row*cube_side;grid_row<std::min(static_cast<int>(grid.map().size()),(face_id_grid_row+1)*cube_side);++grid_row) {
           auto [first,width] = face_rows[grid_row];
           auto line = grid.map()[grid_row];
           std::cout << "\n\t" << first << " " << width << " " << std::quoted(line);
