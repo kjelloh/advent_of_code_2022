@@ -14,6 +14,7 @@
 #include <algorithm> // E.g., std::find, std::all_of,...
 #include <numeric> // E.g., std::accumulate
 #include <limits> // E.g., std::numeric_limits
+#include <cassert>
 
 extern char const* pTest;
 extern char const* pData;
@@ -419,14 +420,14 @@ namespace part2 {
     - going up will travel faces 0,1,5,4,0...
     - going down will faces in the opposite order of going up 1,5,6,2,1,...
 
-    - Define Horizontal Orbit = faces 0,3,5,2,0...
-    - Define Vertical Orbit = 0,1,5,4,0...
+    - Define Horizontal Orbits = faces 0,3,5,2,0...
+    - Define Vertical Orbits  = 0,1,5,4,0...
     - define rotation_direction = clockwise or counter clockwise.
 
   */
 
   const std::map<int,int> H_ORBIT{{0,3},{3,5},{5,2},{2,0}}; // Horizontal Orbit
-  const std::map<int,int> V_ORBIT{{0,1},{1,5},{5,4},{4,0}}; // Horizontal Orbit
+  const std::map<int,int> V_ORBIT{{0,1},{1,5},{5,4},{4,0}}; // Vertical Orbit
   
   using Faces = std::vector<std::vector<std::string>>;
 
@@ -435,43 +436,63 @@ namespace part2 {
     // map row,col on grid to the faces of the cube
     // We need to figure out what faces we encounter and in what order.
     // The leftmost map character in the input is on face 0
-    auto face_candidates = std::vector<std::tuple<int,int,std::string>>{}; // col, width, string
+    auto face_rows = std::vector<std::tuple<int,int>>{}; // col, width
     for (int grid_row=0;grid_row<grid.map().size();++grid_row) {      
       auto line = grid.map()[grid_row]; line += " ";
       auto first = line.find_first_not_of(' ',0);
       auto end = line.find_first_of(' ',first);
       auto width = end-first;
-      face_candidates.push_back({first,width,line.substr(first,width)});
+      face_rows.push_back({first,width});
       std::cout << "\ngrid_row:" << grid_row << " first:" << first << " end:" << end;
     }
     if (true) {
       // LOG
       std::cout << "\nGRID PARTITION";
-      for (int i=0;i<face_candidates.size();++i) {
-        std::cout << "\n" << std::get<0>(face_candidates[i]) << " " << std::get<1>(face_candidates[i]) << " " << std::get<2>(face_candidates[i]);
+      for (int i=0;i<face_rows.size();++i) {
+        std::cout << "\n" << std::get<0>(face_rows[i]) << " " << std::get<1>(face_rows[i]) << " " << grid.map()[i];
       }
     }
-    int cube_side{std::get<0>(face_candidates.front())};
-    for (int i=1;i<face_candidates.size();++i) {
-      cube_side = std::gcd(cube_side,std::get<1>(face_candidates[i]));
+    int cube_side{std::get<0>(face_rows.front())};
+    for (int i=1;i<face_rows.size();++i) {
+      cube_side = std::gcd(cube_side,std::get<1>(face_rows[i]));
     }
-    std::cout << "\nCUBE SIZED SIZE " << cube_side;
+    std::cout << "\nCUBE SIDE SIZE " << cube_side;
 
-    int face{};
-    for (int i=0;i<3;++i) {
-      std::cout << "\ni:" << i;
-      auto face_count = (std::get<1>(face_candidates[i*cube_side]) / cube_side);
+    int face_id{};
+    std::array<std::array<int,5>,5> face_id_grid{{
+       {{5,2,0,3,5}}
+      ,{{1,2,4,3,1}}
+      ,{{-1,2,5,3,-1}}}}; // face id relative face 0 in possible unfolds
+    int lookup_col_offset{0};
+    for (int face_id_grid_row=0;face_id_grid_row<3;++face_id_grid_row) {
+      std::cout << "\nface_id_grid_row:" << face_id_grid_row;
+      auto face_count = (std::get<1>(face_rows[face_id_grid_row*cube_side]) / cube_side);
       std::cout << "\n\tface_count:" << face_count;
-      for (int j=0;j<face_count;++j) {
-        std::cout << "\n\tj:" << j;
-        for ( int grid_row=i*cube_side;grid_row<(i+1)*cube_side;++grid_row) {
-          auto [first,width,line] = face_candidates[grid_row];
-          std::cout << "\n\t" << first << " " << width << " " << line;
-          auto face_row = line.substr(j*cube_side,cube_side);
-          std::cout << " " << face_row;
-          result[face].push_back(face_row);
+      for (int face_id_grid_col=0;face_id_grid_col<5;++face_id_grid_col) {
+        // Loop col 0..4 assuming faces are in the input as in face_id_grid
+        std::cout << "\n\tj:" << face_id_grid_col;
+        for ( int grid_row=face_id_grid_row*cube_side;grid_row<(face_id_grid_row+1)*cube_side;++grid_row) {
+          auto [first,width] = face_rows[grid_row];
+          auto line = grid.map()[grid_row];
+          std::cout << "\n\t" << first << " " << width << " " << std::quoted(line);
+          if (grid_row==0) {
+            // face_id = 0;
+            lookup_col_offset = 2-first/cube_side; // if first/cube_side 0, face 0 is first so we need to offset lookup off the id with + 2
+            std::cout << "\nlookup_col_offset:" << lookup_col_offset;
+            assert(-1 <= lookup_col_offset and lookup_col_offset<=2);
+          }
+          auto lookup_col = face_id_grid_col+lookup_col_offset;
+          std::cout << " id_grid " << face_id_grid_row << " " << face_id_grid_col;
+          std::cout << " face_id " << face_id_grid[face_id_grid_row][lookup_col];
+          face_id = face_id_grid[face_id_grid_row][lookup_col];
+          int begin = face_id_grid_col*cube_side;
+          std::cout << " " << begin << " " << begin-first;
+          if (begin >= first and 0 <= begin-first and  begin-first < width) {
+            auto face_row = line.substr(face_id_grid_col*cube_side,cube_side);
+            std::cout << " " << std::quoted(face_row);
+            result[face_id].push_back(face_row);
+          }
         }
-        ++face;
       }
     }
     if (true) {
@@ -484,6 +505,54 @@ namespace part2 {
     }
     return result;
   }
+
+/*
+
+        ...#  0
+        .#..
+        #...
+        ....
+...#.......#      1,2,4
+........#..A
+..#....#....
+.D........#.
+        ...#..B. 5,3
+        .....#..
+        .#......
+        ..C...#.
+
+face_id:0
+	"...#"
+	".#.."
+	"#..."
+	"...."
+face_id:1
+	"...#"
+	"...."
+	"..#."
+	"...."
+face_id:2
+	"...."
+	"...."
+	"...#"
+	"...."
+face_id:3
+	"...."
+	".#.."
+	"...."
+	"..#."
+face_id:4
+	"...#"
+	"#..."
+	"...."
+	"..#."
+face_id:5
+	"...#"
+	"...."
+	".#.."
+	"...."
+
+*/  
 
   Result solve_for(char const* pData) {
       Result result{};
