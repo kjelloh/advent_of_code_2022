@@ -23,8 +23,7 @@ using Result = long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 namespace dim2 {
-  const int ROW=0; // x maps to row
-  const int COL=1; // y maps to column
+
   using Vector = std::array<int,2>; // x,y,z
 
   // struct Vector {
@@ -114,12 +113,12 @@ namespace dim2 {
     return result;
   }
 
-  const Matrix TURN_RIGHT{{
+  const Matrix NORM_Z_TURN_RIGHT{{
     {0,1}
     ,{-1,0}
   }};
 
-  const Matrix TURN_LEFT{{
+  const Matrix NORM_Z_TURN_LEFT{{
     {0,-1}
     ,{1,0}
   }};
@@ -154,12 +153,32 @@ namespace dim3 {
   //   return (v1.at(0)==v2.at(0) and v1.at(1)==v2.at(1) and v1.at(2)==v2.at(2));
   // }
 
+  Vector& operator+=(Vector& v1,Vector const& v2) {
+    for (int i=0;i<v1.size();++i) v1.at(i) += v2.at(i);
+    return v1;
+  }
+
   Vector operator+(Vector const& v1,Vector const& v2) {
-    return {v1.at(0)+v2.at(0),v1.at(1)+v2.at(1),v1.at(2)+v2.at(2)};
+    auto result = v1;
+    result += v2;
+    return result;
+  }
+
+  Vector& operator-=(Vector& v1,Vector const& v2) {
+    for (int i=0;i<v1.size();++i) v1.at(i) -= v2.at(i);
+    return v1;
   }
 
   Vector operator-(Vector const& v1,Vector const& v2) {
-    return {v1.at(0)-v2.at(0),v1.at(1)-v2.at(1),v1.at(2)-v2.at(2)};
+    auto result = v1;
+    result -= v2;
+    return result;
+  }
+
+  Vector operator-(Vector const& v1) {
+    auto result = v1;
+    for (int i=0;i<result.size();++i) result.at(i) = -result.at(i);
+    return result;
   }
 
   const Vector RIGHT{0,1,0};
@@ -167,9 +186,153 @@ namespace dim3 {
   const Vector LEFT{0,-1,0};
   const Vector UP{-1,0,0};
 
+  std::ostream& operator<<(std::ostream& os,Vector const& v) {
+    os << '[';
+    for (int c=0;c<v.size();++c) {
+      if (c>0) os << ',';
+      os << v[c];
+    }
+    os << ']';
+    return os;
+  }
+
+  // Helper class to create rotations that turn any 3d object into any of its 24 possible orientations in 3D space.
+  // Observation: Imagine a cube and each normal vector of the faces of that cube.
+  // Each such normal vector defines a possible orientation of the cube
+  // For each such face normal, we can rotate around the face normal to get an additional 4 orientation
+  // In total 6 faces x 4 rotations = 24 orientations
+  class Rotations {
+  public:
+
+  static const int X0_Y0_Z0{0};
+  static const int X90_Y0_Z0{1};
+  static const int X180_Y0_Z0{2};
+  static const int X270_Y0_Z0{3};
+  static const int Z90_Y0_X0{4};
+  static const int Z90_Y90_X0{5};
+  static const int Z90_Y180_X0{6};
+  static const int Z90_Y270_X0{7};
+  static const int Z180_X0_Y0{8};
+  static const int Z180_X90_Y0{9};
+  static const int Z180_X180_Y0{10};
+  static const int Z180_X270_Y0{11};
+  static const int Z270_Y0_X0{12};
+  static const int Z270_Y90_X0{13};
+  static const int Z270_Y180_X0{14};
+  static const int Z270_Y270_X0{15};
+  static const int Y90_Z0_X0{16};
+  static const int Y90_Z90_X0{17};
+  static const int Y90_Z180_X0{18};
+  static const int Y90_Z270_X0{19};
+  static const int Y270_Z0_X0{20};
+  static const int Y270_Z90_X0{21};
+  static const int Y270_Z180_X0{22};
+  static const int Y270_Z270_X0{23};
+
+/*
+TEST
+rot:0[1,0,0] [0,1,0] [0,0,1] OK
+rot:1[1,0,0] [0,0,1] [0,-1,0] OK
+rot:2[1,0,0] [0,-1,0] [0,0,-1] OK
+rot:3[1,0,0] [0,0,-1] [0,1,0] OK 
+rot:4[0,1,0] [-1,0,0] [0,0,1] 
+rot:5[0,1,0] [0,0,1] [1,0,0]
+rot:6[0,1,0] [1,0,0] [0,0,-1]
+rot:7[0,1,0] [0,0,-1] [-1,0,0] 
+rot:8[0,1,0] [-1,0,0] [0,0,1]
+rot:9[0,0,1] [-1,0,0] [0,-1,0]
+rot:10[0,-1,0] [-1,0,0] [0,0,-1]
+rot:11[0,0,-1] [-1,0,0] [0,1,0]
+rot:12[0,1,0] [-1,0,0] [0,0,1]
+rot:13[0,1,0] [0,0,1] [1,0,0]
+rot:14[0,1,0] [1,0,0] [0,0,-1]
+rot:15[0,1,0] [0,0,-1] [-1,0,0]
+rot:16[0,0,-1] [0,1,0] [1,0,0]
+rot:17[0,0,-1] [-1,0,0] [0,1,0]
+rot:18[0,0,-1] [0,-1,0] [-1,0,0]
+rot:19[0,0,-1] [1,0,0] [0,-1,0]
+rot:20[0,0,1] [0,1,0] [-1,0,0]
+rot:21[0,0,1] [-1,0,0] [0,-1,0]
+rot:22[0,0,1] [0,-1,0] [1,0,0]
+rot:23[0,0,1] [1,0,0] [0,1,0]%              
+*/    
+
+    Rotations() {
+      // Generate all 24 rotations
+      for (auto i : {1,2,3,4,5,6}) {
+        // Loop over all outgoing normal vectors of a cube (starting with the x axis)
+        switch (i) {
+          // create clockwise rotations around normal vectors of cube faces
+          /* 0 */ case 1: rotations.push_back(RUNIT); break;                        // x
+          /* 4 */ case 2: rotations.push_back(RZ90*rotations[0]); break;            // x -> y   z90
+          /* 8 */ case 3: rotations.push_back(RZ90*RZ90*rotations[0]);break;         // x -> -x  z180
+          /* 12 */ case 4: rotations.push_back(RZ90*RZ90*RZ90*rotations[0]); break;   // x-> -y   z270
+          /* 16 */ case 5: rotations.push_back(RY90*rotations[0]);break;            // x -> -z  y90
+          /* 20 */ case 6: rotations.push_back(RY90*RY90*RY90*rotations[0]); break; // x -> z   y270
+        }
+        for (auto j : {2,3,4}) {
+          // for each cube face normal vector, create the three alternative rotations
+          switch (i) {
+            /* 1,2,3    */ case 1: rotations.push_back(RX90*rotations.back()); break; // rotate x   x90,x180,x270
+            /* 5,6,7  */ case 2: rotations.push_back(RY90*rotations.back()); break; // rotate y     z90 -> y90,y180,y270
+            /* 9,10,11 */ case 3: rotations.push_back(RX90*rotations.back()); break; // rotate -x   z180 -> x90,x180,x270
+            /* 13,14,15 */ case 4: rotations.push_back(RY90*rotations.back()); break; // rotate -y  z270 -> y90,y180,y270
+            /* 17,18,19 */ case 5: rotations.push_back(RZ90*rotations.back()); break; // rotate -z  y90 -> z90,z180,z270
+            /* 21,22,23 */ case 6: rotations.push_back(RZ90*rotations.back()); break; // rotate z   y270 -> z90,z180,z270
+          }
+        }
+      }
+    }
+
+    // See 3d_rotations_matrices.png (https://github.com/kjelloh/advent_of_code_2021/tree/main/day19 )
+    // We can use these to generate all 24 possible rotations
+    // 6 for each "facing" out through a face of a die
+    // 4 rotations around the face normal
+    // 24 in total 
+    static constexpr Matrix const RUNIT = {{ // No rotation
+      {1,0,0}
+      ,{0,1,0}
+      ,{0,0,1}}};
+    static constexpr Matrix const RX90 = {{
+      {1,0,0}
+      ,{0,0,-1}
+      ,{0,1,0}}};
+    static constexpr Matrix const RY90 = {{
+      {0,0,1}
+      ,{0,1,0}
+      ,{-1,0,0}}};
+    static constexpr Matrix const RZ90 = {{
+      {0,-1,0}
+      ,{1,0,0}
+      ,{0,0,1}}};
+
+    auto begin() const {return rotations.begin();}
+    auto end() const {return rotations.end();}
+    auto size() {return rotations.size();}
+    auto const& operator[](auto i) const {return rotations.at(i);}
+
+    static void test() {
+      Rotations rots{};
+      Vector x{1,0,0},y{0,1,0},z{0,0,1};
+      for (int i=0;i<rots.size();++i) {
+        std::cout << "\nrot:" << i << rots[i]*x << " " << rots[i]*y << " " << rots[i]*z;
+      }
+    }
+
+  private:
+    std::vector<Matrix> rotations{};
+  };
+
+  const Rotations ROTATIONS{};
+
+  const Matrix NORM_Z_TURN_RIGHT{ROTATIONS[Rotations::Z270_Y0_X0]};
+  const Matrix NORM_Z_TURN_LEFT{ROTATIONS[Rotations::Z90_Y0_X0]};
+
 } // namespace dim3
 
-using namespace dim2;
+using namespace dim3;
+const int ROW=0; // x maps to row
+const int COL=1; // y maps to column
 
 /*
 Facing is 0 for right (>), 1 for down (v), 2 for left (<), and 3 for up (^).
@@ -178,11 +341,6 @@ const std::vector<Vector> DELTA{RIGHT,DOWN,LEFT,UP};
 char char_of_delta(Vector const& delta) {
   if (delta[ROW]==0) return (delta[COL]>0)?'>':'<';
   else return (delta[ROW]>0)?'v':'^';
-}
-
-std::ostream& operator<<(std::ostream& os,Vector const& v) {
-  os << "[row:" << v[ROW] << ",col:" << v[COL] << "]";
-  return os;
 }
 
 std::ostream& operator<<(std::ostream& os,std::vector<std::string> rows) {
@@ -356,10 +514,10 @@ public:
       std::cout << "\npos:" << pos;
       for (auto i : {0,0,0,0}) pos += delta;
       std::cout << "\npos:" << pos;
-      delta = TURN_RIGHT*delta;
+      delta = NORM_Z_TURN_RIGHT*delta;
       for (auto i : {0,0,0,0}) pos += delta;
       std::cout << "\npos:" << pos;
-      delta = TURN_LEFT*delta;
+      delta = NORM_Z_TURN_LEFT*delta;
       for (auto i : {0,0,0,0}) pos += delta;
       std::cout << "\npos:" << pos;      
     }
@@ -371,8 +529,8 @@ public:
       for (auto const& step : path) {
         std::cout << "\nfrom:" << pos << " step:" << step; 
         switch (step.second) {
-          case 'R': delta = TURN_RIGHT*delta; ;break;
-          case 'L': delta = TURN_LEFT*delta; break;
+          case 'R': delta = NORM_Z_TURN_RIGHT*delta; ;break;
+          case 'L': delta = NORM_Z_TURN_LEFT*delta; break;
           default: break;
         }
         temp.at(pos) = char_of_delta(delta);
@@ -422,8 +580,8 @@ public:
       for (auto const& step : path) {
         std::cout << "\nfrom:" << pos << " step:" << step; 
         switch (step.second) {
-          case 'R': delta = TURN_RIGHT*delta; ;break;
-          case 'L': delta = TURN_LEFT*delta; break;
+          case 'R': delta = NORM_Z_TURN_RIGHT*delta; ;break;
+          case 'L': delta = NORM_Z_TURN_LEFT*delta; break;
           default: break;
         }
         rendered.at(pos) = char_of_delta(delta);
@@ -449,8 +607,8 @@ private:
   }
   void turn(char dir) {
     switch (dir) {
-      case 'R': delta = TURN_RIGHT*delta; ;break;
-      case 'L': delta = TURN_LEFT*delta; break;
+      case 'R': delta = NORM_Z_TURN_RIGHT*delta; ;break;
+      case 'L': delta = NORM_Z_TURN_LEFT*delta; break;
       default: break;
     }
     rendered.at(m_location_and_dir.first) = char_of_delta(delta);
@@ -660,18 +818,24 @@ face_id:5
 
 int main(int argc, char *argv[])
 {
-  Answers answers{};
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
-  for (auto const& answer : answers) {
-    std::cout << "\nanswer[" << answer.first << "] " << answer.second;
+  if (false) {
+    std::cout << "\nTEST";
+    dim3::Rotations::test();
   }
-  // std::cout << "\nPress <enter>...";
-  // std::cin.get();
-  std::cout << "\n";
-  return 0;
+  else {
+    Answers answers{};
+    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+    for (auto const& answer : answers) {
+      std::cout << "\nanswer[" << answer.first << "] " << answer.second;
+    }
+    // std::cout << "\nPress <enter>...";
+    // std::cin.get();
+    std::cout << "\n";
+    return 0;    
+  }
 }
 
 // char const* pTest = R"(        ...#
