@@ -671,6 +671,7 @@ namespace part1 {
 }
 
 namespace part2 {
+
   /*
   Define the cube with one corner at top_left_front (tlf) and a diagonally opposite corner bottom_right_back (brb).
 
@@ -702,10 +703,31 @@ namespace part2 {
 
   */
 
+  // using Face = std::vector<std::string>;
+
+  struct Face {
+    using Row = std::string;
+    using Rows = std::vector<std::string>;
+    Vector m_top_left;
+    Vector m_orientation;
+    Rows m_rows;
+    Face(Vector top_left = {0,0,0}, Rows const& rows = {}) : m_top_left{top_left}, m_rows{rows}, m_orientation{0,0,1} {}
+    Face& push_back(Row const& row) {m_rows.push_back(row); return *this;}
+    auto begin() const {return m_rows.begin();}
+    auto end() const {return m_rows.end();}
+  };
+
+  void test() {
+    if (true) {
+      // Test folding
+
+    }
+  }
+
   const std::map<int,int> H_ORBIT{{0,3},{3,5},{5,2},{2,0}}; // Horizontal Orbit
   const std::map<int,int> V_ORBIT{{0,1},{1,5},{5,4},{4,0}}; // Vertical Orbit
   
-  using Faces = std::vector<std::vector<std::string>>;
+  using Faces = std::vector<Face>;
 
   Faces to_faces(RowsGrid const& grid) {
     auto result = Faces(6);
@@ -765,8 +787,12 @@ namespace part2 {
           int begin = face_id_grid_col*cube_side;
           std::cout << " " << begin << " " << begin-first;
           if (begin >= first and 0 <= begin-first and  begin-first < width) {
+            if (grid_row == face_id_grid_row*cube_side) {
+              Vector top_left{grid_row,(lookup_col-2)*cube_side,0};
+              result[face_id].m_top_left = top_left;
+            }
             auto face_row = line.substr(face_id_grid_col*cube_side,cube_side);
-            std::cout << " " << std::quoted(face_row);
+            std::cout << " " << std::quoted(face_row) << " top_left:" << result[face_id].m_top_left;
             result[face_id].push_back(face_row);
           }
         }
@@ -842,15 +868,17 @@ face_id:5
 
 int main(int argc, char *argv[])
 {
-  if (true) {
+  if (false) {
     std::cout << "\nTEST";
     dim3::Rotations::test();
+
+    part2::test();
   }
   else {
     Answers answers{};
-    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-    answers.push_back({"Part 1     ",part1::solve_for(pData)});
-    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
     // answers.push_back({"Part 2     ",part2::solve_for(pData)});
     for (auto const& answer : answers) {
       std::cout << "\nanswer[" << answer.first << "] " << answer.second;
