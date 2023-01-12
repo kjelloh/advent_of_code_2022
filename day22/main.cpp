@@ -857,6 +857,24 @@ namespace part2 {
         }
       }
     }
+    Faces cube() {
+      Faces result{m_faces};
+      std::deque<Graph::Index> q{};
+      std::set<Graph::Index> marked{};
+      q.push_back(0);
+      marked.insert(0);
+      while (q.size()>0) {
+        auto v = q.front(); q.pop_front();
+        for (auto w : m_graph.adj(v)) {
+          std::cout << "\ncandidates fix:" << v << " and moving:" << w;
+          if (marked.contains(w)) continue;
+          std::cout << " FOLD :)";
+          marked.insert(w);
+          q.push_back(w);          
+        }
+      }
+      return result;
+    }
     std::string to_string() const {
       std::ostringstream os{};
       for (int v=0;v<m_graph.size();++v) {
@@ -886,6 +904,7 @@ namespace part2 {
       auto faces = to_faces(data_model.first);
       Folder folder{faces};
       std::cout << "\n" << folder.to_string();
+      auto cube = folder.cube();
     }
   }
 
