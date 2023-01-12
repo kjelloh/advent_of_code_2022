@@ -715,14 +715,8 @@ namespace part2 {
     Face& push_back(Row const& row) {m_rows.push_back(row); return *this;}
     auto begin() const {return m_rows.begin();}
     auto end() const {return m_rows.end();}
+    int side() const {return m_rows[0].size();}
   };
-
-  void test() {
-    if (true) {
-      // Test folding
-
-    }
-  }
 
   const std::map<int,int> H_ORBIT{{0,3},{3,5},{5,2},{2,0}}; // Horizontal Orbit
   const std::map<int,int> V_ORBIT{{0,1},{1,5},{5,4},{4,0}}; // Vertical Orbit
@@ -809,6 +803,43 @@ namespace part2 {
     return result;
   }
 
+  void test() {
+    if (true) {
+      // Test folding
+      std::istringstream in{pTest};
+      auto data_model = parse(in);
+      auto faces = to_faces(data_model.first);
+      for (int i=0;i<faces.size();++i) {
+        auto const& face = faces[i];
+        for (int j=i;j<faces.size();++j) {
+          auto other_face = faces[j];
+          if (face.m_top_left.at(0)==other_face.m_top_left.at(0)) {
+            // same "row" of faces
+            if (other_face.m_top_left.at(1) + face.side() == face.m_top_left.at(1)) {
+              // other is left neighbour
+              std::cout << "\nface:" << j << " is left of face:" << i;
+            }
+            else if (face.m_top_left.at(1) + face.side() == other_face.m_top_left.at(1)) {
+              // other face is right neighbour
+              std::cout << "\nface:" << j << " is right of face:" << i;
+            }
+          }
+          else if (face.m_top_left.at(1)==other_face.m_top_left.at(1)) {
+            // same "col" of faces
+            if (other_face.m_top_left.at(0) + face.side() == face.m_top_left.at(0)) {
+              // other is neighbour above
+              std::cout << "\nface:" << j << " is above of face:" << i;
+            }
+            else if (face.m_top_left.at(0) + face.side() == other_face.m_top_left.at(0)) {
+              // other face is neighbour below
+              std::cout << "\nface:" << j << " is below face:" << i;
+            }
+          }
+        }
+      }
+    }
+  }
+
 /*
 
         ...#  0
@@ -868,7 +899,7 @@ face_id:5
 
 int main(int argc, char *argv[])
 {
-  if (false) {
+  if (true) {
     std::cout << "\nTEST";
     dim3::Rotations::test();
 
