@@ -22,71 +22,110 @@ extern char const* pData;
 using Result = long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
-struct Vector {
-  int row;
-  int col;
-  Vector& operator-=(Vector const& other) {
-    row -= other.row;
-    col -= other.col;
-    return *this;
-  }
-  Vector operator-() const {
-    Vector result{.row=-row,.col=-col};
-    return result;
-  }
-  Vector& operator+=(Vector const& other) {
-    row += other.row;
-    col += other.col;
-    return *this;
-  }
-  Vector operator+(Vector const& other) const {
-    Vector result{*this};
-    result += other;
-    return result;
-  }
-  bool operator==(Vector const& other) const {
-    if (row == other.row) return col == other.col;
-    else return row == other.row;
-  }
-};
+namespace dim2 {
+  struct Vector {
+    int row;
+    int col;
+    Vector& operator-=(Vector const& other) {
+      row -= other.row;
+      col -= other.col;
+      return *this;
+    }
+    Vector operator-() const {
+      Vector result{.row=-row,.col=-col};
+      return result;
+    }
+    Vector& operator+=(Vector const& other) {
+      row += other.row;
+      col += other.col;
+      return *this;
+    }
+    Vector operator+(Vector const& other) const {
+      Vector result{*this};
+      result += other;
+      return result;
+    }
+    bool operator==(Vector const& other) const {
+      if (row == other.row) return col == other.col;
+      else return row == other.row;
+    }
 
-const Vector RIGHT{.row=0,.col=1};
-const Vector DOWN{.row=1,.col=0};
-const Vector LEFT{.row=0,.col=-1};
-const Vector UP{.row=-1,.col=0};
+    using Vectors = std::vector<Vector>;
+
+  };
+
+  const Vector RIGHT{.row=0,.col=1};
+  const Vector DOWN{.row=1,.col=0};
+  const Vector LEFT{.row=0,.col=-1};
+  const Vector UP{.row=-1,.col=0};
+
+  struct Matrix {
+    std::vector<Vector> rows;
+    Vector operator*(Vector const& v) const {
+      Vector result{};
+      result.row = rows[0].row*v.row + rows[0].col*v.col;
+      result.col = rows[1].row*v.row + rows[1].col*v.col;
+      return result;
+    }
+  };
+
+  const Matrix TURN_RIGHT{{
+    {0,1}
+    ,{-1,0}
+  }};
+
+  const Matrix TURN_LEFT{{
+    {0,-1}
+    ,{1,0}
+  }};
+
+}
+
+namespace dim3 {
+  using Vector3D = std::array<int,3>;
+  using Matrix3D = std::array<Vector3D,3>;
+  Vector3D operator*(Matrix3D const& m, Vector3D const& v){
+    Vector3D result{};
+    for (int r=0;r<m.size();r++) {
+      for (int c=0;c<m[0].size();c++) {
+        result[r] += m[r][c]*v[c];
+      }
+    }
+    return result;
+  }
+  Matrix3D operator*(Matrix3D const& m1, Matrix3D const& m2){
+    Matrix3D result{};
+    for (int r=0;r<m1.size();r++) {
+      for (int c=0;c<m2[0].size();c++) {
+        for (int k=0;k<m1[0].size();k++) {
+          result[r][c] += m1[r][k]*m2[k][c];
+        }
+      }
+    }
+    return result;
+  }
+
+  Vector3D operator+(Vector3D const& v1,Vector3D const& v2) {
+    return {v1.at(0)+v2.at(0),v1.at(1)+v2.at(1),v1.at(2)+v2.at(2)};
+  }
+
+  Vector3D operator-(Vector3D const& v1,Vector3D const& v2) {
+    return {v1.at(0)-v2.at(0),v1.at(1)-v2.at(1),v1.at(2)-v2.at(2)};
+  }
+}
+
+namespace dim = dim2;
+
 /*
 Facing is 0 for right (>), 1 for down (v), 2 for left (<), and 3 for up (^).
 */
-const std::vector<Vector> DELTA{RIGHT,DOWN,LEFT,UP};
-char char_of_delta(Vector const& delta) {
+const std::vector<dim::Vector> DELTA{dim::RIGHT,dim::DOWN,dim::LEFT,dim::UP};
+char char_of_delta(dim::Vector const& delta) {
   if (delta.row==0) return (delta.col>0)?'>':'<';
   else return (delta.row>0)?'v':'^';
 }
 
-struct Matrix {
-  std::vector<Vector> rows;
-  Vector operator*(Vector const& v) const {
-    Vector result{};
-    result.row = rows[0].row*v.row + rows[0].col*v.col;
-    result.col = rows[1].row*v.row + rows[1].col*v.col;
-    return result;
-  }
-};
-
-const Matrix TURN_RIGHT{{
-   {0,1}
-  ,{-1,0}
-}};
-
-const Matrix TURN_LEFT{{
-   {0,-1}
-  ,{1,0}
-}};
-
-
-using Vectors = std::vector<Vector>;
-
-std::ostream& operator<<(std::ostream& os,Vector const& v) {
+std::ostream& operator<<(std::ostream& os,dim::Vector const& v) {
   os << "[row:" << v.row << ",col:" << v.col << "]";
   return os;
 }
@@ -138,18 +177,18 @@ public:
   Map const& map() const {
     return m_map;
   }
-  Vector const& top_left() const {
+  dim::Vector const& top_left() const {
     return m_top_left;
   }
-  Vector const& bottom_right() const {
+  dim::Vector const& bottom_right() const {
     return m_bottom_right;
   }
-  bool in_frame(Vector const& pos) const {
+  bool in_frame(dim::Vector const& pos) const {
     return (pos.row>=top_left().row and pos.row<=bottom_right().row and pos.col>=top_left().col and pos.col<=bottom_right().col);
   }
-  Vector next(Vector const& pos,Vector const& delta) const {
+  dim::Vector next(dim::Vector const& pos,dim::Vector const& delta) const {
     // std::cout << "\nnext(pos:" << pos << ",delta:" << delta << ")"; 
-    Vector result{pos+delta}; // optimistic
+    dim::Vector result{pos+delta}; // optimistic
     // std::cout << "\n\tat(" << result << "):" << at(result);
     // we are now at '.', '#' or at ' ' (the last meaning out of map or out of frame)
     if (at(result)==' ') {
@@ -163,18 +202,18 @@ public:
     // std::cout << "\n\tat(" << result << "):" << at(result);
     return result;
   }
-  char at(Vector const& pos) const {
+  char at(dim::Vector const& pos) const {
     if (in_frame(pos)) return m_map.at(pos.row).at(pos.col);
     else return ' ';
   }
-  char& at(Vector const& pos) {
+  char& at(dim::Vector const& pos) {
     static char NULL_POS{' '};
     if (in_frame(pos)) return m_map[pos.row][pos.col];
     else return NULL_POS;
   }
 private:
-  Vector m_top_left{.row=0,.col=0};
-  Vector m_bottom_right{.row=-1,.col=-1}; // empty
+  dim::Vector m_top_left{.row=0,.col=0};
+  dim::Vector m_bottom_right{.row=-1,.col=-1}; // empty
   Map m_map{};
 };
 
@@ -236,7 +275,7 @@ std::ostream& operator<<(std::ostream& os,Model const& model) {
 
 class Traveler {
 public:
-  using LocationAndDir = std::pair<Vector,int>;
+  using LocationAndDir = std::pair<dim::Vector,int>;
   Traveler(RowsGrid const& grid,Path const path) : m_grid{grid},m_path{path},rendered{grid} {
     std::cout << "\nTraveler::Traveler";
     auto first_col{m_grid.top_left().col};
@@ -244,41 +283,41 @@ public:
       std::cout << "\n[row:0,col:" << first_col << "]=" << m_grid.map()[0][first_col];
       if (m_grid.map()[0][first_col]!=' ') break;
     }
-    m_location_and_dir.first = Vector{.row=0,.col=first_col};
+    m_location_and_dir.first = dim::Vector{.row=0,.col=first_col};
     walk_the_path();
   }
   LocationAndDir location_and_dir() {
     return m_location_and_dir;
   }
-  Vector const& pos() const {
+  dim::Vector const& pos() const {
     return m_location_and_dir.first;
   }
   static void test(RowsGrid const& grid,Path const path) {
     std::cout << "\ntest(...)";
     if (false) {
       RowsGrid temp{};
-      Vector pos{};
-      Vector delta{RIGHT};
+      dim::Vector pos{};
+      dim::Vector delta{dim::RIGHT};
       std::cout << "\npos:" << pos;
       for (auto i : {0,0,0,0}) pos += delta;
       std::cout << "\npos:" << pos;
-      delta = TURN_RIGHT*delta;
+      delta = dim::TURN_RIGHT*delta;
       for (auto i : {0,0,0,0}) pos += delta;
       std::cout << "\npos:" << pos;
-      delta = TURN_LEFT*delta;
+      delta = dim::TURN_LEFT*delta;
       for (auto i : {0,0,0,0}) pos += delta;
       std::cout << "\npos:" << pos;      
     }
     if (false) {
       std::cout << "\n2 path:" << path;
       RowsGrid temp{};
-      Vector pos{};
-      Vector delta{RIGHT};
+      dim::Vector pos{};
+      dim::Vector delta{dim::RIGHT};
       for (auto const& step : path) {
         std::cout << "\nfrom:" << pos << " step:" << step; 
         switch (step.second) {
-          case 'R': delta = TURN_RIGHT*delta; ;break;
-          case 'L': delta = TURN_LEFT*delta; break;
+          case 'R': delta = dim::TURN_RIGHT*delta; ;break;
+          case 'L': delta = dim::TURN_LEFT*delta; break;
           default: break;
         }
         temp.at(pos) = char_of_delta(delta);
@@ -323,13 +362,13 @@ public:
       RowsGrid rendered{grid};
       auto pos = traveler.pos();
       std::cout << "\nstart_pos" << pos;
-      auto delta = RIGHT;
+      auto delta = dim::RIGHT;
       std::cout << "\n" << rendered;
       for (auto const& step : path) {
         std::cout << "\nfrom:" << pos << " step:" << step; 
         switch (step.second) {
-          case 'R': delta = TURN_RIGHT*delta; ;break;
-          case 'L': delta = TURN_LEFT*delta; break;
+          case 'R': delta = dim::TURN_RIGHT*delta; ;break;
+          case 'L': delta = dim::TURN_LEFT*delta; break;
           default: break;
         }
         rendered.at(pos) = char_of_delta(delta);
@@ -345,7 +384,7 @@ private:
   friend std::ostream& operator<<(std::ostream& os,Traveler const& traveler);
   RowsGrid m_grid;
   Path m_path;
-  Vector delta{RIGHT};
+  dim::Vector delta{dim::RIGHT};
   LocationAndDir m_location_and_dir{};
   RowsGrid rendered{};
   void take_step() {
@@ -355,8 +394,8 @@ private:
   }
   void turn(char dir) {
     switch (dir) {
-      case 'R': delta = TURN_RIGHT*delta; ;break;
-      case 'L': delta = TURN_LEFT*delta; break;
+      case 'R': delta = dim::TURN_RIGHT*delta; ;break;
+      case 'L': delta = dim::TURN_LEFT*delta; break;
       default: break;
     }
     rendered.at(m_location_and_dir.first) = char_of_delta(delta);
@@ -568,8 +607,8 @@ int main(int argc, char *argv[])
 {
   Answers answers{};
   // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   for (auto const& answer : answers) {
     std::cout << "\nanswer[" << answer.first << "] " << answer.second;
