@@ -61,6 +61,9 @@ namespace dim2 {
   //   return (v1.at(0)==v2.at(0) and v1.at(1)==v2.at(1));
   // }
 
+  const Vector X_UNIT{1,0};
+  const Vector Y_UNIT{0,1};
+
   Vector& operator+=(Vector& v1,Vector const& v2) {
     for (int i=0;i<v1.size();++i) v1.at(i) += v2.at(i);
     return v1;
@@ -127,6 +130,11 @@ namespace dim2 {
 
 namespace dim3 {
   using Vector = std::array<int,3>;
+
+  const Vector X_UNIT{1,0,0};
+  const Vector Y_UNIT{0,1,0};
+  const Vector Z_UNIT{0,0,1};
+
   using Matrix = std::array<Vector,3>;
   Vector operator*(Matrix const& m, Vector const& v){
     Vector result{};
@@ -703,19 +711,18 @@ namespace part2 {
 
   */
 
-  // using Face = std::vector<std::string>;
-
   struct Face {
     using Row = std::string;
     using Rows = std::vector<std::string>;
     Vector m_top_left;
-    Vector m_orientation;
+    Vector m_row_v,m_col_v;
     Rows m_rows;
-    Face(Vector top_left = {0,0,0}, Rows const& rows = {}) : m_top_left{top_left}, m_rows{rows}, m_orientation{0,0,1} {}
+    Face(Vector top_left = {}, Rows const& rows = {}) : m_top_left{top_left}, m_rows{rows}, m_row_v{X_UNIT},m_col_v{Y_UNIT} {}
     Face& push_back(Row const& row) {m_rows.push_back(row); return *this;}
     auto begin() const {return m_rows.begin();}
     auto end() const {return m_rows.end();}
     int side() const {return m_rows[0].size();}
+    bool operator<(Face const& other) const {return m_top_left < other.m_top_left;}
   };
 
   const std::map<int,int> H_ORBIT{{0,3},{3,5},{5,2},{2,0}}; // Horizontal Orbit
@@ -725,67 +732,55 @@ namespace part2 {
 
   Faces to_faces(RowsGrid const& grid) {
     auto result = Faces{};
+
     // map row,col on grid to the faces of the cube
     // We need to figure out what faces we encounter and in what order.
     // The leftmost map character in the input is on face 0
-    auto face_rows = std::vector<std::tuple<int,int>>{}; // col, width
+    std::set<int> widths{};
     for (int grid_row=0;grid_row<grid.map().size();++grid_row) {      
-      auto line = grid.map()[grid_row]; line += " ";
+      auto const& line = grid.map()[grid_row];
       auto first = line.find_first_not_of(' ',0);
-      auto end = line.find_first_of(' ',first);
+      auto end = std::min(line.size(),line.find_first_of(' ',first));
       auto width = end-first;
-      face_rows.push_back({first,width});
-      std::cout << "\ngrid_row:" << grid_row << " first:" << first << " end:" << end;
+      assert(width<line.size());
+      widths.insert(width);
     }
-    if (true) {
-      // LOG
-      std::cout << "\nGRID PARTITION";
-      for (int i=0;i<face_rows.size();++i) {
-        std::cout << "\n" << std::get<0>(face_rows[i]) << " " << std::get<1>(face_rows[i]) << " " << grid.map()[i];
-      }
-    }
-    int cube_side{std::get<0>(face_rows.front())};
-    for (int i=1;i<face_rows.size();++i) {
-      cube_side = std::gcd(cube_side,std::get<1>(face_rows[i]));
+    int cube_side{*widths.begin()};
+    for (auto width : widths) {
+      cube_side = std::gcd(cube_side,width);
     }
     std::cout << "\nCUBE SIDE SIZE " << cube_side;
 
-    int lookup_col_offset{0};
-    for (int face_id_grid_row=0;face_id_grid_row<5;++face_id_grid_row) {
-      std::cout << "\nface_id_grid_row:" << face_id_grid_row;
-      auto face_count = (std::get<1>(face_rows[face_id_grid_row*cube_side]) / cube_side);
-      std::cout << "\n\tface_count:" << face_count;
-      for (int face_id_grid_col=0;face_id_grid_col<5;++face_id_grid_col) {
-        // Loop col 0..4 assuming faces are in the input as in face_id_grid
-        std::cout << "\n\tj:" << face_id_grid_col;
-        result.push_back({}); std::cout << "\npush! faces:" << result.size();
-        for ( int grid_row=face_id_grid_row*cube_side;grid_row<std::min(static_cast<int>(grid.map().size()),(face_id_grid_row+1)*cube_side);++grid_row) {
-          auto [first,width] = face_rows[grid_row];
-          auto line = grid.map()[grid_row];
-          std::cout << "\n\t" << first << " " << width << " " << std::quoted(line);
-          if (grid_row==0) {
-            // Check offset of first face (face 0,1,...5)
-            lookup_col_offset = 2-first/cube_side; // if first/cube_side = 0, face 0 is first in input so we need to offset lookup id with + 2
-            std::cout << "\nlookup_col_offset:" << lookup_col_offset;
-            assert(-1 <= lookup_col_offset and lookup_col_offset<=2);
-          }
-          auto lookup_col = face_id_grid_col+lookup_col_offset;
-          std::cout << " id_grid " << face_id_grid_row << " " << face_id_grid_col;
-          int begin = face_id_grid_col*cube_side;
-          std::cout << " " << begin << " " << begin-first;
-          if (begin >= first and 0 <= begin-first and  begin-first < width) {
-            if (grid_row == face_id_grid_row*cube_side) {
-              Vector top_left{grid_row,(lookup_col-2)*cube_side,0};
-              result.back().m_top_left = top_left;
+    // Loop over grid of unfolded faces
+    int offset{0};
+    auto vert_cube_side_counts = grid.map().size() / cube_side;
+    for (int r=0;r<vert_cube_side_counts;++r) {
+      auto hor_cube_side_counts = grid.map()[0].size() / cube_side;
+      for (int c=0;c<hor_cube_side_counts;++c) {
+        result.push_back({}); result.back().m_top_left = Vector{r*cube_side,(c-offset)*cube_side,0};
+        for (int dr=0;dr<cube_side;++dr) {
+          auto row = r*cube_side+dr;
+          auto const& line = grid.map()[row];
+          auto first = c*cube_side;
+          std::cout << "\n" << std::quoted(line) << " " << r << " " << c << " " << dr << " " << first << " " << offset << std::flush;
+          if (first+cube_side <= line.size()) {
+            auto snippet = line.substr(first,cube_side);
+            std::cout << " " << std::quoted(snippet);
+            if (snippet.find_first_not_of(' ')==0) {
+              if (row==0 and result.back().m_rows.size()==0) {
+                offset = first/cube_side;
+                result.back().m_top_left = Vector{r*cube_side,(c-offset)*cube_side,0};
+              }
+              result.back().push_back(snippet);
+              std::cout << " :)";
             }
-            auto face_row = line.substr(face_id_grid_col*cube_side,cube_side);
-            std::cout << " " << std::quoted(face_row) << " top_left:" << result.back().m_top_left;
-            result.back().push_back(face_row);
-          }
+          }          
         }
-        if (result.back().m_rows.size()==0) {result.pop_back(); std::cout << "\npop empty! faces:" << result.size();}
+        if (result.back().m_rows.size()==0) result.pop_back();
       }
     }
+    assert(result.size()==6);
+
     if (true) {
       for (int face_id=0;face_id<result.size();++face_id) {
         std::cout << "\nface_id:" << face_id;
@@ -797,25 +792,53 @@ namespace part2 {
     return result;
   }
 
-  void test() {
-    if (true) {
-      // Test folding
-      std::istringstream in{pTest};
-      auto data_model = parse(in);
-      auto faces = to_faces(data_model.first);
+  class Graph {
+  public:
+    using Index = int;
+    auto size() const {return m_adj.size();}
+    auto const& adj(Index index) const {return m_adj.at(index);}
+    Graph& insert(Index index1,Index index2) {
+      while (index1>=m_adj.size() or index2>=m_adj.size()) m_adj.push_back({});
+      m_adj[index1].insert(index2);
+      m_adj[index2].insert(index1);
+      return *this;
+    }
+    std::string to_string() const {
+      std::ostringstream os{};
+      for (int v=0;v<m_adj.size();++v) {
+        if (v>0) os << "\n";
+        os << "v:" << v << " : ";
+        for (auto iter=m_adj[v].begin();iter!=m_adj[v].end();++iter) {
+          if (iter!=m_adj[v].begin()) os << ',';
+          os << "w:" << *iter;
+        }
+      }
+      return os.str();
+    }
+  private:
+    std::vector<std::set<Index>> m_adj{};
+  };
+
+  class Folder {
+  public:
+    Folder(Faces const& faces) : m_faces{faces} {
+      std::cout << "\n" << m_graph.to_string();
       for (int i=0;i<faces.size();++i) {
         auto const& face = faces[i];
-        for (int j=i;j<faces.size();++j) {
+        for (int j=i+1;j<faces.size();++j) {
+          std::cout << "\ni:" << i << " j:" << j;
           auto other_face = faces[j];
           if (face.m_top_left.at(0)==other_face.m_top_left.at(0)) {
             // same "row" of faces
             if (other_face.m_top_left.at(1) + face.side() == face.m_top_left.at(1)) {
               // other is left neighbour
               std::cout << "\nface:" << j << " is left of face:" << i;
+              m_graph.insert(i,j);
             }
             else if (face.m_top_left.at(1) + face.side() == other_face.m_top_left.at(1)) {
               // other face is right neighbour
               std::cout << "\nface:" << j << " is right of face:" << i;
+              m_graph.insert(i,j);
             }
           }
           else if (face.m_top_left.at(1)==other_face.m_top_left.at(1)) {
@@ -823,14 +846,46 @@ namespace part2 {
             if (other_face.m_top_left.at(0) + face.side() == face.m_top_left.at(0)) {
               // other is neighbour above
               std::cout << "\nface:" << j << " is above of face:" << i;
+              m_graph.insert(i,j);
             }
             else if (face.m_top_left.at(0) + face.side() == other_face.m_top_left.at(0)) {
               // other face is neighbour below
               std::cout << "\nface:" << j << " is below face:" << i;
+              m_graph.insert(i,j);
             }
           }
         }
       }
+    }
+    std::string to_string() const {
+      std::ostringstream os{};
+      for (int v=0;v<m_graph.size();++v) {
+        if (v>0) os << "\n";
+        os << v << ":" << face(v).m_top_left << " : ";
+        for (auto iter=m_graph.adj(v).begin();iter!=m_graph.adj(v).end();++iter) {
+          if (iter!=m_graph.adj(v).begin()) os << ',';
+          os << *iter << ":" << face(*iter).m_top_left;
+        }
+      }
+      return os.str();
+    }
+  private:
+    Graph m_graph{};
+    Faces m_faces{};
+    Face const& face(Graph::Index v) const {
+      assert(v<m_faces.size());
+      return m_faces[v];
+    }
+  };
+
+  void test() {
+    if (true) {
+      // Test folding
+      std::istringstream in{pTest};
+      auto data_model = parse(in);
+      auto faces = to_faces(data_model.first);
+      Folder folder{faces};
+      std::cout << "\n" << folder.to_string();
     }
   }
 
