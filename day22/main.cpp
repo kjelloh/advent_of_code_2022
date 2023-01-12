@@ -724,7 +724,7 @@ namespace part2 {
   using Faces = std::vector<Face>;
 
   Faces to_faces(RowsGrid const& grid) {
-    auto result = Faces(6);
+    auto result = Faces{};
     // map row,col on grid to the faces of the cube
     // We need to figure out what faces we encounter and in what order.
     // The leftmost map character in the input is on face 0
@@ -750,46 +750,40 @@ namespace part2 {
     }
     std::cout << "\nCUBE SIDE SIZE " << cube_side;
 
-    int face_id{};
-    std::array<std::array<int,5>,4> face_id_grid{{
-       {{5 ,2,0,3, 5}}
-      ,{{1 ,2,4,3, 1}}
-      ,{{-1,2,5,3,-1}}
-      ,{{-1,1,-1,-1, -1}}}}; // face id relative face 0 in possible unfolds
     int lookup_col_offset{0};
-    for (int face_id_grid_row=0;face_id_grid_row<face_id_grid.size();++face_id_grid_row) {
+    for (int face_id_grid_row=0;face_id_grid_row<5;++face_id_grid_row) {
       std::cout << "\nface_id_grid_row:" << face_id_grid_row;
       auto face_count = (std::get<1>(face_rows[face_id_grid_row*cube_side]) / cube_side);
       std::cout << "\n\tface_count:" << face_count;
       for (int face_id_grid_col=0;face_id_grid_col<5;++face_id_grid_col) {
         // Loop col 0..4 assuming faces are in the input as in face_id_grid
         std::cout << "\n\tj:" << face_id_grid_col;
+        result.push_back({}); std::cout << "\npush! faces:" << result.size();
         for ( int grid_row=face_id_grid_row*cube_side;grid_row<std::min(static_cast<int>(grid.map().size()),(face_id_grid_row+1)*cube_side);++grid_row) {
           auto [first,width] = face_rows[grid_row];
           auto line = grid.map()[grid_row];
           std::cout << "\n\t" << first << " " << width << " " << std::quoted(line);
           if (grid_row==0) {
-            // face_id = 0;
-            lookup_col_offset = 2-first/cube_side; // if first/cube_side 0, face 0 is first so we need to offset lookup off the id with + 2
+            // Check offset of first face (face 0,1,...5)
+            lookup_col_offset = 2-first/cube_side; // if first/cube_side = 0, face 0 is first in input so we need to offset lookup id with + 2
             std::cout << "\nlookup_col_offset:" << lookup_col_offset;
             assert(-1 <= lookup_col_offset and lookup_col_offset<=2);
           }
           auto lookup_col = face_id_grid_col+lookup_col_offset;
           std::cout << " id_grid " << face_id_grid_row << " " << face_id_grid_col;
-          std::cout << " face_id " << face_id_grid[face_id_grid_row][lookup_col];
-          face_id = face_id_grid[face_id_grid_row][lookup_col];
           int begin = face_id_grid_col*cube_side;
           std::cout << " " << begin << " " << begin-first;
           if (begin >= first and 0 <= begin-first and  begin-first < width) {
             if (grid_row == face_id_grid_row*cube_side) {
               Vector top_left{grid_row,(lookup_col-2)*cube_side,0};
-              result[face_id].m_top_left = top_left;
+              result.back().m_top_left = top_left;
             }
             auto face_row = line.substr(face_id_grid_col*cube_side,cube_side);
-            std::cout << " " << std::quoted(face_row) << " top_left:" << result[face_id].m_top_left;
-            result[face_id].push_back(face_row);
+            std::cout << " " << std::quoted(face_row) << " top_left:" << result.back().m_top_left;
+            result.back().push_back(face_row);
           }
         }
+        if (result.back().m_rows.size()==0) {result.pop_back(); std::cout << "\npop empty! faces:" << result.size();}
       }
     }
     if (true) {
