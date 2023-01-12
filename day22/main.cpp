@@ -317,6 +317,30 @@ rot:23[0,0,1] [1,0,0] [0,1,0]%
       for (int i=0;i<rots.size();++i) {
         std::cout << "\nrot:" << i << rots[i]*x << " " << rots[i]*y << " " << rots[i]*z;
       }
+      assert((rots[Rotations::X0_Y0_Z0]*Vector{1,3,7}==Vector{1,3,7}));
+      assert((rots[Rotations::X90_Y0_Z0]*y==z));
+      assert((rots[Rotations::X180_Y0_Z0]*y==-y));
+      assert((rots[Rotations::X270_Y0_Z0]*y==-z));
+      assert((rots[Rotations::Z90_Y0_X0]*x==y));
+      assert((rots[Rotations::Z90_Y90_X0]*y==z));
+      assert((rots[Rotations::Z90_Y180_X0]*y==x));
+      assert((rots[Rotations::Z90_Y270_X0]*y==-z));
+      assert((rots[Rotations::Z180_X0_Y0]*x==-x));
+      assert((rots[Rotations::Z180_X90_Y0]*y==-z));
+      assert((rots[Rotations::Z180_X180_Y0]*y==y));
+      assert((rots[Rotations::Z180_X270_Y0]*y==z));
+      assert((rots[Rotations::Z270_Y0_X0]*y==x));
+      assert((rots[Rotations::Z270_Y90_X0]*y==-z));
+      assert((rots[Rotations::Z270_Y180_X0]*y==-x));
+      assert((rots[Rotations::Z270_Y270_X0]*y==z));
+      assert((rots[Rotations::Y90_Z0_X0]*x==-z));
+      assert((rots[Rotations::Y90_Z90_X0]*z==y));
+      assert((rots[Rotations::Y90_Z180_X0]*z==-x));
+      assert((rots[Rotations::Y90_Z270_X0]*z==-y));
+      assert((rots[Rotations::Y270_Z0_X0]*z==-x));
+      assert((rots[Rotations::Y270_Z90_X0]*z==-y));
+      assert((rots[Rotations::Y270_Z180_X0]*z==x));
+      assert((rots[Rotations::Y270_Z270_X0]*z==y));
     }
 
   private:
@@ -818,7 +842,7 @@ face_id:5
 
 int main(int argc, char *argv[])
 {
-  if (false) {
+  if (true) {
     std::cout << "\nTEST";
     dim3::Rotations::test();
   }
