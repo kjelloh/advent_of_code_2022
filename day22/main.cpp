@@ -758,16 +758,17 @@ namespace part2 {
       auto hor_cube_side_counts = grid.map()[0].size() / cube_side;
       for (int c=0;c<hor_cube_side_counts;++c) {
         result.push_back({}); result.back().m_top_left = Vector{r*cube_side,(c-offset)*cube_side,0};
+        std::cout << "\n";
         for (int dr=0;dr<cube_side;++dr) {
           auto row = r*cube_side+dr;
           auto const& line = grid.map()[row];
           auto first = c*cube_side;
-          std::cout << "\n" << std::quoted(line) << " " << r << " " << c << " " << dr << " " << first << " " << offset << std::flush;
+          std::cout << "\n" << std::quoted(line) << " " << r << " " << c << " " << dr << " " << first << " " << offset << " " <<  result.back().m_top_left << std::flush;
           if (first+cube_side <= line.size()) {
             auto snippet = line.substr(first,cube_side);
             std::cout << " " << std::quoted(snippet);
             if (snippet.find_first_not_of(' ')==0) {
-              if (row==0 and result.back().m_rows.size()==0) {
+              if (result.size()==1 and row==0 and result.back().m_rows.size()==0) {
                 offset = first/cube_side;
                 result.back().m_top_left = Vector{r*cube_side,(c-offset)*cube_side,0};
               }
@@ -783,7 +784,7 @@ namespace part2 {
 
     if (true) {
       for (int face_id=0;face_id<result.size();++face_id) {
-        std::cout << "\nface_id:" << face_id;
+        std::cout << "\nface_id:" << face_id << " " << result.at(face_id).m_top_left;
         for (auto const& line : result[face_id]) {
           std::cout << "\n\t" << std::quoted(line);
         }
@@ -899,7 +900,8 @@ namespace part2 {
   void test() {
     if (true) {
       // Test folding
-      std::istringstream in{pTest};
+      // std::istringstream in{pTest};
+      std::istringstream in{pData};
       auto data_model = parse(in);
       auto faces = to_faces(data_model.first);
       Folder folder{faces};
