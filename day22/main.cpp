@@ -189,6 +189,12 @@ namespace dim3 {
     return result;
   }
 
+  int inner_product(Vector const& v,Vector const& w) {
+    int result{};
+    for (int i=0;i<v.size();++i) result += v.at(i)*w.at(i);
+    return result;
+  }
+
   const Vector RIGHT{0,1,0};
   const Vector DOWN{1,0,0};
   const Vector LEFT{0,-1,0};
@@ -361,8 +367,10 @@ rot:23[0,0,1] [1,0,0] [0,1,0]%
   const Matrix NORM_Z_TURN_LEFT{ROTATIONS[Rotations::Z90_Y0_X0]};
 
 } // namespace dim3
+using dim3::operator<<;
 
 using namespace dim3;
+
 const int ROW=0; // x maps to row
 const int COL=1; // y maps to column
 
@@ -711,19 +719,38 @@ namespace part2 {
 
   */
 
-  struct Face {
+  class Face {
+  public:
     using Row = std::string;
     using Rows = std::vector<std::string>;
-    Vector m_top_left; // face top left as defined when unfolded
-    Rows m_rows; // face markings from top left  as rows in the direction of column vector and rows in the direction of row vector
-    Vector m_row_v,m_col_v; // defines the face plane in 3D space
-    Face(Vector top_left = {}, Rows const& rows = {}) : m_top_left{top_left}, m_rows{rows}, m_row_v{X_UNIT},m_col_v{Y_UNIT} {}
+    Face(Vector const&) = delete;
+    explicit Face(Vector top_left = {}, Rows const& rows = {}) : m_top_left{top_left}, m_rows{rows}, m_row_v{X_UNIT},m_col_v{Y_UNIT} {}
     Face& push_back(Row const& row) {m_rows.push_back(row); return *this;}
     auto begin() const {return m_rows.begin();}
     auto end() const {return m_rows.end();}
     int side() const {return m_rows[0].size();}
     bool operator<(Face const& other) const {return m_top_left < other.m_top_left;}
+    Vector const& top_left() const {return m_top_left;}
+    Rows const& rows() const {return m_rows;}
+    Vector const& row_v() const {return m_row_v;}
+    Vector const& col_v() const {return m_col_v;}
+    void top_left(Vector const& pos) {m_top_left=pos;}
+    void row_v(Vector const& v) {m_row_v=v;}
+    void col_v(Vector const& v) {m_col_v=v;}
+  private:
+    friend std::ostream& operator<<(std::ostream& os,Face const& face);
+
+    Vector m_top_left; // face top left as defined when unfolded
+    Rows m_rows; // face markings from top left  as rows in the direction of column vector and rows in the direction of row vector
+    Vector m_row_v,m_col_v; // defines the face plane in 3D space
   };
+
+  using ::operator<<;
+
+  std::ostream& operator<<(std::ostream& os,Face const& face) {
+    os << " top " << face.m_top_left << " col_v" << face.m_col_v << " row_v" << face.m_row_v;
+    return os;
+  }
 
   const std::map<int,int> H_ORBIT{{0,3},{3,5},{5,2},{2,0}}; // Horizontal Orbit
   const std::map<int,int> V_ORBIT{{0,1},{1,5},{5,4},{4,0}}; // Vertical Orbit
@@ -757,34 +784,34 @@ namespace part2 {
     for (int r=0;r<vert_cube_side_counts;++r) {
       auto hor_cube_side_counts = grid.map()[0].size() / cube_side;
       for (int c=0;c<hor_cube_side_counts;++c) {
-        result.push_back({}); result.back().m_top_left = Vector{r*cube_side,(c-offset)*cube_side,0};
+        result.push_back(Face{}); result.back().top_left(Vector{r*cube_side,(c-offset)*cube_side,0});
         std::cout << "\n";
         for (int dr=0;dr<cube_side;++dr) {
           auto row = r*cube_side+dr;
           auto const& line = grid.map()[row];
           auto first = c*cube_side;
-          std::cout << "\n" << std::quoted(line) << " " << r << " " << c << " " << dr << " " << first << " " << offset << " " <<  result.back().m_top_left << std::flush;
+          std::cout << "\n" << std::quoted(line) << " " << r << " " << c << " " << dr << " " << first << " " << offset << " " <<  result.back().top_left() << std::flush;
           if (first+cube_side <= line.size()) {
             auto snippet = line.substr(first,cube_side);
             std::cout << " " << std::quoted(snippet);
             if (snippet.find_first_not_of(' ')==0) {
-              if (result.size()==1 and row==0 and result.back().m_rows.size()==0) {
+              if (result.size()==1 and row==0 and result.back().rows().size()==0) {
                 offset = first/cube_side;
-                result.back().m_top_left = Vector{r*cube_side,(c-offset)*cube_side,0};
+                result.back().top_left(Vector{r*cube_side,(c-offset)*cube_side,0});
               }
               result.back().push_back(snippet);
               std::cout << " :)";
             }
           }          
         }
-        if (result.back().m_rows.size()==0) result.pop_back();
+        if (result.back().rows().size()==0) result.pop_back();
       }
     }
     assert(result.size()==6);
 
     if (true) {
       for (int face_id=0;face_id<result.size();++face_id) {
-        std::cout << "\nface_id:" << face_id << " " << result.at(face_id).m_top_left;
+        std::cout << "\nface_id:" << face_id << " " << result.at(face_id).top_left();
         for (auto const& line : result[face_id]) {
           std::cout << "\n\t" << std::quoted(line);
         }
@@ -842,27 +869,27 @@ namespace part2 {
         for (int j=i+1;j<faces.size();++j) {
           std::cout << "\ni:" << i << " j:" << j;
           auto& other_face = m_faces[j];
-          if (face.m_top_left.at(0)==other_face.m_top_left.at(0)) {
+          if (face.top_left().at(0)==other_face.top_left().at(0)) {
             // same "row" of faces
-            if (other_face.m_top_left.at(1) + face.side() == face.m_top_left.at(1)) {
+            if (other_face.top_left().at(1) + face.side() == face.top_left().at(1)) {
               // other is left neighbour
               std::cout << "\nface:" << j << " is left of face:" << i;
               m_graph.insert(i,j);              
             }
-            else if (face.m_top_left.at(1) + face.side() == other_face.m_top_left.at(1)) {
+            else if (face.top_left().at(1) + face.side() == other_face.top_left().at(1)) {
               // other face is right neighbour
               std::cout << "\nface:" << j << " is right of face:" << i;
               m_graph.insert(i,j);
             }
           }
-          else if (face.m_top_left.at(1)==other_face.m_top_left.at(1)) {
+          else if (face.top_left().at(1)==other_face.top_left().at(1)) {
             // same "col" of faces
-            if (other_face.m_top_left.at(0) + face.side() == face.m_top_left.at(0)) {
+            if (other_face.top_left().at(0) + face.side() == face.top_left().at(0)) {
               // other is neighbour above
               std::cout << "\nface:" << j << " is above of face:" << i;
               m_graph.insert(i,j);
             }
-            else if (face.m_top_left.at(0) + face.side() == other_face.m_top_left.at(0)) {
+            else if (face.top_left().at(0) + face.side() == other_face.top_left().at(0)) {
               // other face is neighbour below
               std::cout << "\nface:" << j << " is below face:" << i;
               m_graph.insert(i,j);
@@ -880,22 +907,22 @@ namespace part2 {
       return result;
     }
     void fold(Faces& result) {
-      for (auto fold : m_folds) {
-        auto [fixed,loose] = splitted_graph(m_graph,fold);
-        rotate(result,fold,loose);
+      for (int i=0;i<m_folds.size();++i) {
+        auto [fixed,loose] = splitted_graph(m_graph,m_folds[i]);
+        rotate(result,i,loose);
       }
     }
-    void rotate(Faces& result,Fold const& fold,Graph const& loose) {
+    void rotate(Faces& result,int fold_ix,Graph const& loose) {
+      auto const& fold = m_folds[fold_ix];
       std::cout << "\nrotate fix:" << fold.first << " w:" << fold.second;
       Graph::Bag attached{};
       std::stack<Graph::Index> q{};
       std::map<Graph::Index,bool> marked{};
       q.push(fold.second);
-      marked[fold.second] == true;
-      q.push(fold.second);
       while (q.size()>0) {
         auto v = q.top();
         q.pop();
+        std::cout << "\nq " << q.size() << " v:" << v << " marked:" << marked[v];
         if (marked[v]) continue;
         marked[v] = true; // used as parent
         if (v!=fold.second) attached.insert(v);
@@ -907,7 +934,39 @@ namespace part2 {
         // LOG
         std::cout << " attached:";
         for (auto a : attached) std::cout << " " << a;
-      } 
+      }
+      auto edge = m_fold_edges[fold_ix];
+      std::cout << "\naxis:" << edge.axis << " X:" << X_UNIT << " Y:" << Y_UNIT << " Z:" << Z_UNIT;
+      std::cout << "\nX?" << inner_product(edge.axis,X_UNIT);
+      std::cout << "\nY?" << inner_product(edge.axis,Y_UNIT);
+      std::cout << "\nZ?" << inner_product(edge.axis,Z_UNIT);
+      char axis_id = std::abs(inner_product(edge.axis,X_UNIT)) + 3*std::abs(inner_product(edge.axis,Y_UNIT)) + 5*std::abs(inner_product(edge.axis,Z_UNIT));
+      std::cout << "\naxis_id:" << static_cast<int>(axis_id);
+      auto offset = m_faces[fold.first].top_left();
+      switch (axis_id) {
+        case 1: rotate(result,fold_ix,attached,offset,ROTATIONS[Rotations::X90_Y0_Z0]); break;
+        case -1: break;
+        case 3: break;
+        case -3: break;
+        case 5: break;
+        case -5: break;
+        default: std::cout << "Wrong axis_id. should be +/-1 (X), +/-3 (Y) or +/-5 (Z)" << std::flush; assert(false);
+      }
+
+      for (auto w : attached) {
+      }      
+    }
+    void rotate(Faces& result,int fold_ix,Graph::Bag const& attached,Vector const& offset,Matrix const& rot) {
+      for (auto a : attached) {
+         auto& face = result[a];
+         std::cout << "\nfold_ix:" << fold_ix << " fix:" << m_folds[fold_ix].first << " w:" << m_folds[fold_ix].second << " face:" << a << ":" << face << " offset:" << offset << " edge axis:" << m_fold_edges[fold_ix].axis << " pos:" << m_fold_edges[fold_ix].pos;
+         face.col_v(rot*face.col_v());
+         face.row_v(rot*face.row_v());
+         face.top_left(rot*(face.top_left()-offset));
+         m_fold_edges[fold_ix].axis = rot*m_fold_edges[fold_ix].axis;
+         m_fold_edges[fold_ix].pos = rot*(m_fold_edges[fold_ix].pos-offset);
+         std::cout << "\nfold_ix:" << fold_ix << " fix:" << m_folds[fold_ix].first << " w:" << m_folds[fold_ix].second << " face:" << a << ":" << face << " offset:" << offset << " edge axis:" << m_fold_edges[fold_ix].axis << " pos:" << m_fold_edges[fold_ix].pos;
+      }
     }
     std::pair<Graph,Graph> splitted_graph(Graph const& graph,Fold const& fold) {
       auto first = graph;
@@ -941,16 +1000,16 @@ namespace part2 {
       auto const& fixed_face = m_faces[fixed];
       auto const& loose_face = m_faces[loose]; 
       // Use the top left of the face "facing" the other to the left or above (top)
-      result.pos = std::max(fixed_face.m_top_left,loose_face.m_top_left);
-      if (fixed_face.m_top_left.at(0) == loose_face.m_top_left.at(0)) {
+      result.pos = std::max(fixed_face.top_left(),loose_face.top_left());
+      if (fixed_face.top_left().at(0) == loose_face.top_left().at(0)) {
         // same row
-        if (fixed_face.m_top_left.at(1) < loose_face.m_top_left.at(1)) result.axis = {-1,0,0};
+        if (fixed_face.top_left().at(1) < loose_face.top_left().at(1)) result.axis = {-1,0,0};
         else result.axis = {1,0,0};
       }
       else {
         // same column
-        assert(fixed_face.m_top_left.at(1) == loose_face.m_top_left.at(1));
-        if (fixed_face.m_top_left.at(0) < loose_face.m_top_left.at(0)) result.axis = {0,1,0};
+        assert(fixed_face.top_left().at(1) == loose_face.top_left().at(1));
+        if (fixed_face.top_left().at(0) < loose_face.top_left().at(0)) result.axis = {0,1,0};
         else result.axis = {0,-1,0};
       }
       std::cout << "\nto_fold_edge fix:" << fixed << " w:" << loose << " pos:" << result.pos << " axis:" << result.axis; 
@@ -960,10 +1019,10 @@ namespace part2 {
       std::ostringstream os{};
       for (int v=0;v<m_graph.size();++v) {
         if (v>0) os << "\n";
-        os << v << ":" << face(v).m_top_left << " : ";
+        os << v << ":" << face(v).top_left() << " : ";
         for (auto iter=m_graph.adj(v).begin();iter!=m_graph.adj(v).end();++iter) {
           if (iter!=m_graph.adj(v).begin()) os << ',';
-          os << *iter << ":" << face(*iter).m_top_left;
+          os << *iter << ":" << face(*iter).top_left();
         }
       }
       return os.str();
@@ -982,8 +1041,8 @@ namespace part2 {
   void test() {
     if (true) {
       // Test folding
-      // std::istringstream in{pTest};
-      std::istringstream in{pData};
+      std::istringstream in{pTest};
+      // std::istringstream in{pData};
       auto data_model = parse(in);
       auto faces = to_faces(data_model.first);
       Folder folder{faces};
