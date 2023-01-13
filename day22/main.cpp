@@ -830,6 +830,11 @@ namespace part2 {
   
   class Folder {
   public:
+    struct FoldEdge {
+      Vector pos{};
+      Vector axis{}; 
+    };
+    using FoldEdges = std::vector<FoldEdge>;
     Folder(Faces const& faces) : m_faces{faces} {
       std::cout << "\n" << m_graph.to_string();
       for (int i=0;i<faces.size();++i) {
@@ -842,7 +847,7 @@ namespace part2 {
             if (other_face.m_top_left.at(1) + face.side() == face.m_top_left.at(1)) {
               // other is left neighbour
               std::cout << "\nface:" << j << " is left of face:" << i;
-              m_graph.insert(i,j);
+              m_graph.insert(i,j);              
             }
             else if (face.m_top_left.at(1) + face.side() == other_face.m_top_left.at(1)) {
               // other face is right neighbour
@@ -865,17 +870,17 @@ namespace part2 {
           }
         }
       }
+      m_folds = to_folds();
     }
     using Fold = std::pair<Graph::Index,Graph::Index>;
     using Folds = std::vector<Fold>;
     Faces cube() {
       Faces result{m_faces};
-      auto folds = to_folds();
-      fold(result,folds);
+      fold(result);
       return result;
     }
-    void fold(Faces& result,Folds const& folds) {
-      for (auto fold : folds) {
+    void fold(Faces& result) {
+      for (auto fold : m_folds) {
         auto [fixed,loose] = splitted_graph(m_graph,fold);
         rotate(result,fold,loose);
       }
@@ -902,7 +907,7 @@ namespace part2 {
         // LOG
         std::cout << " attached:";
         for (auto a : attached) std::cout << " " << a;
-      }
+      } 
     }
     std::pair<Graph,Graph> splitted_graph(Graph const& graph,Fold const& fold) {
       auto first = graph;
@@ -924,10 +929,31 @@ namespace part2 {
           if (marked.contains(w)) continue;
           std::cout << " FOLD " << v << " " << w;
           result.push_back({v,w});
+          m_fold_edges.push_back(to_fold_edge(v,w));
           marked.insert(w);
           q.push_back(w);          
         }
       }
+      return result;
+    }
+    FoldEdge to_fold_edge(Graph::Index fixed,Graph::Index loose) {
+      FoldEdge result{};
+      auto const& fixed_face = m_faces[fixed];
+      auto const& loose_face = m_faces[loose]; 
+      // Use the top left of the face "facing" the other to the left or above (top)
+      result.pos = std::max(fixed_face.m_top_left,loose_face.m_top_left);
+      if (fixed_face.m_top_left.at(0) == loose_face.m_top_left.at(0)) {
+        // same row
+        if (fixed_face.m_top_left.at(1) < loose_face.m_top_left.at(1)) result.axis = {-1,0,0};
+        else result.axis = {1,0,0};
+      }
+      else {
+        // same column
+        assert(fixed_face.m_top_left.at(1) == loose_face.m_top_left.at(1));
+        if (fixed_face.m_top_left.at(0) < loose_face.m_top_left.at(0)) result.axis = {0,1,0};
+        else result.axis = {0,-1,0};
+      }
+      std::cout << "\nto_fold_edge fix:" << fixed << " w:" << loose << " pos:" << result.pos << " axis:" << result.axis; 
       return result;
     }
     std::string to_string() const {
@@ -946,6 +972,7 @@ namespace part2 {
     Graph m_graph{};
     Faces m_faces{};
     Folds m_folds{};
+    FoldEdges m_fold_edges{};
     Face const& face(Graph::Index v) const {
       assert(v<m_faces.size());
       return m_faces[v];
