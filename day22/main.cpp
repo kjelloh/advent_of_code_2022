@@ -714,9 +714,9 @@ namespace part2 {
   struct Face {
     using Row = std::string;
     using Rows = std::vector<std::string>;
-    Vector m_top_left;
-    Vector m_row_v,m_col_v;
-    Rows m_rows;
+    Vector m_top_left; // face top left as defined when unfolded
+    Rows m_rows; // face markings from top left  as rows in the direction of column vector and rows in the direction of row vector
+    Vector m_row_v,m_col_v; // defines the face plane in 3D space
     Face(Vector top_left = {}, Rows const& rows = {}) : m_top_left{top_left}, m_rows{rows}, m_row_v{X_UNIT},m_col_v{Y_UNIT} {}
     Face& push_back(Row const& row) {m_rows.push_back(row); return *this;}
     auto begin() const {return m_rows.begin();}
@@ -796,6 +796,7 @@ namespace part2 {
   class Graph {
   public:
     using Index = int;
+    using Bag = std::set<Index>;
     auto size() const {return m_adj.size();}
     auto const& adj(Index index) const {return m_adj.at(index);}
     Graph& insert(Index index1,Index index2) {
@@ -803,6 +804,13 @@ namespace part2 {
       m_adj[index1].insert(index2);
       m_adj[index2].insert(index1);
       return *this;
+    }
+    void disconnect(Index v) {
+      assert(v<m_adj.size());
+      m_adj[v].clear(); // unconnected vertex
+      for (auto& bag : m_adj) {
+        if (bag.contains(v)) bag.erase(v);
+      }
     }
     std::string to_string() const {
       std::ostringstream os{};
@@ -817,18 +825,18 @@ namespace part2 {
       return os.str();
     }
   private:
-    std::vector<std::set<Index>> m_adj{};
+    std::vector<Bag> m_adj{};
   };
-
+  
   class Folder {
   public:
     Folder(Faces const& faces) : m_faces{faces} {
       std::cout << "\n" << m_graph.to_string();
       for (int i=0;i<faces.size();++i) {
-        auto const& face = faces[i];
+        auto& face = m_faces[i];
         for (int j=i+1;j<faces.size();++j) {
           std::cout << "\ni:" << i << " j:" << j;
-          auto other_face = faces[j];
+          auto& other_face = m_faces[j];
           if (face.m_top_left.at(0)==other_face.m_top_left.at(0)) {
             // same "row" of faces
             if (other_face.m_top_left.at(1) + face.side() == face.m_top_left.at(1)) {
@@ -858,8 +866,53 @@ namespace part2 {
         }
       }
     }
+    using Fold = std::pair<Graph::Index,Graph::Index>;
+    using Folds = std::vector<Fold>;
     Faces cube() {
       Faces result{m_faces};
+      auto folds = to_folds();
+      fold(result,folds);
+      return result;
+    }
+    void fold(Faces& result,Folds const& folds) {
+      for (auto fold : folds) {
+        auto [fixed,loose] = splitted_graph(m_graph,fold);
+        rotate(result,fold,loose);
+      }
+    }
+    void rotate(Faces& result,Fold const& fold,Graph const& loose) {
+      std::cout << "\nrotate fix:" << fold.first << " w:" << fold.second;
+      Graph::Bag attached{};
+      std::stack<Graph::Index> q{};
+      std::map<Graph::Index,bool> marked{};
+      q.push(fold.second);
+      marked[fold.second] == true;
+      q.push(fold.second);
+      while (q.size()>0) {
+        auto v = q.top();
+        q.pop();
+        if (marked[v]) continue;
+        marked[v] = true; // used as parent
+        if (v!=fold.second) attached.insert(v);
+        for (auto w : loose.adj(v)) {
+          if (!marked[w]) q.push(w);          
+        }
+      }
+      if (true) {
+        // LOG
+        std::cout << " attached:";
+        for (auto a : attached) std::cout << " " << a;
+      }
+    }
+    std::pair<Graph,Graph> splitted_graph(Graph const& graph,Fold const& fold) {
+      auto first = graph;
+      auto second = graph;
+      first.disconnect(fold.second);
+      second.disconnect(fold.first);
+      return {first,second};
+    }
+    Folds to_folds() {
+      Folds result{};
       std::deque<Graph::Index> q{};
       std::set<Graph::Index> marked{};
       q.push_back(0);
@@ -869,7 +922,8 @@ namespace part2 {
         for (auto w : m_graph.adj(v)) {
           std::cout << "\ncandidates fix:" << v << " and moving:" << w;
           if (marked.contains(w)) continue;
-          std::cout << " FOLD :)";
+          std::cout << " FOLD " << v << " " << w;
+          result.push_back({v,w});
           marked.insert(w);
           q.push_back(w);          
         }
@@ -891,6 +945,7 @@ namespace part2 {
   private:
     Graph m_graph{};
     Faces m_faces{};
+    Folds m_folds{};
     Face const& face(Graph::Index v) const {
       assert(v<m_faces.size());
       return m_faces[v];
