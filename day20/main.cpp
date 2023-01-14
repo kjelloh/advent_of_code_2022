@@ -277,6 +277,9 @@ namespace part2 {
 
 int main(int argc, char *argv[])
 {
+  if (true) {
+    
+  }
   // for (int i = -10;i<=10;++i) {
   //   std::cout << "\n" << i << " % " << static_cast<size_t>(7) << " = " << i % 7;
   // }
