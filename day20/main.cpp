@@ -115,6 +115,35 @@ public:
     else if (pos<0) for (int i=0;i<std::abs(pos);++i) --iter;
     return *iter;
   }
+
+/*
+
+move(val:3230,distance:3230 % 5000 == 3230) insert_before.pos():1770 pp->value:-4873
+
+Differs at n:2103 -8549 3230
+Differs at n:2104 3230 -8549
+ n:2088 858 858
+ n:2089 -6365 -6365
+ n:2090 9414 9414
+ n:2091 859 859
+ n:2092 5931 5931
+ n:2093 -8551 -8551
+ n:2094 2196 2196
+ n:2095 -7941 -7941
+ n:2096 -9454 -9454
+ n:2097 9657 9657
+ n:2098 -9012 -9012
+ n:2099 7108 7108
+ n:2100 -9603 -9603
+ n:2101 -4545 -4545
+ n:2102 -9037 -9037
+
+ n:2103 -8549 3230
+ n:2104 3230 -8549
+ 
+ n:2105 -4873 -4873
+
+*/
   void move(Node* p,int distance) {
     std::cout << "\nmove(val:" << p->value << ",distance:" << distance;
     distance = distance % size();
@@ -123,20 +152,26 @@ public:
     if (distance!=0) {
       auto insert_before = ConstIterator{p,-distance,size()};
       std::cout << " insert_before.pos():" << insert_before.pos();
-      while (insert_before.pos()!=0) ++insert_before;
-      if (distance>0) ++insert_before;
+      if (distance>0) {
+        while (insert_before.pos()!=0) ++insert_before;
+        ++insert_before; // make the operation always "insert before"
+      }
+      if (distance<0) {
+        while (insert_before.pos()!=0) --insert_before;
+      }
       auto pp = const_cast<Node*>(insert_before.ptr());
       std::cout << " pp->value:" << pp->value;
       if (pp==m_last) std::cout << " pp is last";
       // make p take the location of pp
-      // unlink p
+
+      // 1. unlink p
       p->prev->next=p->next;
       p->next->prev=p->prev;
       --m_size;
-      // link in before pp
-      pp->prev->next=p;
+      // 2. link in before pp
       p->next=pp;
       p->prev=pp->prev;
+      pp->prev->next=p;
       pp->prev=p;
       ++m_size;
     }
@@ -269,25 +304,134 @@ Model parse(auto& in) {
     return result;
 }
 
+namespace korektur {
+  // This code is from https://github.com/korektur/AdventOfCode22/blob/master/day20/day20.cpp
+  // Many thanks to Ruslan Korektur for sharing this solution with me!
+
+  using namespace std;
+
+  int64_t solve(list<pair<int, int64_t>> numbers, int iterations = 1, long multiplier = 1) {
+      while(iterations-- > 0) {
+          for (size_t i = 0; i < numbers.size(); ++i) {
+              auto it = numbers.begin();
+              int64_t ind = 0;
+              while (it->first != i) { it++; ind++; }
+              pair<int, int64_t> p = *it;
+              numbers.erase(it);
+              int64_t second = p.second * multiplier;
+              if (second < 0) second += (abs(second) / numbers.size() + 1) * numbers.size();
+              int64_t newPosInd = (ind + second) % (int64_t) numbers.size();
+              if (newPosInd == 0) newPosInd = (int) numbers.size();
+              auto newPos = numbers.begin();
+              advance(newPos, newPosInd);
+              numbers.insert(newPos, p);
+          }
+      }
+
+      int64_t ans = 0;
+      auto it = find_if(numbers.begin(), numbers.end(), [=](auto &p) { return p.second == 0; });
+      for(int i = 1; i <= 3000; ++i) {
+          it++;
+          if (it == numbers.end()) it = numbers.begin();
+          if (i % 1000 == 0) ans += it->second * multiplier;
+      }
+      return ans;
+  }
+
+  // KoH Added to compare with my erroneous solution
+  int64_t solve_in_concert(std::vector<CircularList::Node*> nodes, CircularList to_mix,list<pair<int, int64_t>> numbers, int iterations = 1, long multiplier = 1) {
+      while(iterations-- > 0) {
+          for (size_t i = 0; i < numbers.size(); ++i) {
+              // Koh part
+              // The two mixed lists should at each step of the way be "the same"
+              {
+                auto iter_0 = to_mix.find_first(0);
+                auto it_0 = numbers.begin(); while (it_0->second!=0) ++it_0;
+                std::cout << "\nto_mix:";
+                static const int WINDOW_SIZE{30};
+                std::deque<std::tuple<int,int,int>> window{};
+                bool do_break{false};
+                int break_count_down{WINDOW_SIZE/2};
+                for (int n=0;n<numbers.size();++n) {
+                  window.push_back({n,*iter_0,it_0->second});
+                  if (window.size()>WINDOW_SIZE) window.pop_front();
+                  if (*iter_0!=it_0->second) {
+                    std::cout << "\nDiffers at n:" << n << " " << *iter_0 << " " << it_0->second;
+                    do_break=true;
+                  }
+                  ++it_0; if (it_0==numbers.end()) it_0 = numbers.begin(); // wrap around
+                  ++iter_0;
+                  if (do_break) --break_count_down;
+                  if (break_count_down<=0) break;
+                }
+                if (do_break) {
+                  for (auto [i,x,y] : window) std::cout << "\n n:" << i << " " << x << " " << y;
+                  exit(0);
+                }
+              }
+              auto delta = nodes[i]->value;
+              to_mix.move(nodes[i],delta);
+
+              // Korektur part
+              auto it = numbers.begin();
+              int64_t ind = 0;
+              while (it->first != i) { it++; ind++; }
+              pair<int, int64_t> p = *it;
+              numbers.erase(it);
+              int64_t second = p.second * multiplier;
+              if (second < 0) second += (abs(second) / numbers.size() + 1) * numbers.size();
+              int64_t newPosInd = (ind + second) % (int64_t) numbers.size();
+              if (newPosInd == 0) newPosInd = (int) numbers.size();
+              auto newPos = numbers.begin();
+              advance(newPos, newPosInd);
+              numbers.insert(newPos, p);
+          }
+      }
+
+      int64_t ans = 0;
+      auto it = find_if(numbers.begin(), numbers.end(), [=](auto &p) { return p.second == 0; });
+      for(int i = 1; i <= 3000; ++i) {
+          it++;
+          if (it == numbers.end()) it = numbers.begin();
+          if (i % 1000 == 0) ans += it->second * multiplier;
+      }
+      return ans;
+  }
+
+}
+
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << "\nmodel:" << data_model;
-      Mixed mixed{data_model};
-      std::cout << "\nmixed:" << mixed;
-      if (false) {
-        // test
-        CircularList::test();
-        // Mixed::test();
+      if (true) {
+        std::list<std::pair<int, int64_t>> nums{};
+        std::vector<CircularList::Node*> nodes{};
+        CircularList to_mix{};
+
+        for (int num : data_model) {
+          nums.push_back({nums.size(),num});          
+          nodes.push_back(to_mix.push_back(num));
+        }
+        result = korektur::solve_in_concert(nodes,to_mix,nums);
       }
       else {
-        // for (int i=0;i<20;++i) std::cout << " " << i << " " << mixed.from_0(i);
-        auto r1000 = mixed[1000]; std::cout << "\nr1000:" << r1000;
-        auto r2000 = mixed[2000]; std::cout << "\nr2000:" << r2000;
-        auto r3000 = mixed[3000]; std::cout << "\nr3000:" << r3000;
-        result =  r1000 + r2000 + r3000;
+        Mixed mixed{data_model};
+        std::cout << "\nmixed:" << mixed;
+        if (false) {
+          // test
+          CircularList::test();
+          // Mixed::test();
+        }
+        else {
+          // for (int i=0;i<20;++i) std::cout << " " << i << " " << mixed.from_0(i);
+          auto r1000 = mixed[1000]; std::cout << "\nr1000:" << r1000;
+          auto r2000 = mixed[2000]; std::cout << "\nr2000:" << r2000;
+          auto r3000 = mixed[3000]; std::cout << "\nr3000:" << r3000;
+          result =  r1000 + r2000 + r3000;
+        }
       }
       return result;
   }
