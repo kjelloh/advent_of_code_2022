@@ -204,6 +204,7 @@ private:
     if (time_left==0) {
       return 0; // nothing to gain
     }
+    auto key = to_key(start_index,is_open,time_left);
     if (auto cached = m_cache[to_key(start_index,is_open,time_left)]>=0) return cached;
     if (m_flowrate[start_index]>0 and !is_open[start_index]) {
       // try open the valve here
@@ -222,6 +223,7 @@ private:
         result = new_candidate;
       }
     }
+    assert(key = to_key(start_index,is_open,time_left));
     m_cache[to_key(start_index,is_open,time_left)] = result;
     if (call_count++ % 1000 == 0) std::cout << "\n" << is_open.to_string() << " best:" << result << std::flush;
     return result;
