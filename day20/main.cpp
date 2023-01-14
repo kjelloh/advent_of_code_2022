@@ -118,7 +118,7 @@ public:
   void move(Node* p,int distance) {
     std::cout << "\nmove(val:" << p->value << ",distance:" << distance;
     distance = distance % size();
-    std::cout << "==" << distance << ")";
+    std::cout << " % " << size() << " == " << distance << ")";
     if (p==m_last) std::cout << " p is last";
     if (distance!=0) {
       auto insert_before = ConstIterator{p,-distance,size()};
@@ -204,8 +204,8 @@ std::ostream& operator<<(std::ostream& os,CircularList const& cl) {
     vals_os << std::setw(7) << val;
     ix_os << std::setw(7) << ix;
   }
-  os << vals_os.str();
-  os << "\n" << ix_os.str();
+  os <<   " ix:" << ix_os.str();
+  os << "\nval:" << vals_os.str();
   return os;
 }
 
@@ -403,7 +403,7 @@ bool test() {
       std::cout << "\n\nbefore move " << val;
       std::cout << "\n" << to_mix;
       auto iter_0 = to_mix.find_first(0);
-      auto iter_val = to_mix.find_first(val);
+      auto iter_val = to_mix.find_first(val); // Requires unique values in input!
       auto distance_before = std::distance(iter_0,iter_val);
       std::cout << "\ndistance_before:" << distance_before;
       to_mix.move(const_cast<CircularList::Node*>(to_mix.find_first(values[i]).p),values[i]);
@@ -428,6 +428,93 @@ bool test() {
     std::cout << "\nok_count:" << ok_count;
     result = (ok_count==const_values.size());
     assert(result);
+  }
+  if (result) {
+    std::istringstream in{pData};
+    auto values = parse(in);
+    std::vector<CircularList::Node*> to_move;
+    CircularList to_mix{};
+    for (int i=0;i<values.size();++i) {
+      auto p = to_mix.push_back(values[i]);
+      to_move.push_back(p);
+    }
+    assert(to_move.size() == to_mix.size());
+    int ok_count{};
+    for (int i=0;i<to_move.size();++i) {
+      std::vector<CircularList::Node const*> node_order_before{};
+      {
+        auto iter = to_mix.find_first(0);
+        for (int n=0;n<to_mix.size();++n) {
+          node_order_before.push_back(iter.p);
+          ++iter;
+        }
+      }
+      auto p = to_move[i];
+      auto dist = p->value;
+      if (dist<0) {
+        auto before_p = p;
+        for (int n=0;n<std::abs(dist);++n) before_p = before_p->prev;
+        to_mix.move(p,dist);
+        if (before_p->prev == p) {
+          ++ok_count;
+          std::cout << "\nok_count:" << ok_count;
+        }
+        else {
+          std::cerr << "\n\nFAILED\n";
+        }
+      }
+      else if (dist>0) {
+        auto after_p = p;
+        for (int n=0;n<std::abs(dist);++n) after_p = after_p->next;
+        to_mix.move(p,dist);
+        if (after_p->next == p) {
+          ++ok_count;
+          std::cout << "\nok_count:" << ok_count;
+        }
+        else {
+          std::cerr << "\n\nFAILED\n";
+        }
+      }
+      assert(std::distance(to_mix.begin(),to_mix.end()) == to_move.size());
+      assert(to_move.size() == to_mix.size());      
+      int missmatch_count{};
+      {
+        auto iter = to_mix.find_first(0);
+        for (int n=0;n<node_order_before.size();++n) {
+          auto p = node_order_before[n];
+          if (p!=iter.p) {
+            if (p==iter.p->prev) {
+              ++missmatch_count;
+              --iter;
+            }
+            else if (p==iter.p->next) {
+              ++missmatch_count;
+              ++iter;
+            }
+          }
+          ++iter;
+        }
+      }
+      std::cout << "\ndist:" << dist <<  " missmatch_count:" << missmatch_count << std::flush;
+      if (dist % static_cast<int>(to_move.size()) != 0) {
+        // one missmatch for node moved one step, otherwise two missmatches (one for location of moved-from and one for location moved-to)
+        assert(missmatch_count==1 or missmatch_count==2);
+      }
+      else {
+        std::cout << "\n" << std::flush;
+        assert(missmatch_count==0);
+      }
+    }
+    auto iter_0 = to_mix.find_first(0);
+    {
+      auto iter=iter_0;
+      for (int i=0;i<=3000;++i) {
+        if (i==1000) std::cout << "\n[1000]=" << *iter;
+        if (i==2000) std::cout << "\n[2000]=" << *iter;
+        if (i==3000) std::cout << "\n[3000]=" << *iter;
+        ++iter;
+      }
+    }
   }
   assert(result);
   return result;
