@@ -15,6 +15,8 @@
 #include <algorithm> // E.g., std::find, std::all_of,...
 #include <numeric> // E.g., std::accumulate
 #include <limits> // E.g., std::numeric_limits
+#include <iomanip>
+#include <cassert>
 
 extern char const* pTest;
 extern char const* pData;
@@ -33,9 +35,15 @@ public:
     Node* prev{nullptr};
   };
   struct ConstIterator {
+    using difference_type = int;
+    using value_type = int;	
+    using pointer	= Node*;
+    using reference	= Node;
+    using iterator_category = std::bidirectional_iterator_tag;
     Node const* p;
     int index;
     int cycle;
+    bool is_begin{false};
     Node const* ptr() {return p;}
     int operator*() const {return p->value;}
     int pos() const {
@@ -46,19 +54,27 @@ public:
     ConstIterator& operator++() {
       p=p->next;
       ++index;
+      index %= cycle; // Keep within cycle
+      if (index<0) index+=cycle; // use positive index 0..(cycle-1)
       // std::cout << "\n++ index:" << index << " pos:" << pos();
+      is_begin=false; // no longer begin
       return *this;
     }
-    ConstIterator(Node const* p,int index,int cycle) : p{p},index{index},cycle{cycle} {}
+    ConstIterator(Node const* p,int index,int cycle,bool is_begin = false) : p{p},index{index},cycle{cycle},is_begin{is_begin} {}
     ConstIterator& operator--() {
       p=p->prev;
       --index;
+      index %= cycle; // Keep within cycle
+      if (index<0) index+=cycle; // use positive index 0..(cycle-1)
       // std::cout << " --index:" << index << " pos:" << pos();
+      is_begin=false; // no longer begin
       return *this;
     }
     bool operator!=(ConstIterator const& other) {
-      if (p==other.p) return index!=other.index; // distinguish between loops
-      else return p!=other.p;
+      bool result{};
+      if (p==other.p) result = (is_begin)?index!=other.index:false; // begin != end although they both point to same Node
+      else result = p!=other.p;
+      return result;
     }
   };
   Node* push_back(int value) {
@@ -81,10 +97,15 @@ public:
   }
   int size() const {return m_size;}
   ConstIterator begin() const {
-    return ConstIterator{m_last->next,0,m_size};
+    return ConstIterator{m_last->next,0,m_size,true};
   }
   ConstIterator end() const {
     return ConstIterator{m_last->next,m_size,m_size};
+  }
+  ConstIterator find_first(int val) {
+    auto iter = begin();
+    while (*iter!=val) ++iter;
+    return iter;
   }
   int operator[](int pos) const {
     // return value at pos relative the member value 0
@@ -118,7 +139,6 @@ public:
       p->prev=pp->prev;
       pp->prev=p;
       ++m_size;
-      std::cout << "\nmoved:" << *this;
     }
   }
   static void test() {
@@ -170,16 +190,22 @@ public:
 private:
   Node* m_last{nullptr};
   int m_size{0};
+  friend bool test();
 };
 
 std::ostream& operator<<(std::ostream& os,CircularList const& cl) {
-  os << "[" << cl.size() << "]";
-  os << "[";
-  for (auto iter=cl.begin();iter!=cl.end();++iter) {
-    if (iter!=cl.begin()) os << ',';
-    os << *iter;
+  auto offset = std::vector<std::pair<int,int>>{};
+  for (auto iter = cl.begin();iter!=cl.end();++iter) {
+    offset.push_back({*iter,iter.index});
   }
-  os << "]";
+  std::ostringstream vals_os{};
+  std::ostringstream ix_os{};
+  for (auto [val,ix] : offset) {
+    vals_os << std::setw(7) << val;
+    ix_os << std::setw(7) << ix;
+  }
+  os << vals_os.str();
+  os << "\n" << ix_os.str();
   return os;
 }
 
@@ -208,6 +234,7 @@ public:
     Mixed mixed{values};
     std::cout << "\ntest:" << mixed;
   }
+  friend bool test();
 private:
   friend std::ostream& operator<<(std::ostream& os,Mixed const& mixed);
   std::vector<CircularList::Node*> m_nodes{};
@@ -274,27 +301,157 @@ namespace part2 {
       return result;
   }
 }
+bool test() {
+  std::cerr << "\ntest()";
+  bool result{true};
+  Values const const_values{-3,-2,-1,1,2,3,-17,-52,0,52,17,-6,-5,-4,4,5,6};
+  if (result) {
+    auto values{const_values};
+    CircularList to_mix{};
+    for (int j=0;j<values.size();++j) to_mix.push_back(values[j]);
+    if (result) {
+      result = false;
+      int ok_count{0};
+      for (int i=0;i<values.size();++i) {
+        std::cout << "\ni:" << i;
+        auto val = values[i];
+        auto iter_0 = to_mix.find_first(0);
+        auto iter_val = to_mix.find_first(val);
+        auto iter=iter_0;
+        // Test that we can iterate from iter_0 to iter_val
+        for (int j=0;j<to_mix.size();++j) {
+          std::cout << "\niter [" << iter.index << "]=" << *iter << " iter_val [" << iter_val.index << "]=" << *iter_val;          
+          if (iter!=iter_val) std::cout << " !=";
+          else {
+            std::cout << " == ";
+            ++ok_count;
+          }
+          ++iter;
+        }
+      }     
+      std::cout << "\nok_count:" << ok_count << " required:" << values.size();
+      result = ok_count==values.size();
+      assert(result);
+    }
+    if (result) {
+      result = false;
+      auto begin = to_mix.begin();
+      auto iter_val = to_mix.end();
+      auto iter=begin;
+      // Test that we can iterate from begin to end
+      for (int j=0;j<to_mix.size()+1 and !result;++j) {
+        std::cout << "\niter [" << iter.index << "]=" << *iter << " end [" << iter_val.index << "]=" << *iter_val;          
+        if (iter!=iter_val) std::cout << " !=";
+        else {
+          std::cout << " == ";
+          result=true;
+          break;
+        }
+        ++iter;
+      }
+    }
+    if (result) {
+      result = false;
+      // Test that we can iterate from begin to end
+      int count = values.size();
+      for (auto iter=to_mix.begin();iter!=to_mix.end();++iter) {
+        std::cout << "\niter [" << iter.index << "]=" << *iter;
+        --count;
+      }
+      result=count==0;
+      assert(result);
+    }
+    if (result) {
+      auto visited = std::set<int>{};
+      for (int j=0;j<values.size();++j) {
+        for (auto iter = to_mix.begin();iter!=to_mix.end();++iter) {
+          visited.insert(*iter);
+        }
+        result = visited.size() == values.size();
+        if (!result) {
+          std::cerr << "\nvisited.size():" << visited.size() << " != values.size():" << values.size(); 
+        }
+      }
+    }
+    if (result) {
+      auto offset = std::map<int,int>{};
+      auto count = values.size();
+      for (auto iter = to_mix.begin();iter!=to_mix.end() and result;++iter) {
+        std::cout << " ! ";
+        offset[*iter] = iter.index;
+        --count;
+        result = result and (count>=0);
+      }
+      std::ostringstream vals_os{};
+      std::ostringstream ix_os{};
+      std::cout << "\noffset.size():" << offset.size();
+      for (auto val : values) {
+        vals_os << std::setw(3) << val;
+        ix_os << std::setw(3) << offset[val];
+      }
+      std::cout << "\n" << vals_os.str();
+      std::cout << "\n" << ix_os.str();
+    }
+  }
+  if (result) {
+    int ok_count{};
+    for (int i=0;i<const_values.size();++i) {
+      auto values{const_values};
+      auto val = values[i];
+      CircularList to_mix{};
+      for (int j=0;j<values.size();++j) to_mix.push_back(values[j]);
+      std::cout << "\n\nbefore move " << val;
+      std::cout << "\n" << to_mix;
+      auto iter_0 = to_mix.find_first(0);
+      auto iter_val = to_mix.find_first(val);
+      auto distance_before = std::distance(iter_0,iter_val);
+      std::cout << "\ndistance_before:" << distance_before;
+      to_mix.move(const_cast<CircularList::Node*>(to_mix.find_first(values[i]).p),values[i]);
+      std::cout << "\nafter move " << values[i];
+      std::cout << "\n" << to_mix;
+      iter_0 = to_mix.find_first(0);
+      iter_val = to_mix.find_first(val);
+      auto distance_after = std::distance(iter_0,iter_val);
+      std::cout << "\ndistance_after:" << distance_after;
+      auto diff = (distance_after - distance_before) % to_mix.size();
+      if (val>0 and diff<0) diff += to_mix.size()-1; // there are size-1 spaces between size items
+      if (val<0 and diff>0) diff -= to_mix.size()-1; // there are size-1 spaces between size items
+      std::cout << "\ndiff:" << diff << " val:" << val;
+      if (diff==val % to_mix.size()) {
+        ++ok_count;
+        std::cerr << "\nok_count:" << ok_count;
+      }
+      else {
+        std::cerr << "\n\nFAILED\n";
+      }
+    }
+    std::cout << "\nok_count:" << ok_count;
+    result = (ok_count==const_values.size());
+    assert(result);
+  }
+  assert(result);
+  return result;
+}
 
 int main(int argc, char *argv[])
 {
-  if (true) {
-    
+  if (argc>1 and std::string{argv[1]}=="test") {
+    if (test()) std::cout << "\nTest: You have arrived at your destination :)";
+    else std::cout << "\nTest: Not there yet...";
   }
-  // for (int i = -10;i<=10;++i) {
-  //   std::cout << "\n" << i << " % " << static_cast<size_t>(7) << " = " << i % 7;
-  // }
-
-  Answers answers{};
-  // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  answers.push_back({"Part 1     ",part1::solve_for(pData)}); // wrong: 9663 (r1000:2034 r2000:8846 r3000:-1217 answer[Part 1     ] 9663)
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
-  for (auto const& answer : answers) {
-    std::cout << "\nanswer[" << answer.first << "] " << answer.second;
+  else {
+    Answers answers{};
+    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    answers.push_back({"Part 1     ",part1::solve_for(pData)}); // 9663 is NOT the correct answer
+    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+    for (auto const& answer : answers) {
+      std::cout << "\nanswer[" << answer.first << "] " << answer.second;
+    }
+    // std::cout << "\nPress <enter>...";
+    // std::cin.get();
+    std::cout << "\n";
   }
-  // std::cout << "\nPress <enter>...";
-  // std::cin.get();
-  std::cout << "\n";
   return 0;
 }
 
