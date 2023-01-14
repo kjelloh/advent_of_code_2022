@@ -50,19 +50,29 @@ namespace part2 {
   }
 }
 
+bool test() {
+  return false;
+}
+
 int main(int argc, char *argv[])
 {
-  Answers answers{};
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
-  for (auto const& answer : answers) {
-    std::cout << "\nanswer[" << answer.first << "] " << answer.second;
+  if (argc>1 and std::string{argv[1]}=="test") {
+    if (test()) std::cout << "\nTest: You have arrived at your destination :)";
+    else std::cout << "\nTest: Not there yet...";
   }
-  // std::cout << "\nPress <enter>...";
-  // std::cin.get();
-  std::cout << "\n";
+  else {
+    Answers answers{};
+    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+    for (auto const& answer : answers) {
+      std::cout << "\nanswer[" << answer.first << "] " << answer.second;
+    }
+    // std::cout << "\nPress <enter>...";
+    // std::cin.get();
+    std::cout << "\n";
+  }
   return 0;
 }
 
