@@ -161,25 +161,25 @@ public:
   Result operator()(int start_time) {
     for (int t=0;t<=31;++t) {
       auto is_open = BitMap(std::string(15,'0'));
-      std::bitset<26> bitmap{to_key(0,is_open,t)};
-      std::cout << "\nkey:" << bitmap.to_string();
+      std::bitset<KEY_BITS> bitmap{to_key(0,is_open,t)};
+      std::cout << "\nkey:" << bitmap.to_ulong() << " " << bitmap.to_string() << std::flush;
     }
     for (int i=0;i<15;++i) {
       auto is_open = BitMap(); is_open[i] = true;
-      std::bitset<26> bitmap{to_key(63,is_open,31)};
-      std::cout << "\nkey:" << bitmap.to_string();
+      std::bitset<KEY_BITS> bitmap{to_key(63,is_open,31)};
+      std::cout << "\nkey:" << bitmap.to_ulong() << " " << bitmap.to_string() << std::flush;
     }
     for (int i=0;i<=63;++i) {
       auto is_open = BitMap(); is_open[14] = true;
-      std::bitset<26> bitmap{to_key(i,is_open,31)};
-      std::cout << "\nkey:" << bitmap.to_string();
+      std::bitset<KEY_BITS> bitmap{to_key(i,is_open,31)};
+      std::cout << "\nkey:" << bitmap.to_ulong() << " " << bitmap.to_string() << std::flush;
     }
     return max_to_gain(m_cave_system.index("AA"),BitMap{},start_time);
   }
 private:
   using Key = u_int32_t;
-  const int KEY_BITS{26};
-  const Key KEY_RANGE{Key{1} << (KEY_BITS+1)};
+  static const int KEY_BITS{26};
+  static const Key KEY_RANGE{Key{1} << (KEY_BITS)};
   Key to_key(Index valve_ix,BitMap is_open,int time_left) {
     // 54 valves = 6 bits
     // 15 possible valves to open (has flowrate > 0)= 15 bits
@@ -191,7 +191,12 @@ private:
     // f = flags for open valves (0..14)
     // t = time left
     Key result = (valve_ix<<20) + (is_open.to_ulong()<<5) + time_left;
-    assert(result<=KEY_RANGE);
+    if (result>KEY_RANGE) {
+      std::bitset<KEY_BITS+1> bitmap{result};
+      std::cout << "\nto_key(" << valve_ix << "," << is_open.to_string() << ":" << is_open.to_ulong() << "," << time_left << " result:" << "[" << bitmap.size() << "]" << bitmap.to_string() << ":" << result << " > " << KEY_RANGE << std::flush;
+      std::cout << "\n\n" << std::flush;
+      assert(result<=KEY_RANGE);
+    }
     return result;
   }
   std::vector<Result> m_cache{};
@@ -224,6 +229,7 @@ private:
       }
     }
     assert(key = to_key(start_index,is_open,time_left));
+    assert(result<1648);
     m_cache[to_key(start_index,is_open,time_left)] = result;
     if (call_count++ % 1000 == 0) std::cout << "\n" << is_open.to_string() << " best:" << result << std::flush;
     return result;
