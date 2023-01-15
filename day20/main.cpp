@@ -30,7 +30,7 @@ class CircularList {
 public:
   friend std::ostream& operator<<(std::ostream& os,CircularList const& cl);
   struct Node {
-    int value;
+    int value{};
     Node* next{nullptr};
     Node* prev{nullptr};
   };
@@ -109,11 +109,30 @@ public:
   }
   int operator[](int pos) const {
     // return value at pos relative the member value 0
-    auto iter = begin();
-    while (*iter!=0) ++iter;
-    if (pos>0) for (int i=0;i<pos;++i) ++iter;
-    else if (pos<0) for (int i=0;i<std::abs(pos);++i) --iter;
-    return *iter;
+    if (true) {
+      // Test
+      auto p = m_last;
+      int zero_count{0};
+      for (int n=0;n<m_size;++n) {
+        if (p->value==0) {
+          // std::cout << "\n[" << pos << "] n:" << n <<  " NOLL NOLL NOLL NOLL NOLL !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+          // std::cout << "\n\n" << std::flush;
+          ++zero_count;
+        }
+        p=p->next;
+      }
+      if (zero_count!=1) {
+          std::cout << "\n[" << pos << "] " << " FAILED TO FIND 0";
+          std::cout << "\n\n" << std::flush;        
+      }
+    }
+    std::cout << " [ " << std::flush;
+    auto p = m_last;
+    while (p->value!=0) p=p->next;
+    std::cout << " [[ " << std::flush;
+    for (int n=0;n<pos;++n) p=p->next;
+    std::cout << " [[[ " << std::flush;
+    return p->value;
   }
 
 /*
@@ -146,34 +165,36 @@ Differs at n:2104 3230 -8549
 */
   void move(Node* p,int distance) {
     std::cout << "\nmove(val:" << p->value << ",distance:" << distance;
-    distance = distance % size();
-    std::cout << " % " << size() << " == " << distance << ")";
-    if (p==m_last) std::cout << " p is last";
     if (distance!=0) {
-      auto insert_before = ConstIterator{p,-distance,size()};
-      std::cout << " insert_before.pos():" << insert_before.pos();
-      if (distance>0) {
-        while (insert_before.pos()!=0) ++insert_before;
-        ++insert_before; // make the operation always "insert before"
-      }
-      if (distance<0) {
-        while (insert_before.pos()!=0) --insert_before;
-      }
-      auto pp = const_cast<Node*>(insert_before.ptr());
-      std::cout << " pp->value:" << pp->value;
-      if (pp==m_last) std::cout << " pp is last";
-      // make p take the location of pp
+      auto insert_before = p;
 
-      // 1. unlink p
+      // 1. unlink p (IMPORTANT! Otherwise the wrap around will get target item WRONG)
       p->prev->next=p->next;
       p->next->prev=p->prev;
-      --m_size;
+
+      if (distance>0) {
+        for (int i=0;i<distance;++i) {
+          // std::cout << " ++ ";
+          insert_before = insert_before->next;
+        }
+        insert_before = insert_before->next;
+      }
+      if (distance<0) {
+        for (int i=0;i<std::abs(distance);++i) {
+          // std::cout << " -- ";
+          insert_before = insert_before->prev;
+        }
+      }
+      // std::cout << " ! ";
+      // make p take the location of insert_before
       // 2. link in before pp
-      p->next=pp;
-      p->prev=pp->prev;
-      pp->prev->next=p;
-      pp->prev=p;
-      ++m_size;
+      p->next=insert_before;
+      p->prev=insert_before->prev;
+      insert_before->prev->next=p;
+      insert_before->prev=p;
+      if (p->value==0) std::cout << "\nMOVED 0 ----------------------------------------------";
+      assert(p->next->prev == p);
+      assert(p->prev->next==p);
     }
   }
   static void test() {
@@ -258,12 +279,15 @@ class Mixed {
 public:
   Mixed(Values const& values)  {
     for (auto const& value : values) {
+      if (value==0) {
+        std::cout << "\n" << m_nodes.size() << ":" << value << " NOLL NOLL NOLL NOLL NOLL -----------------------------";
+      }
       m_nodes.push_back(m_mixed.push_back(value));
     }
     mix();
   }
   auto size() const {return m_nodes.size();};
-  int operator[](int pos) const {return m_mixed[pos];}
+  int operator[](int pos) const {std::cout << " " << pos << std::flush;return m_mixed[pos];}
   static void test() {
     Values values{1,2,3,0};
     Mixed mixed{values};
@@ -278,7 +302,12 @@ private:
     for (int index=0;index<m_nodes.size();++index) {
       auto delta = m_nodes[index]->value;
       m_mixed.move(m_nodes[index],delta);
+      if (m_mixed[0]!=0) {
+        std::cout << "\n[0]!=0 but " << m_mixed[0];
+        exit(0);
+      }
     }
+    std::cout << " !! " << std::flush;
   }
 };
 
@@ -406,7 +435,7 @@ namespace part1 {
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << "\nmodel:" << data_model;
-      if (true) {
+      if (false) {
         std::list<std::pair<int, int64_t>> nums{};
         std::vector<CircularList::Node*> nodes{};
         CircularList to_mix{};
@@ -419,7 +448,8 @@ namespace part1 {
       }
       else {
         Mixed mixed{data_model};
-        std::cout << "\nmixed:" << mixed;
+        // std::cout << "\nmixed:" << mixed;
+        std::cout << " !!! " << std::flush;
         if (false) {
           // test
           CircularList::test();
