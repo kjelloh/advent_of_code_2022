@@ -4,7 +4,9 @@
 #include <sstream> // E.g., std::istringstream, std::ostringstream
 #include <vector>
 #include <set>
+#include <unordered_set>
 #include <map>
+#include <unordered_map>
 #include <stack>
 #include <queue>
 #include <deque>
@@ -76,6 +78,14 @@ struct Resources {
     }
     return result;
   }
+  bool operator>(Resources const& other) const {
+    bool all_are_at_least_equal = *this >= other;
+    bool at_least_one_is_greater{false};
+    for (int n=0;n<m_amounts.size() and !at_least_one_is_greater;++n) {
+      at_least_one_is_greater = at_least_one_is_greater or (m_amounts[n]>other.m_amounts[n]);
+    }
+    return all_are_at_least_equal and at_least_one_is_greater;
+  }
   Resources& operator+=(Resources const& other) {
     for (int index=0;index<SYMBOL_TABLE.size();++index) {
       m_amounts[index] += other.m_amounts[index];
@@ -94,6 +104,26 @@ struct Resources {
     return result;
   }
 };
+
+struct ResourcesHash {
+  std::size_t operator()(Resources const& resources) const {
+    std::size_t result{};
+    for (auto amount : resources.m_amounts) {
+      result = (result << 1) ^ std::hash<Result>{}(amount);
+    }
+    return result;
+  }
+};
+
+std::ostream& operator<<(std::ostream& os,Resources::Amounts const& amounts) {
+  os << "[";
+  for (int index=0;index<amounts.size();++index) {
+    if (index>0) os << ",";
+    os << amounts[index];
+  }
+  os << "]";
+  return os;
+}
 
 std::ostream& operator<<(std::ostream& os,Resources const& r) {
   for (int index=0;index<r.m_amounts.size();++index) {
@@ -114,6 +144,13 @@ Resources to_resource(std::string const& name,int amount) {
 
 struct BluePrint {
   std::vector<Resources> cost{std::vector<Resources>(SYMBOL_TABLE.size(),Resources{})};
+  int max_required(int index) {
+    int result{0};
+    for (int n=0;n<cost.size();++n) {
+      result = std::max(result,cost[n].m_amounts[index]);
+    }
+    return result;
+  }
 };
 
 std::ostream& operator<<(std::ostream& os,BluePrint const& blueprint) {
@@ -223,17 +260,33 @@ Model parse(auto& in) {
 }
 
 struct State {
-  BluePrint const* blueprint;
   int time{};
   Resources robots{};
   Resources resources{};
-  State& execute_robots();
+  State& harvest_resources();
+  bool operator==(State const& other) const {
+    return false; // All states with different hash are unique
+  }
 };
 
-State& State::execute_robots() {
+struct StateHash {
+  std::size_t operator()(State const& state) const {
+    std::size_t result = std::hash<int>{}(state.time);
+    result = (result << 1) ^ ResourcesHash{}(state.robots);
+    result = (result << 1) ^ ResourcesHash{}(state.resources);
+    return result;
+  }
+};
+
+using StateCache = std::unordered_map<State,Result,StateHash>;
+
+State& State::harvest_resources() {
   for (int index=0;index<this->robots.m_amounts.size();++index) {
     // std::cout << "\n" << this->robots.m_amounts[index] << " of robot " << to_name(index) << " collects " << this->robots.m_amounts[index] << " of " << to_name(index); 
     this->resources.m_amounts[index] += this->robots.m_amounts[index]; // each robot creates one of its resource type
+    if (index==3 and this->robots.m_amounts[index]>0) {
+      std::cout << "\n" << this->robots.m_amounts << " -> " << this->resources.m_amounts;
+    }
     // std::cout << ". You have " << this->resources.m_amounts[index] << " " << to_name(index);
   }
   return *this;
@@ -256,30 +309,72 @@ std::ostream& operator<<(std::ostream& os,State const& state) {
   return os;
 }
 
-Result dfs(State const& state,int end_time) {
-  Result result{state.resources.m_amounts[3]}; // result = count of created geodes so far
-  // std::cout << "\n" << result << " dfs(state.time:" << state.time  << ")";
-  // std::cout << state;
-  if (state.time<end_time) {
-    // at least one more
-    for (int index=SYMBOL_TABLE.size()-1;index>=0;--index) {
-      auto cost = state.blueprint->cost[index];
-      if (state.resources >= cost) {
-        // can afford this robot 
-        // std::cout << "\nSpend " << cost << " to start building a " << to_name(index) << " collecting/cracking robot.";
-        State adj_state{.blueprint=state.blueprint,.time=state.time+1,.robots=state.robots,.resources=state.resources-cost};
-        adj_state.execute_robots(); // execute existing robots in next state
-        ++adj_state.robots.m_amounts[index]; // create the new robot
-        result = std::max(dfs(adj_state,end_time),result);
+class GeodeCrackingEnterprise {
+public:
+  GeodeCrackingEnterprise(BluePrint const& blueprint) : m_blueprint{blueprint} {}
+  Result most_cracked_geodes(int minutes_to_run) {
+    return dfs(State{.time=1,.robots={.m_amounts={1,0,0,0}},.resources={}},minutes_to_run);
+  }
+private:
+  BluePrint m_blueprint;
+  StateCache m_known{};
+  int call_count{0};
+  std::vector<int> m_peak_robots = std::vector<int>(4,0);
+  Resources m_peak_robot_state{{0,0,0,0}};
+  Result dfs(State const& state,int end_time) {    
+    Result result{state.resources.m_amounts[3]}; // result = count of created geodes so far
+    if (state.time==end_time) return result; // return candidate
+    if (m_known.contains(state)) return m_known[state];
+    if (call_count++ % 10000==0) std::cout << "\n" << call_count << " " << m_known.size() << " " << state << " " <<  m_peak_robots << result;
+    if (true) {
+      for (int i=0;i<SYMBOL_TABLE.size();++i) m_peak_robots[i] = std::max(state.robots.m_amounts[i],m_peak_robots[i]);
+      if (state.resources.m_amounts[1]>=m_blueprint.cost[3].m_amounts[1] and state.resources.m_amounts[2]>=m_blueprint.cost[3].m_amounts[2]) {
+        std::cout << "\nCAN BUILD GEODE CRACKING ROBOT ---------------------------";
       }
     }
-    // explore next state with same robots
-    State adj_state{.blueprint=state.blueprint,.time=state.time+1,.robots=state.robots,.resources=state.resources};
-    adj_state.execute_robots(); // execute existing robots
-    result = std::max(dfs(adj_state,end_time),result);
+    if (state.robots > m_peak_robot_state) {
+      m_peak_robot_state = state.robots;
+      std::cout << "\n" << call_count << " " << m_known.size() << " " << m_peak_robot_state << " " << result;
+    }
+    if (state.robots.m_amounts[3]>0) {
+      std::cout << "\n" << call_count << " " << m_known.size() << " " << state;
+    }
+    bool built_a_robot{false};
+    for (int index=SYMBOL_TABLE.size()-1;index>=0;--index) {
+      auto cost = m_blueprint.cost[index];
+      if (state.resources >= cost) {
+        // can afford this robot -> harvest resources and add new robot to robot collection
+        // Max clay robots required is max cost of clay for any robot.
+        // The same for the other resources
+        // index is the robot candidate to produce more of its resources.
+        // if (/* robots(index) < max_required(index), OK, we benefit from building this robot */)
+        if (state.robots.m_amounts[index] < m_blueprint.max_required(index)) {
+          State adj_state{.time=state.time+1,.robots=state.robots,.resources=state.resources-cost};
+          adj_state.harvest_resources(); // execute existing robots in next state
+          ++adj_state.robots.m_amounts[index]; // create the new robot
+          if (index>2) {
+            std::cout << "\n" << call_count << " " << m_known.size() << " " << adj_state;
+          }
+          result = std::max(dfs(adj_state,end_time),result);
+          built_a_robot = true;
+        }
+        else {
+          if (index > 1) std::cout << "\nEnough of robot " << index << " " << state;
+        }
+      }
+    }
+    // if (!built_a_robot) {
+      // Assume it is only worth to harvest with existing robots if no new robot could be built? 
+    if (true) {
+      // explore next state with same robots but harvested resources
+      State adj_state{.time=state.time+1,.robots=state.robots,.resources=state.resources};
+      adj_state.harvest_resources(); // execute existing robots to harvest more resources
+      result = std::max(dfs(adj_state,end_time),result);
+    }
+    m_known[state] = result; // keep to short cut future dfs call with same state
+    return result;
   }
-  return result;
-}
+};
 
 namespace part1 {
   Result solve_for(char const* pData) {
@@ -292,7 +387,8 @@ namespace part1 {
         auto const& blueprint = data_model[index];
         std::cout << "\n\nTRY BLUEPRINT";
         std::cout << "\n\t" << blueprint;
-        best = std::max(dfs(State{.blueprint=&blueprint,.time=1,.robots={.m_amounts={1,0,0,0}},.resources={}},19),best);
+        GeodeCrackingEnterprise gce{data_model[index]};
+        best = gce.most_cracked_geodes(24);
         result += best * index;
         std::cout << "\nblueprint:" << index << " best:" << best << " result:" << result;
       }
@@ -309,49 +405,19 @@ namespace part2 {
   }
 }
 
-void test(char const* pData) {
-  std::stringstream in{ pData };
-  auto data_model = parse(in);
-  auto blueprint = data_model[0];
-  std::cout << "\n" << data_model;
-  std::cout << "\n\nTRY BLUEPRINT";
-  std::cout << "\n\t" << blueprint;
-  State state{.blueprint=&blueprint,.time=1,.robots={.m_amounts={1,0,0,0}},.resources={}};
-  std::vector<std::pair<int,std::string>> ops{
-     {3,"clay"}
-    ,{5,"clay"}
-    ,{7,"clay"}
-    ,{11,"obsidian"}
-    ,{12,"clay"}
-    ,{15,"obsidian"}
-    ,{18,"geode"}
-    ,{21,"geode"}
-  };
-  int op_index{0};
-  while (op_index<ops.size()) {
-    auto op = ops[op_index];
-    while (state.time < op.first) {
-      std::cout << "\n== minute " << state.time << " ==";
-      state.execute_robots();
-      ++state.time;
-    }
-    std::cout << "\n== minute " << state.time << " ==";
-    auto index = to_index(op.second);
-    auto cost = state.blueprint->cost.at(to_index(op.second));
-    if (state.resources >= cost) {
-      std::cout << "\nSpend " << cost << " to start building a " << to_name(index) << " collectin/cracking robot.";
-      state.resources -= cost;
-      state.execute_robots();
-      ++state.robots.m_amounts[index];
-      ++state.time;
-    }
-    ++op_index;
+bool test(char const* pData) {
+  bool result{true};
+  if (result) {
+    result = false;
+    std::stringstream in{ pData };
+    auto data_model = parse(in);
+    auto blueprint = data_model[0];
+    int index = 0;
+    GeodeCrackingEnterprise gce{data_model[index]};
+    auto best = gce.most_cracked_geodes(24);
+    std::cout << "\nblueprint:" << index << " best:" << best;
   }
-  while (state.time <= 24) {
-    std::cout << "\n== minute " << state.time << " ==";
-    state.execute_robots();
-    ++state.time;
-  }
+  return result;
 }
 
 /*
@@ -371,29 +437,30 @@ void test(char const* pData) {
 
 int main(int argc, char *argv[])
 {
-  if (false) {
+  if (argc>1 and std::string_view{argv[1]}=="test") {
     std::cout << "\nTEST";
     test(pTest);
-    exit(0);
   }
-  Answers answers{};
+  else {
+    Answers answers{};
 
-  std::chrono::time_point<std::chrono::system_clock> start_time{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // exec_times.push_back(std::chrono::system_clock::now());
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // exec_times.push_back(std::chrono::system_clock::now());
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // exec_times.push_back(std::chrono::system_clock::now());
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
-  exec_times.push_back(std::chrono::system_clock::now());
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms"; 
-    std::cout << " answer[" << answers[i].first << "] " << answers[i].second;
+    std::chrono::time_point<std::chrono::system_clock> start_time{};
+    std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
+    exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    // exec_times.push_back(std::chrono::system_clock::now());
+    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    // exec_times.push_back(std::chrono::system_clock::now());
+    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    // exec_times.push_back(std::chrono::system_clock::now());
+    // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+    exec_times.push_back(std::chrono::system_clock::now());
+    for (int i=0;i<answers.size();++i) {
+      std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms"; 
+      std::cout << " answer[" << answers[i].first << "] " << answers[i].second;
+    }
+    std::cout << "\n";
   }
-  std::cout << "\n";
   return 0;
 }
 
