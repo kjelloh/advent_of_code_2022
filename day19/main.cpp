@@ -285,7 +285,7 @@ State& State::harvest_resources() {
     // std::cout << "\n" << this->robots.m_amounts[index] << " of robot " << to_name(index) << " collects " << this->robots.m_amounts[index] << " of " << to_name(index); 
     this->resources.m_amounts[index] += this->robots.m_amounts[index]; // each robot creates one of its resource type
     if (index==3 and this->robots.m_amounts[index]>0) {
-      std::cout << "\n" << this->robots.m_amounts << " -> " << this->resources.m_amounts;
+      std::cout << "\nGEODE++ " << this->robots.m_amounts << " -> " << this->resources.m_amounts;
     }
     // std::cout << ". You have " << this->resources.m_amounts[index] << " " << to_name(index);
   }
@@ -337,7 +337,7 @@ private:
       std::cout << "\n" << call_count << " " << m_known.size() << " " << m_peak_robot_state << " " << result;
     }
     if (state.robots.m_amounts[3]>0) {
-      std::cout << "\n" << call_count << " " << m_known.size() << " " << state;
+      std::cout << "\nGEODES! " << call_count << " " << m_known.size() << " " << state;
     }
     bool built_a_robot{false};
     for (int index=SYMBOL_TABLE.size()-1;index>=0;--index) {
@@ -348,12 +348,18 @@ private:
         // The same for the other resources
         // index is the robot candidate to produce more of its resources.
         // if (/* robots(index) < max_required(index), OK, we benefit from building this robot */)
-        if (state.robots.m_amounts[index] < m_blueprint.max_required(index)) {
+        if ((index == 3) or (state.robots.m_amounts[index] < m_blueprint.max_required(index))) {
           State adj_state{.time=state.time+1,.robots=state.robots,.resources=state.resources-cost};
+          if (index>2) {
+            std::cout << "\n-" << call_count << " " << m_known.size() << " " << adj_state;
+          }
           adj_state.harvest_resources(); // execute existing robots in next state
+          if (index>2) {
+            std::cout << "\nh" << call_count << " " << m_known.size() << " " << adj_state;
+          }
           ++adj_state.robots.m_amounts[index]; // create the new robot
           if (index>2) {
-            std::cout << "\n" << call_count << " " << m_known.size() << " " << adj_state;
+            std::cout << "\np" << call_count << " " << m_known.size() << " " << adj_state;
           }
           result = std::max(dfs(adj_state,end_time),result);
           built_a_robot = true;
