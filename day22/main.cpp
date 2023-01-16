@@ -378,9 +378,36 @@ rot:23[0,0,1] [1,0,0] [0,1,0]%
   using Edge = std::pair<Point,Point>;
 
   struct Square {
-    std::tuple<Point,Point,Point,Point> corners{};
-    std::tuple<Edge,Edge,Edge,Edge> edges{};
+    Vector pos; // Host coordinate system position
+    std::array<Point,4> corners{}; // Local coordinate system corners
+    std::array<Edge,4> edges{}; // local coordinate system edges
   };
+
+  std::ostream& operator<<(std::ostream& os,Square const& square) {
+    os << "\n[" << square.corners[0] << ":" << square.pos << "\t" << square.corners[3] << "]"; 
+    for (int n=0;n<4;++n) os << "\n  " << n << ":" << square.edges[n].first << " -> " << square.edges[n].second;
+    os << "\n[" << square.corners[1] << "\t\t" << square.corners[2] << "]"; 
+    return os;
+  }
+
+  Square to_xy_square(Vector const& pos,int side_size) {
+    Square result{
+       .pos = pos
+      ,.corners{{
+         {0,0,0}
+        ,{0,side_size,0}
+        ,{side_size,side_size,0}
+        ,{side_size,0,0}}}
+      ,.edges = {{
+         {{0,0,0},{0,side_size,0}}
+        ,{{0,side_size,0},{side_size,side_size,0}}
+        ,{{side_size,side_size,0},{side_size,0,0}}
+        ,{{side_size,0,0},{0,0,0}}
+      }}
+    };
+    return result;
+  }
+
   using Squares = std::vector<Square>;
 
   // The hull of a cube with faces 0..5 oriented in such a way that 
@@ -393,8 +420,7 @@ rot:23[0,0,1] [1,0,0] [0,1,0]%
   // Folds a collection of 6 squares in the xy-plane into a convex hull of a cube
   class CubeHullFolder {
   public:
-    CubeHullFolder(Squares const& squares) : m_anonymous_faces{squares} {}
-    void push_back(Square const& square) {m_anonymous_faces.push_back(square);}
+    void push_back(Square const& square) {m_anonymous_faces.push_back(square); std::cout << "\n" << square;}
     CubeHull hull() {
       // Folds anonymous faces into a cube
       return CubeHull{};
@@ -471,9 +497,91 @@ std::ostream& operator<<(std::ostream& os,Model const& model) {
   return os;
 }
 
+class Face {
+public:
+  Vector top_left{};
+  Vector bottom_right() const {return top_left + Vector{static_cast<int>(rows[0].size()),static_cast<int>(rows.size())};}
+  Strings rows{};
+  int side_size() const {return bottom_right()[COORD::x] - top_left[COORD::x] + 1;}
+private:
+  Vector m_bottom_right{};
+};
+using Faces = std::vector<Face>;
+
+Faces to_faces(Strings& strings) {
+  auto result = Faces{};
+
+  // Map row,col on grid defined by strings to faces of a cube
+  // We need to figure out face size and face positions on the flat (unfolded) surface.
+  // The leftmost map non-space character in the input is on face 0 row 0 col 0.
+  // Faces returned are in the order encountered scanning left to right, up to down of strings.
+
+  auto max_width = std::accumulate(strings.begin(),strings.end(),std::size_t{0},[](auto acc,auto const& s) { return std::max(acc,s.size());});
+  std::for_each(strings.begin(),strings.end(),[&max_width](auto& s){
+    auto diff =  max_width - (s.size() - 1);
+    s += std::string(diff,' ');
+  });
+
+  std::set<int> widths{};
+  for (int grid_row=0;grid_row<strings.size();++grid_row) {      
+    auto const& line = strings[grid_row];
+    auto first = line.find_first_not_of(' ',0);
+    auto end = std::min(line.size(),line.find_first_of(' ',first));
+    auto width = end-first;
+    assert(width<line.size());
+    widths.insert(width);
+  }
+  int cube_side{*widths.begin()};
+  for (auto width : widths) {
+    cube_side = std::gcd(cube_side,width);
+  }
+  std::cout << "\nCUBE SIDE SIZE " << cube_side;
+
+  // Loop over grid of unfolded faces
+  int offset{0};
+  auto vert_cube_side_counts = strings.size() / cube_side;
+  for (int r=0;r<vert_cube_side_counts;++r) {
+    auto hor_cube_side_counts = strings[0].size() / cube_side;
+    for (int c=0;c<hor_cube_side_counts;++c) {
+      result.push_back(Face{}); result.back().top_left = Vector{r*cube_side,(c-offset)*cube_side};
+      std::cout << "\n";
+      for (int dr=0;dr<cube_side;++dr) {
+        auto row = r*cube_side+dr;
+        auto const& line = strings[row];
+        auto first = c*cube_side;
+        std::cout << "\n" << std::quoted(line) << " " << r << " " << c << " " << dr << " " << first << " " << offset << " " <<  result.back().top_left << std::flush;
+        if (first+cube_side <= line.size()) {
+          auto snippet = line.substr(first,cube_side);
+          std::cout << " " << std::quoted(snippet);
+          if (snippet.find_first_not_of(' ')==0) {
+            if (result.size()==1 and row==0 and result.back().rows.size()==0) {
+              offset = first/cube_side;
+              result.back().top_left = Vector{r*cube_side,(c-offset)*cube_side};
+            }
+            result.back().rows.push_back(snippet);
+            std::cout << " :)";
+          }
+        }          
+      }
+      if (result.back().rows.size()==0) result.pop_back();
+    }
+  }
+  assert(result.size()==6);
+
+  if (true) {
+    for (int face_id=0;face_id<result.size();++face_id) {
+      std::cout << "\nface_id:" << face_id << " " << result.at(face_id).top_left;
+      for (auto const& line : result[face_id].rows) {
+        std::cout << "\n\t" << std::quoted(line);
+      }
+    }
+  }
+  return result;
+}
+
 class Traveler {
 public:
-  Traveler(Strings const& strings,Path const path) {}
+  Traveler(Strings const& strings,Path const path) : m_strings{strings} {}
   Vector walk_as_if_flat() {
     // Walk the flat map using the rules of wrap around on the flat grid
     // return the position on the flat strings map
@@ -483,11 +591,18 @@ public:
     // Fold the flat map defined by strings into a cube
     // Walk the cube
     // return the position on the flat strings map
+    Faces faces = to_faces(m_strings);
+    dim3::CubeHullFolder folder{};
+    for (auto const& face : faces) {
+      dim3::Vector pos{face.top_left[0],face.top_left[1],0};
+      folder.push_back(dim3::to_xy_square(pos,face.side_size()));
+    }
     return {};
   }
   static bool test() {return false;}
 private:
   friend std::ostream& operator<<(std::ostream& os,Traveler const& traveler);
+  Strings m_strings{};
 };
 
 std::ostream& operator<<(std::ostream& os,Traveler const& traveler) {
@@ -606,69 +721,6 @@ namespace part2 {
   const std::map<int,int> V_ORBIT{{0,1},{1,5},{5,4},{4,0}}; // Vertical Orbit
   
   using Faces = std::vector<Face>;
-
-  Faces to_faces(Strings const& strings) {
-    auto result = Faces{};
-
-    // map row,col on grid to the faces of the cube
-    // We need to figure out what faces we encounter and in what order.
-    // The leftmost map character in the input is on face 0
-    std::set<int> widths{};
-    for (int grid_row=0;grid_row<strings.size();++grid_row) {      
-      auto const& line = strings[grid_row];
-      auto first = line.find_first_not_of(' ',0);
-      auto end = std::min(line.size(),line.find_first_of(' ',first));
-      auto width = end-first;
-      assert(width<line.size());
-      widths.insert(width);
-    }
-    int cube_side{*widths.begin()};
-    for (auto width : widths) {
-      cube_side = std::gcd(cube_side,width);
-    }
-    std::cout << "\nCUBE SIDE SIZE " << cube_side;
-
-    // Loop over grid of unfolded faces
-    int offset{0};
-    auto vert_cube_side_counts = strings.size() / cube_side;
-    for (int r=0;r<vert_cube_side_counts;++r) {
-      auto hor_cube_side_counts = strings[0].size() / cube_side;
-      for (int c=0;c<hor_cube_side_counts;++c) {
-        result.push_back(Face{}); result.back().top_left(Vector{r*cube_side,(c-offset)*cube_side,0});
-        std::cout << "\n";
-        for (int dr=0;dr<cube_side;++dr) {
-          auto row = r*cube_side+dr;
-          auto const& line = strings[row];
-          auto first = c*cube_side;
-          std::cout << "\n" << std::quoted(line) << " " << r << " " << c << " " << dr << " " << first << " " << offset << " " <<  result.back().top_left() << std::flush;
-          if (first+cube_side <= line.size()) {
-            auto snippet = line.substr(first,cube_side);
-            std::cout << " " << std::quoted(snippet);
-            if (snippet.find_first_not_of(' ')==0) {
-              if (result.size()==1 and row==0 and result.back().rows().size()==0) {
-                offset = first/cube_side;
-                result.back().top_left(Vector{r*cube_side,(c-offset)*cube_side,0});
-              }
-              result.back().push_back(snippet);
-              std::cout << " :)";
-            }
-          }          
-        }
-        if (result.back().rows().size()==0) result.pop_back();
-      }
-    }
-    assert(result.size()==6);
-
-    if (true) {
-      for (int face_id=0;face_id<result.size();++face_id) {
-        std::cout << "\nface_id:" << face_id << " " << result.at(face_id).top_left();
-        for (auto const& line : result[face_id]) {
-          std::cout << "\n\t" << std::quoted(line);
-        }
-      }
-    }
-    return result;
-  }
 
   class Graph {
   public:
