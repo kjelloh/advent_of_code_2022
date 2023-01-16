@@ -24,42 +24,22 @@ using Answers = std::vector<std::pair<std::string,Result>>;
 
 namespace dim2 {
 
+  enum COORD : int {
+     x=0
+    ,y=1
+  };
+
   using Vector = std::array<int,2>; // x,y,z
 
-  // struct Vector {
-  //   int row;
-  //   int col;
-  //   Vector& operator-=(Vector const& other) {
-  //     row -= other[ROW];
-  //     col -= other[COL];
-  //     return *this;
-  //   }
-  //   Vector operator-() const {
-  //     Vector result{-row,-col};
-  //     return result;
-  //   }
-  //   Vector& operator+=(Vector const& other) {
-  //     row += other[ROW];
-  //     col += other[COL];
-  //     return *this;
-  //   }
-  //   Vector operator+(Vector const& other) const {
-  //     Vector result{*this};
-  //     result += other;
-  //     return result;
-  //   }
-  //   bool operator==(Vector const& other) const {
-  //     if (row == other[ROW]) return col == other[COL];
-  //     else return row == other[ROW];
-  //   }
-
-  //   using Vectors = std::vector<Vector>;
-
-  // };
-
-  // bool operator==(Vector const& v1,Vector const& v2) {
-  //   return (v1.at(0)==v2.at(0) and v1.at(1)==v2.at(1));
-  // }
+  std::ostream& operator<<(std::ostream& os,Vector const& v) {
+    os << '[';
+    for (int c=0;c<v.size();++c) {
+      if (c>0) os << ',';
+      os << v[c];
+    }
+    os << ']';
+    return os;
+  }
 
   const Vector X_UNIT{1,0};
   const Vector Y_UNIT{0,1};
@@ -127,9 +107,20 @@ namespace dim2 {
   }};
 
 } // namespace dim2
+using dim2::operator<<;
 
 namespace dim3 {
   using Vector = std::array<int,3>;
+
+  std::ostream& operator<<(std::ostream& os,Vector const& v) {
+    os << '[';
+    for (int c=0;c<v.size();++c) {
+      if (c>0) os << ',';
+      os << v[c];
+    }
+    os << ']';
+    return os;
+  }
 
   enum COORD : int {
      x=0
@@ -205,16 +196,6 @@ namespace dim3 {
   const Vector DOWN{1,0,0};
   const Vector LEFT{0,-1,0};
   const Vector UP{-1,0,0};
-
-  std::ostream& operator<<(std::ostream& os,Vector const& v) {
-    os << '[';
-    for (int c=0;c<v.size();++c) {
-      if (c>0) os << ',';
-      os << v[c];
-    }
-    os << ']';
-    return os;
-  }
 
   // Helper class to create rotations that turn any 3d object into any of its 24 possible orientations in 3D space.
   // Observation: Imagine a cube and each normal vector of the faces of that cube.
@@ -400,21 +381,35 @@ rot:23[0,0,1] [1,0,0] [0,1,0]%
     std::tuple<Point,Point,Point,Point> corners{};
     std::tuple<Edge,Edge,Edge,Edge> edges{};
   };
+  using Squares = std::vector<Square>;
 
-  // Folds a flat 2D graph of squares into a Cube mech
-  class CubeFolder {
+  // The hull of a cube with faces 0..5 oriented in such a way that 
+  // the sum of opposite face indices are 5;
+  struct CubeHull {
+    using Cubefaces = std::array<Square,6>;
+    Cubefaces faces{};
+  };
+
+  // Folds a collection of 6 squares in the xy-plane into a convex hull of a cube
+  class CubeHullFolder {
   public:
-    using Squares = std::array<Square,6>;
-    CubeFolder(Squares const& squares) : m_squares{squares} {}
-
+    CubeHullFolder(Squares const& squares) : m_anonymous_faces{squares} {}
+    void push_back(Square const& square) {m_anonymous_faces.push_back(square);}
+    CubeHull hull() {
+      // Folds anonymous faces into a cube
+      return CubeHull{};
+    }
   private:
-    Squares m_squares;
+    Squares m_anonymous_faces{};
   };
 
 } // namespace dim3
 using dim3::operator<<;
 
-using namespace dim3;
+using namespace dim2;
+
+auto ROW = COORD::x;
+auto COL = COORD::y;
 
 using Strings = std::vector<std::string>;
 std::ostream& operator<<(std::ostream& os,Strings const& strings) {
@@ -499,9 +494,6 @@ std::ostream& operator<<(std::ostream& os,Traveler const& traveler) {
   return os;
 }
 
-auto ROW = COORD::x;
-auto COL = COORD::y;
-
 namespace part1 {
   Result solve_for(char const* pData) {
       Result result{};
@@ -577,6 +569,7 @@ namespace part2 {
       - Each face square position in 3D space is defined by the position of corner 0.
   */
 
+/*
   class Face {
   public:
     using Row = std::string;
@@ -906,66 +899,7 @@ namespace part2 {
     }
   };
 
-  void test() {
-    if (true) {
-      // Test folding
-      std::istringstream in{pTest};
-      // std::istringstream in{pData};
-      auto data_model = parse(in);
-      auto faces = to_faces(data_model.first);
-      Folder folder{faces};
-      std::cout << "\n" << folder.to_string();
-      auto cube = folder.cube();
-    }
-  }
-
-/*
-
-        ...#  0
-        .#..
-        #...
-        ....
-...#.......#      1,2,4
-........#..A
-..#....#....
-.D........#.
-        ...#..B. 5,3
-        .....#..
-        .#......
-        ..C...#.
-
-face_id:0
-	"...#"
-	".#.."
-	"#..."
-	"...."
-face_id:1
-	"...#"
-	"...."
-	"..#."
-	"...."
-face_id:2
-	"...."
-	"...."
-	"...#"
-	"...."
-face_id:3
-	"...."
-	".#.."
-	"...."
-	"..#."
-face_id:4
-	"...#"
-	"#..."
-	"...."
-	"..#."
-face_id:5
-	"...#"
-	"...."
-	".#.."
-	"...."
-
-*/  
+*/
 
   Result solve_for(char const* pData) {
       Result result{};
@@ -990,7 +924,6 @@ int main(int argc, char *argv[])
   if (argc>1 and std::string{argv[1]}=="test") {
     std::cout << "\nTEST";
     dim3::Rotations::test();
-    part2::test();
   }
   else {
     Answers answers{};
