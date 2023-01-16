@@ -275,7 +275,7 @@ private:
   BluePrint m_blueprint;
   using Q = std::deque<State>;
   // based on https://github.com/jonathanpaulson/AdventOfCode/blob/master/2022/19.py
-  // many thanks and credits to Jonathan Paulsson (https://youtu.be/yT3yHDp6hss)
+  // many thanks and credits to Jonathan Paulson (https://youtu.be/yT3yHDp6hss)
   Result bfs(int t,int r1, int r2, int r3, int r4) {
     static int call_count{0};
     Result best{};
