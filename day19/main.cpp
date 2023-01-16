@@ -346,7 +346,7 @@ namespace part1 {
         std::cout << "\n\t" << blueprint;
         BFS bfs{blueprint};
         auto best = bfs.best(24);
-        result += best * index;
+        result += best * (index+1);
         std::cout << "\nblueprint:" << index << " best:" << best << " result:" << result;
       }
       return result;
@@ -379,9 +379,9 @@ int main(int argc, char *argv[])
     std::chrono::time_point<std::chrono::system_clock> start_time{};
     std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
     exec_times.push_back(std::chrono::system_clock::now());
-    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    answers.push_back({"Part 1     ",part1::solve_for(pData)});
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
