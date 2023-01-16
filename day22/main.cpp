@@ -131,6 +131,12 @@ namespace dim2 {
 namespace dim3 {
   using Vector = std::array<int,3>;
 
+  enum COORD : int {
+     x=0
+    ,y=1
+    ,z=2
+  };
+
   const Vector X_UNIT{1,0,0};
   const Vector Y_UNIT{0,1,0};
   const Vector Z_UNIT{0,0,1};
@@ -366,119 +372,63 @@ rot:23[0,0,1] [1,0,0] [0,1,0]%
   const Matrix NORM_Z_TURN_RIGHT{ROTATIONS[Rotations::Z270_Y0_X0]};
   const Matrix NORM_Z_TURN_LEFT{ROTATIONS[Rotations::Z90_Y0_X0]};
 
+  /*
+    Define a Square in 3D space as follows.
+
+                                             sheet (z)
+                                              /
+                                             /
+                       3                   tlf ---> col (x)
+                0------------ 3             |
+               /             /              |
+            0 / Square   / 2             v
+             /             /               row (y)
+            1-------------2
+                  1
+
+      - each square has four corners 0...3 and four edges 0..3
+      - Each face square now gets a normal "up" in the -z direction (3D coordinate system right hand rule  x cross-product y = z)
+      - The square Corners are numbered anti clockwise (right hand rule)
+      - The square edges are numbered anti clock-wise (right hand rule)
+      - Each square position in 3D space is defined by the position of corner 0.
+  */
+
+  using Point = Vector;
+  using Edge = std::pair<Point,Point>;
+
+  struct Square {
+    std::tuple<Point,Point,Point,Point> corners{};
+    std::tuple<Edge,Edge,Edge,Edge> edges{};
+  };
+
+  // Folds a flat 2D graph of squares into a Cube mech
+  class CubeFolder {
+  public:
+    using Squares = std::array<Square,6>;
+    CubeFolder(Squares const& squares) : m_squares{squares} {}
+
+  private:
+    Squares m_squares;
+  };
+
 } // namespace dim3
 using dim3::operator<<;
 
 using namespace dim3;
 
-const int ROW=0; // x maps to row
-const int COL=1; // y maps to column
-
-/*
-Facing is 0 for right (>), 1 for down (v), 2 for left (<), and 3 for up (^).
-*/
-const std::vector<Vector> DELTA{RIGHT,DOWN,LEFT,UP};
-char char_of_delta(Vector const& delta) {
-  if (delta[ROW]==0) return (delta[COL]>0)?'>':'<';
-  else return (delta[ROW]>0)?'v':'^';
-}
-
-std::ostream& operator<<(std::ostream& os,std::vector<std::string> rows) {
-  for (int row=0;row<rows.size();++row) {
+using Strings = std::vector<std::string>;
+std::ostream& operator<<(std::ostream& os,Strings const& strings) {
+  for (int row=0;row<strings.size();++row) {
     if (row>0) os << "\n";
-    os << std::quoted(rows[row]);
+    os << std::quoted(strings[row]);
   }
-  return os;
-}
-
-class RowsGrid {
-public:
-  using Row = std::string;
-  using Map=std::vector<Row>;
-  RowsGrid& push_back(Row const& row) {
-    m_map.push_back(row);
-    m_bottom_right[ROW] = m_map.size()-1;
-    if (m_bottom_right[COL] < 0) m_bottom_right[COL] = row.size()-1;
-    // std::cout << "\nPUSH_BACK m_bottom_right[COL]:" << m_bottom_right[COL] << " row.size()-1:" << row.size()-1;
-    if (static_cast<Result>(row.size()-1) < m_bottom_right[COL]) {
-      auto& ref = m_map.back();
-      auto diff =  m_bottom_right[COL] - static_cast<Result>(ref.size() - 1);
-      if (diff>0) {
-        // std::cout << "\ndiff:" << diff << std::flush;
-        auto expansion = std::string(diff,' ');
-        ref += expansion;
-        // std::cout << " expansion:" << std::quoted(expansion) << " ref:" << std::quoted(ref) << std::flush;
-      }
-    }
-    else if (m_bottom_right[COL] < static_cast<Result>(row.size()-1)) {
-      m_bottom_right[COL] = row.size()-1;
-      // std::cout << "\nEXPAND!" << std::flush;
-      // expand map to the right
-      for (auto& ref : m_map) {
-        // std::cout << "\nexpand ref:" << std::quoted(ref);
-        auto diff =  m_bottom_right[COL] - static_cast<Result>(ref.size() - 1);
-        if (diff>0) {
-          // std::cout << "\ndiff:" << diff << std::flush;
-          auto expansion = std::string(diff,' ');
-          ref += expansion;
-          // std::cout << " expansion:" << std::quoted(expansion) << " ref:" << std::quoted(ref) << std::flush;
-        }
-      }
-    }
-    return *this;
-  }
-  Map const& map() const {
-    return m_map;
-  }
-  Vector const& top_left() const {
-    return m_top_left;
-  }
-  Vector const& bottom_right() const {
-    return m_bottom_right;
-  }
-  bool in_frame(Vector const& pos) const {
-    return (pos[ROW]>=top_left()[ROW] and pos[ROW]<=bottom_right()[ROW] and pos[COL]>=top_left()[COL] and pos[COL]<=bottom_right()[COL]);
-  }
-  Vector next(Vector const& pos,Vector const& delta) const {
-    // std::cout << "\nnext(pos:" << pos << ",delta:" << delta << ")"; 
-    Vector result{pos+delta}; // optimistic
-    // std::cout << "\n\tat(" << result << "):" << at(result);
-    // we are now at '.', '#' or at ' ' (the last meaning out of map or out of frame)
-    if (at(result)==' ') {
-      // wrap around
-      result -=delta; // back off
-      while (at(result)!=' ') result -=delta; // back track on map
-      result += delta; // back off
-      // std::cout << "\n\tat(" << result << "):" << at(result);
-    }
-    if (at(result)=='#') result = next(result,-delta);
-    // std::cout << "\n\tat(" << result << "):" << at(result);
-    return result;
-  }
-  char at(Vector const& pos) const {
-    if (in_frame(pos)) return m_map.at(pos[ROW]).at(pos[COL]);
-    else return ' ';
-  }
-  char& at(Vector const& pos) {
-    static char NULL_POS{' '};
-    if (in_frame(pos)) return m_map[pos[ROW]][pos[COL]];
-    else return NULL_POS;
-  }
-private:
-  Vector m_top_left{0,0};
-  Vector m_bottom_right{-1,-1}; // empty
-  Map m_map{};
-};
-
-std::ostream& operator<<(std::ostream& os,RowsGrid const& grid) {
-  os << "\n" << grid.map();
   return os;
 }
 
 using Step = std::pair<int,char>;
 using Path = std::vector<Step>;
 
-using Model = std::pair<RowsGrid,Path>;
+using Model = std::pair<Strings,Path>;
 
 Model parse(auto& in) {
     Model result{};
@@ -528,144 +478,29 @@ std::ostream& operator<<(std::ostream& os,Model const& model) {
 
 class Traveler {
 public:
-  using LocationAndDir = std::pair<Vector,int>;
-  Traveler(RowsGrid const& grid,Path const path) : m_grid{grid},m_path{path},rendered{grid} {
-    std::cout << "\nTraveler::Traveler";
-    auto first_col{m_grid.top_left()[COL]};
-    for (;first_col<m_grid.bottom_right()[COL];++first_col) {
-      std::cout << "\n[row:0,col:" << first_col << "]=" << m_grid.map()[0][first_col];
-      if (m_grid.map()[0][first_col]!=' ') break;
-    }
-    m_location_and_dir.first = Vector{0,first_col};
-    walk_the_path();
+  Traveler(Strings const& strings,Path const path) {}
+  Vector walk_as_if_flat() {
+    // Walk the flat map using the rules of wrap around on the flat grid
+    // return the position on the flat strings map
+    return {};
   }
-  LocationAndDir location_and_dir() {
-    return m_location_and_dir;
+  Vector walk_as_if_cube() {
+    // Fold the flat map defined by strings into a cube
+    // Walk the cube
+    // return the position on the flat strings map
+    return {};
   }
-  Vector const& pos() const {
-    return m_location_and_dir.first;
-  }
-  static void test(RowsGrid const& grid,Path const path) {
-    std::cout << "\ntest(...)";
-    if (false) {
-      RowsGrid temp{};
-      Vector pos{};
-      Vector delta{RIGHT};
-      std::cout << "\npos:" << pos;
-      for (auto i : {0,0,0,0}) pos += delta;
-      std::cout << "\npos:" << pos;
-      delta = NORM_Z_TURN_RIGHT*delta;
-      for (auto i : {0,0,0,0}) pos += delta;
-      std::cout << "\npos:" << pos;
-      delta = NORM_Z_TURN_LEFT*delta;
-      for (auto i : {0,0,0,0}) pos += delta;
-      std::cout << "\npos:" << pos;      
-    }
-    if (false) {
-      std::cout << "\n2 path:" << path;
-      RowsGrid temp{};
-      Vector pos{};
-      Vector delta{RIGHT};
-      for (auto const& step : path) {
-        std::cout << "\nfrom:" << pos << " step:" << step; 
-        switch (step.second) {
-          case 'R': delta = NORM_Z_TURN_RIGHT*delta; ;break;
-          case 'L': delta = NORM_Z_TURN_LEFT*delta; break;
-          default: break;
-        }
-        temp.at(pos) = char_of_delta(delta);
-        for (int i=0;i<step.first;++i) {
-          pos += delta;
-        }
-        temp.at(pos) = char_of_delta(delta);
-        std::cout << "\n" << temp;
-      }
-    }
-/*
-
-        >>v#    
-        .#v.    
-        #.v.    
-        ..v.    
-...#...v..v#    
->>>v...>#.>>    
-..#v...#....    
-...>>>>v..#.    
-        ...#....
-        .....#..
-        .#......
-        ......#.
-
-"        >>v#    "
-"        .#v.    "
-"        #.v.    "
-"        ..v.    "
-"...#...v..v#    "
-">>>v...>#.>>    "
-"..#v...#....    "
-"...>>>>v..#.    "
-"        ...#...."
-"        .....#.."
-"        .#......"
-"        ......#."
-*/    
-    if (true) {
-      std::cout << "\n3 path:" << path << std::flush;
-      Traveler traveler{grid,path};
-      RowsGrid rendered{grid};
-      auto pos = traveler.pos();
-      std::cout << "\nstart_pos" << pos;
-      auto delta = RIGHT;
-      std::cout << "\n" << rendered;
-      for (auto const& step : path) {
-        std::cout << "\nfrom:" << pos << " step:" << step; 
-        switch (step.second) {
-          case 'R': delta = NORM_Z_TURN_RIGHT*delta; ;break;
-          case 'L': delta = NORM_Z_TURN_LEFT*delta; break;
-          default: break;
-        }
-        rendered.at(pos) = char_of_delta(delta);
-        for (int i=0;i<step.first;++i) {
-          pos = traveler.m_grid.next(pos,delta);
-          rendered.at(pos) = char_of_delta(delta);
-        }
-        std::cout << "\n" << rendered;
-      }
-    }
-  }
+  static bool test() {return false;}
 private:
   friend std::ostream& operator<<(std::ostream& os,Traveler const& traveler);
-  RowsGrid m_grid;
-  Path m_path;
-  Vector delta{RIGHT};
-  LocationAndDir m_location_and_dir{};
-  RowsGrid rendered{};
-  void take_step() {
-    auto next = m_grid.next(m_location_and_dir.first,delta);
-    if (m_grid.at(next)!='#') m_location_and_dir.first = next;
-    rendered.at(m_location_and_dir.first) = char_of_delta(delta);
-  }
-  void turn(char dir) {
-    switch (dir) {
-      case 'R': delta = NORM_Z_TURN_RIGHT*delta; ;break;
-      case 'L': delta = NORM_Z_TURN_LEFT*delta; break;
-      default: break;
-    }
-    rendered.at(m_location_and_dir.first) = char_of_delta(delta);
-  }
-  void walk_the_path() {
-    for (auto const& step : m_path) {
-      for (int i=0;i<step.first;++i) take_step();
-      turn(step.second);
-    }
-  }
 };
 
 std::ostream& operator<<(std::ostream& os,Traveler const& traveler) {
-  os << "traveled:" << traveler.m_path;
-  os << "\n" << traveler.rendered;
   return os;
 }
+
+auto ROW = COORD::x;
+auto COL = COORD::y;
 
 namespace part1 {
   Result solve_for(char const* pData) {
@@ -674,12 +509,12 @@ namespace part1 {
       auto data_model = parse(in);
       std::cout << data_model;
       if (false) {
-        Traveler::test(data_model.first,data_model.second);        
+        Traveler::test();        
       }
       else {
         Traveler traveler{data_model.first,data_model.second};
-        auto location_and_dir = traveler.location_and_dir();
-        result = 1000*(location_and_dir.first[ROW]+1) + 4*(location_and_dir.first[COL]+1) + location_and_dir.second;
+        auto pos = traveler.walk_as_if_flat();
+        result = 1000*(pos[ROW]+1) + 4*(pos[COL]+1);
         std::cout << traveler;
       }
       return result;
@@ -691,16 +526,16 @@ namespace part2 {
   /*
   Define the cube with one corner at top_left_front (tlf) and a diagonally opposite corner bottom_right_back (brb).
 
-                /-------------
+                *-------------*
                /|            /|               sheet (z)
               / |    1      / |              /
              /  |      5   /  |             /
-          tlf-------------- 3 |            tlf ---> col (x)
-            | 2 |---------|-- brb           |
+          tlf-------------* 3 |            tlf ---> col (x)
+            | 2 *---------|-- brb           |
             |  /   0      |  /              |
             | /      4    | /               v
             |/            |/               row (y)
-             --------------
+            *-------------*
 
     - Number the faces counter clockwise from tlf with face 0 in row,col plane.
     - Number opposite faces so that the sum is 5
@@ -717,6 +552,29 @@ namespace part2 {
     - Define Vertical Orbits  = 0,1,5,4,0...
     - define rotation_direction = clockwise or counter clockwise.
 
+  */
+
+  /*
+    Define a Face in 3D space as follows.
+
+                                             sheet (z)
+                                              /
+                                             /
+                       3                   tlf ---> col (x)
+                0------------ 3             |
+               /             /              |
+            0 /   face n    / 2             v
+             /             /               row (y)
+            1-------------2
+                  1
+
+      - Each face maps to a Square 
+      - each face square has four corners 0...3 and four edges 0..3
+      - each face is originally (unfolded) placed with rows in the 3D y direction and columns in the 3D x direction
+      - Each face square now gets a normal "up" in the -z direction (3D coordinate system right hand rule  x cross-product y = z)
+      - The face square Corners are numbered anti clockwise (right hand rule)
+      - The face square edges are numbered anti clock-wise (right hand rule)
+      - Each face square position in 3D space is defined by the position of corner 0.
   */
 
   class Face {
@@ -739,33 +597,32 @@ namespace part2 {
     void col_v(Vector const& v) {m_col_v=v;}
   private:
     friend std::ostream& operator<<(std::ostream& os,Face const& face);
-
-    Vector m_top_left; // face top left as defined when unfolded
     Rows m_rows; // face markings from top left  as rows in the direction of column vector and rows in the direction of row vector
+    
+    Vector m_top_left; // face top left as defined when unfolded
     Vector m_row_v,m_col_v; // defines the face plane in 3D space
   };
-
-  using ::operator<<;
+  using ::operator<<; // bring in outer namespace stream operator
 
   std::ostream& operator<<(std::ostream& os,Face const& face) {
     os << " top " << face.m_top_left << " col_v" << face.m_col_v << " row_v" << face.m_row_v;
     return os;
   }
-
+  
   const std::map<int,int> H_ORBIT{{0,3},{3,5},{5,2},{2,0}}; // Horizontal Orbit
   const std::map<int,int> V_ORBIT{{0,1},{1,5},{5,4},{4,0}}; // Vertical Orbit
   
   using Faces = std::vector<Face>;
 
-  Faces to_faces(RowsGrid const& grid) {
+  Faces to_faces(Strings const& strings) {
     auto result = Faces{};
 
     // map row,col on grid to the faces of the cube
     // We need to figure out what faces we encounter and in what order.
     // The leftmost map character in the input is on face 0
     std::set<int> widths{};
-    for (int grid_row=0;grid_row<grid.map().size();++grid_row) {      
-      auto const& line = grid.map()[grid_row];
+    for (int grid_row=0;grid_row<strings.size();++grid_row) {      
+      auto const& line = strings[grid_row];
       auto first = line.find_first_not_of(' ',0);
       auto end = std::min(line.size(),line.find_first_of(' ',first));
       auto width = end-first;
@@ -780,15 +637,15 @@ namespace part2 {
 
     // Loop over grid of unfolded faces
     int offset{0};
-    auto vert_cube_side_counts = grid.map().size() / cube_side;
+    auto vert_cube_side_counts = strings.size() / cube_side;
     for (int r=0;r<vert_cube_side_counts;++r) {
-      auto hor_cube_side_counts = grid.map()[0].size() / cube_side;
+      auto hor_cube_side_counts = strings[0].size() / cube_side;
       for (int c=0;c<hor_cube_side_counts;++c) {
         result.push_back(Face{}); result.back().top_left(Vector{r*cube_side,(c-offset)*cube_side,0});
         std::cout << "\n";
         for (int dr=0;dr<cube_side;++dr) {
           auto row = r*cube_side+dr;
-          auto const& line = grid.map()[row];
+          auto const& line = strings[row];
           auto first = c*cube_side;
           std::cout << "\n" << std::quoted(line) << " " << r << " " << c << " " << dr << " " << first << " " << offset << " " <<  result.back().top_left() << std::flush;
           if (first+cube_side <= line.size()) {
@@ -899,13 +756,24 @@ namespace part2 {
       }
       m_folds = to_folds();
     }
+    // A Face edge is defined by a face index 0..5 and a square edge index 0..3
+    struct FaceEdgeR {
+      Graph::Index face; // index into the face graph 
+      int edge; // Square edge 0..3
+    };
     using Fold = std::pair<Graph::Index,Graph::Index>;
+    // A fold is defined by a face edge and a list of all attached faces that is to be rotated
+    struct FoldR {
+      FaceEdgeR edge{};
+      std::vector<Graph::Index> faces{};
+    };
     using Folds = std::vector<Fold>;
     Faces cube() {
       Faces result{m_faces};
       fold(result);
       return result;
     }
+
     void fold(Faces& result) {
       for (int i=0;i<m_folds.size();++i) {
         auto [fixed,loose] = splitted_graph(m_graph,m_folds[i]);
@@ -1102,18 +970,26 @@ face_id:5
   Result solve_for(char const* pData) {
       Result result{};
       std::stringstream in{ pData };
-      auto [grid,path] = parse(in);
-      auto faces = to_faces(grid);
+      auto data_model = parse(in);
+      std::cout << data_model;
+      if (false) {
+        Traveler::test();        
+      }
+      else {
+        Traveler traveler{data_model.first,data_model.second};
+        auto pos = traveler.walk_as_if_cube();
+        result = 1000*(pos[ROW]+1) + 4*(pos[COL]+1);
+        std::cout << traveler;
+      }
       return result;
   }
 }
 
 int main(int argc, char *argv[])
 {
-  if (true) {
+  if (argc>1 and std::string{argv[1]}=="test") {
     std::cout << "\nTEST";
     dim3::Rotations::test();
-
     part2::test();
   }
   else {
