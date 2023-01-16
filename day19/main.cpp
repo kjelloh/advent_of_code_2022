@@ -259,126 +259,77 @@ Model parse(auto& in) {
     return result;
 }
 
-struct State {
-  int time{};
-  Resources robots{};
-  Resources resources{};
-  State& harvest_resources();
-  bool operator==(State const& other) const {
-    return false; // All states with different hash are unique
-  }
-};
-
-struct StateHash {
-  std::size_t operator()(State const& state) const {
-    std::size_t result = std::hash<int>{}(state.time);
-    result = (result << 1) ^ ResourcesHash{}(state.robots);
-    result = (result << 1) ^ ResourcesHash{}(state.resources);
-    return result;
-  }
-};
-
-using StateCache = std::unordered_map<State,Result,StateHash>;
-
-State& State::harvest_resources() {
-  for (int index=0;index<this->robots.m_amounts.size();++index) {
-    // std::cout << "\n" << this->robots.m_amounts[index] << " of robot " << to_name(index) << " collects " << this->robots.m_amounts[index] << " of " << to_name(index); 
-    this->resources.m_amounts[index] += this->robots.m_amounts[index]; // each robot creates one of its resource type
-    if (index==3 and this->robots.m_amounts[index]>0) {
-      std::cout << "\nGEODE++ " << this->robots.m_amounts << " -> " << this->resources.m_amounts;
-    }
-    // std::cout << ". You have " << this->resources.m_amounts[index] << " " << to_name(index);
-  }
-  return *this;
-}
-
+using State = std::array<int,9>; // time left,4 resource count 4 robot count
 std::ostream& operator<<(std::ostream& os,State const& state) {
-  os << " time:" << state.time;
-  os << " robots[";
-  for (int index = 0;index<state.robots.m_amounts.size();++index) {
-    if (index>0) os << ",";
-    os << state.robots.m_amounts[index];
-  }
-  os << "]";
-  os << " resources[";
-  for (int index = 0;index<state.resources.m_amounts.size();++index) {
-    if (index>0) os << ",";
-    os << state.resources.m_amounts[index];
-  }
-  os << "]";
+  for (auto x : state) os << " " << x; 
   return os;
 }
 
-class GeodeCrackingEnterprise {
+struct BFS {
 public:
-  GeodeCrackingEnterprise(BluePrint const& blueprint) : m_blueprint{blueprint} {}
-  Result most_cracked_geodes(int minutes_to_run) {
-    return dfs(State{.time=1,.robots={.m_amounts={1,0,0,0}},.resources={}},minutes_to_run);
-  }
+  BFS(BluePrint const& blueprint) : m_blueprint{blueprint} {}
+  Result best(int start_time) {
+    return bfs(start_time,1,0,0,0);
+  } 
 private:
   BluePrint m_blueprint;
-  StateCache m_known{};
-  int call_count{0};
-  std::vector<int> m_peak_robots = std::vector<int>(4,0);
-  Resources m_peak_robot_state{{0,0,0,0}};
-  Result dfs(State const& state,int end_time) {    
-    Result result{state.resources.m_amounts[3]}; // result = count of created geodes so far
-    if (state.time==end_time) return result; // return candidate
-    if (m_known.contains(state)) return m_known[state];
-    if (call_count++ % 10000==0) std::cout << "\n" << call_count << " " << m_known.size() << " " << state << " " <<  m_peak_robots << result;
-    if (true) {
-      for (int i=0;i<SYMBOL_TABLE.size();++i) m_peak_robots[i] = std::max(state.robots.m_amounts[i],m_peak_robots[i]);
-      if (state.resources.m_amounts[1]>=m_blueprint.cost[3].m_amounts[1] and state.resources.m_amounts[2]>=m_blueprint.cost[3].m_amounts[2]) {
-        std::cout << "\nCAN BUILD GEODE CRACKING ROBOT ---------------------------";
-      }
+  using Q = std::deque<State>;
+  Result bfs(int t,int r1, int r2, int r3, int r4) {
+    static int call_count{0};
+    Result best{};
+    Q q{};
+    q.push_back({t,0,0,0,0,r1,r2,r3,r4});
+    std::set<State> seen{};
+    while (!q.empty()) {
+      auto state = q.front(); // Breadth first search
+      auto [t,a1,a2,a3,a4,r1,r2,r3,r4] = state;
+      q.pop_front();
+      best = std::max(best,state[4]); // current geodes count best?
+      if (t==0) continue; // times up = exhausted state
+
+      if (call_count++ % 50000 == 0) std::cout << "\n" << state << " " << best;
+
+      auto max1 = m_blueprint.max_required(0);
+      auto max2 = m_blueprint.max_required(1);
+      auto max3 = m_blueprint.max_required(2);
+
+      // Reduce our search state
+      if (r1 > max1) r1 = max1; // Reduce ore robot count so they still produce ore to buy eny robot in one turn
+      if (r2 > max2) r2 = max2; // Reduce clay robot count so they still produce clay to buy eny robot in one turn
+      if (r3 > max3) r3 = max3; // Reduce obsidian robot count so they still produce obsidian to buy any robot in one turn
+
+      auto net1 = max1*t - r1*(t-1); // Amount of ore we need to buy any robot in time left
+      if (a1 > net1) a1 = net1; // Reduce ore so we have enough for our needs the next t minutes
+      auto net2 = max2*t - r2*(t-1); // Amount of clay we need to buy any robot in time left
+      if (a2 > net2) a2 = net2; // Reduce clay so we have enough for our needs the next t minutes
+      auto net3 = max3*t - r3*(t-1); // Amount of obsidian we need to buy any robot in time left
+      if (a2 > net2) a2 = net2; // Reduce obsidian so we have enough for our needs the next t minutes
+
+      State reduced_state{t,a1,a2,a3,a4,r1,r2,r3,r4};
+      if (seen.contains(reduced_state)) continue; // seen = exhausted state
+      seen.insert(reduced_state);
+
+      q.push_back({t-1,a1+r1,a2+r2,a3+r3,a4+r4,r1,r2,r3,r4}); // harvest but no new robots
+
+      auto c1 = m_blueprint.cost[0].m_amounts[0]; // cost of ore robot in ore
+      if (a1 >= c1) // enough ore?
+        q.push_back({t-1,a1+r1-c1,a2+r2,a3+r3,a4+r4,r1+1,r2,r3,r4}); // harvest, pay ore and create ore robot
+
+      auto c2 = m_blueprint.cost[1].m_amounts[0]; // cost clay robot in ore
+      if (a1 >= c2) // enough ore?
+        q.push_back({t-1,a1+r1-c2,a2+r2,a3+r3,a4+r4,r1,r2+1,r3,r4}); // harvest, pay ore and create clay robot
+
+      auto c31 = m_blueprint.cost[2].m_amounts[0]; // cost obsidian robot in ore
+      auto c32 = m_blueprint.cost[2].m_amounts[1]; // cost obsidian robot in clay
+      if ((a1 >= c31) and (a2 >= c32)) // enough ore and clay?
+        q.push_back({t-1,a1+r1-c31,a2+r2-c32,a3+r3,a4+r4,r1,r2,r3+1,r4}); // buy obsidian robot with ore and clay
+      
+      auto c41 = m_blueprint.cost[3].m_amounts[0]; // cost geode robot in ore
+      auto c42 = m_blueprint.cost[3].m_amounts[2]; // cost geode robot in obsidian
+      if ((a1 >= c41) and (a3 >= c42)) // Enough ore and obsidian? 
+        q.push_back({t-1,a1+r1-c41,a2+r2,a3+r3-c42,a4+r4,r1,r2+1,r3,r4+1}); // buy geode robot with ore and obsidian
     }
-    if (state.robots > m_peak_robot_state) {
-      m_peak_robot_state = state.robots;
-      std::cout << "\n" << call_count << " " << m_known.size() << " " << m_peak_robot_state << " " << result;
-    }
-    if (state.robots.m_amounts[3]>0) {
-      std::cout << "\nGEODES! " << call_count << " " << m_known.size() << " " << state;
-    }
-    bool built_a_robot{false};
-    for (int index=SYMBOL_TABLE.size()-1;index>=0;--index) {
-      auto cost = m_blueprint.cost[index];
-      if (state.resources >= cost) {
-        // can afford this robot -> harvest resources and add new robot to robot collection
-        // Max clay robots required is max cost of clay for any robot.
-        // The same for the other resources
-        // index is the robot candidate to produce more of its resources.
-        // if (/* robots(index) < max_required(index), OK, we benefit from building this robot */)
-        if ((index == 3) or (state.robots.m_amounts[index] < m_blueprint.max_required(index))) {
-          State adj_state{.time=state.time+1,.robots=state.robots,.resources=state.resources-cost};
-          if (index>2) {
-            std::cout << "\n-" << call_count << " " << m_known.size() << " " << adj_state;
-          }
-          adj_state.harvest_resources(); // execute existing robots in next state
-          if (index>2) {
-            std::cout << "\nh" << call_count << " " << m_known.size() << " " << adj_state;
-          }
-          ++adj_state.robots.m_amounts[index]; // create the new robot
-          if (index>2) {
-            std::cout << "\np" << call_count << " " << m_known.size() << " " << adj_state;
-          }
-          result = std::max(dfs(adj_state,end_time),result);
-          built_a_robot = true;
-        }
-        else {
-          if (index > 1) std::cout << "\nEnough of robot " << index << " " << state;
-        }
-      }
-    }
-    // if (!built_a_robot) {
-      // Assume it is only worth to harvest with existing robots if no new robot could be built? 
-    if (true) {
-      // explore next state with same robots but harvested resources
-      State adj_state{.time=state.time+1,.robots=state.robots,.resources=state.resources};
-      adj_state.harvest_resources(); // execute existing robots to harvest more resources
-      result = std::max(dfs(adj_state,end_time),result);
-    }
-    m_known[state] = result; // keep to short cut future dfs call with same state
-    return result;
+    return best;
   }
 };
 
@@ -393,8 +344,8 @@ namespace part1 {
         auto const& blueprint = data_model[index];
         std::cout << "\n\nTRY BLUEPRINT";
         std::cout << "\n\t" << blueprint;
-        GeodeCrackingEnterprise gce{data_model[index]};
-        best = gce.most_cracked_geodes(24);
+        BFS bfs{blueprint};
+        auto best = bfs.best(24);
         result += best * index;
         std::cout << "\nblueprint:" << index << " best:" << best << " result:" << result;
       }
@@ -413,33 +364,8 @@ namespace part2 {
 
 bool test(char const* pData) {
   bool result{true};
-  if (result) {
-    result = false;
-    std::stringstream in{ pData };
-    auto data_model = parse(in);
-    auto blueprint = data_model[0];
-    int index = 0;
-    GeodeCrackingEnterprise gce{data_model[index]};
-    auto best = gce.most_cracked_geodes(24);
-    std::cout << "\nblueprint:" << index << " best:" << best;
-  }
   return result;
 }
-
-/*
-
-== minute 24 ==
-1 of robot ore collects 1 of ore. You have 6 ore
-4 of robot clay collects 4 of clay. You have 41 clay
-2 of robot obsidian collects 2 of obsidian. You have 8 obsidian
-2 of robot geode collects 2 of geode. You have 9 geode%         
-
-== Minute 24 ==
-1 ore-collecting robot collects 1 ore; you now have 6 ore.
-4 clay-collecting robots collect 4 clay; you now have 41 clay.
-2 obsidian-collecting robots collect 2 obsidian; you now have 8 obsidian.
-2 geode-cracking robots crack 2 geodes; you now have 9 open geodes.
-*/
 
 int main(int argc, char *argv[])
 {
