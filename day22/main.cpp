@@ -132,28 +132,6 @@ namespace dim3 {
   const Vector Y_UNIT{0,1,0};
   const Vector Z_UNIT{0,0,1};
 
-  using Matrix = std::array<Vector,3>;
-  Vector operator*(Matrix const& m, Vector const& v){
-    Vector result{};
-    for (int r=0;r<m.size();r++) {
-      for (int c=0;c<m[0].size();c++) {
-        result[r] += m[r][c]*v[c];
-      }
-    }
-    return result;
-  }
-  Matrix operator*(Matrix const& m1, Matrix const& m2){
-    Matrix result{};
-    for (int r=0;r<m1.size();r++) {
-      for (int c=0;c<m2[0].size();c++) {
-        for (int k=0;k<m1[0].size();k++) {
-          result[r][c] += m1[r][k]*m2[k][c];
-        }
-      }
-    }
-    return result;
-  }
-
   // bool operator==(Vector const& v1,Vector const& v2) {
   //   return (v1.at(0)==v2.at(0) and v1.at(1)==v2.at(1) and v1.at(2)==v2.at(2));
   // }
@@ -192,10 +170,27 @@ namespace dim3 {
     return result;
   }
 
-  const Vector RIGHT{0,1,0};
-  const Vector DOWN{1,0,0};
-  const Vector LEFT{0,-1,0};
-  const Vector UP{-1,0,0};
+  using Matrix = std::array<Vector,3>;
+  Vector operator*(Matrix const& m, Vector const& v) {
+    Vector result{};
+    for (int r=0;r<m.size();r++) {
+      for (int c=0;c<m[0].size();c++) {
+        result[r] += m[r][c]*v[c];
+      }
+    }
+    return result;
+  }
+  Matrix operator*(Matrix const& m1, Matrix const& m2){
+    Matrix result{};
+    for (int r=0;r<m1.size();r++) {
+      for (int c=0;c<m2[0].size();c++) {
+        for (int k=0;k<m1[0].size();k++) {
+          result[r][c] += m1[r][k]*m2[k][c];
+        }
+      }
+    }
+    return result;
+  }
 
   // Helper class to create rotations that turn any 3d object into any of its 24 possible orientations in 3D space.
   // Observation: Imagine a cube and each normal vector of the faces of that cube.
@@ -350,25 +345,19 @@ rot:23[0,0,1] [1,0,0] [0,1,0]%
 
   const Rotations ROTATIONS{};
 
-  const Matrix NORM_Z_TURN_RIGHT{ROTATIONS[Rotations::Z270_Y0_X0]};
-  const Matrix NORM_Z_TURN_LEFT{ROTATIONS[Rotations::Z90_Y0_X0]};
-
   /*
     Define a Square in 3D space as follows.
-
-                                             sheet (z)
-                                              /
-                                             /
-                       3                   tlf ---> col (x)
-                0------------ 3             |
-               /             /              |
-            0 / Square   / 2             v
-             /             /               row (y)
-            1-------------2
+                                        
+                       3                   tlf ---> col (y)
+                0------------ 3            /|
+               /             /            / |
+            0 / Square   / 2             /  |
+             /             /            /   v
+            1-------------2            z    row (x)
                   1
 
       - each square has four corners 0...3 and four edges 0..3
-      - Each face square now gets a normal "up" in the -z direction (3D coordinate system right hand rule  x cross-product y = z)
+      - Each face square now gets a normal "up" in the z direction (3D coordinate system right hand rule  x cross-product y = z)
       - The square Corners are numbered anti clockwise (right hand rule)
       - The square edges are numbered anti clock-wise (right hand rule)
       - Each square position in 3D space is defined by the position of corner 0.
@@ -410,9 +399,53 @@ rot:23[0,0,1] [1,0,0] [0,1,0]%
 
   using Squares = std::vector<Square>;
 
-  // The hull of a cube with faces 0..5 oriented in such a way that 
-  // the sum of opposite face indices are 5;
-  struct CubeHull {
+  using EnhancedVector = std::array<int,4>;
+  using AffineTransformationMatrix = std::array<EnhancedVector,4>;
+
+  EnhancedVector operator*(AffineTransformationMatrix const& m,Vector const& v) {
+    EnhancedVector result{};
+    std::cerr << "\noperator*(AffineTransformationMatrix const& m,Vector const& v) NOT YET IMPLEMENTED";
+    return result;
+  }
+  
+  // See https://en.wikipedia.org/wiki/Transformation_matrix#Affine_transformations
+  AffineTransformationMatrix to_transformation_matrix(Matrix const& rotation,Vector const& translation) {
+    AffineTransformationMatrix result{};
+    std::cerr << "\nto_transformation_matrix NOT YET IMPLEMENTED";
+    return result;
+  }
+
+  AffineTransformationMatrix to_inverse(AffineTransformationMatrix const& am) {
+    AffineTransformationMatrix result{};
+    std::cerr << "\nto_inverse NOT YET IMPLEMENTED";
+    return result;
+  }
+
+  /*
+  Define the cube with one corner at top_left_front (tlf) and a diagonally opposite corner bottom_right_back (brb).
+
+                *-------------*
+               /|            /|               
+              / |    1      / |              
+             /  |      5   /  |             
+          tlf-------------* 3 |            tlf ---> col (y)
+            | 2 *---------|-- brb          /|
+            |  /   0      |  /            / |
+            | /      4    | /            /  v
+            |/            |/            /  row (x)
+            *-------------*            z
+
+    - Number the faces counter clockwise from tlf with face 0 in row,col plane.
+    - Number opposite faces so that the sum is 5
+    - Place the coordinate system at tlf with column as x, row as y and "sheet" as z
+  */
+
+
+  // The hull of a cube that is the result of folding cube faces arranged on a 2D surface
+  // The FoldedCube hull keeps a record of where the folds are, to enable transformation
+  // between the cube hull reference frame and the unfolded cube reference frame.
+  // The Hull reference frame is corner 0 of the first face in the faces array.
+  struct FoldedCubeHull {
     using Cubefaces = std::array<Square,6>;
     Cubefaces faces{};
   };
@@ -421,12 +454,42 @@ rot:23[0,0,1] [1,0,0] [0,1,0]%
   class CubeHullFolder {
   public:
     void push_back(Square const& square) {m_anonymous_faces.push_back(square); std::cout << "\n" << square;}
-    CubeHull hull() {
+    FoldedCubeHull hull() {
       // Folds anonymous faces into a cube
-      return CubeHull{};
+      return FoldedCubeHull{};
     }
   private:
     Squares m_anonymous_faces{};
+  };
+
+  struct FoldedCubeHullWalker {
+    std::reference_wrapper<FoldedCubeHull const> hull;
+    int face_index{0};
+    Vector face_pos{0,0,0};
+    Vector face_delta{0,1,0};
+    FoldedCubeHullWalker(FoldedCubeHull const& hull) : hull{hull} {}
+    FoldedCubeHullWalker& turn_left() {
+      face_delta = dim3::ROTATIONS[dim3::Rotations::Z90_Y0_X0]*face_delta;
+      return *this;
+    }
+    FoldedCubeHullWalker& turn_right() {
+      face_delta = dim3::ROTATIONS[dim3::Rotations::Z270_Y0_X0]*face_delta;
+      return *this;
+    }
+    FoldedCubeHullWalker& operator++() {
+      face_pos += face_delta;
+      return *this;
+    }
+    Vector frame_0_pos() const {
+      Vector result{};
+      std::cerr << "\nFoldedCubeHullWalker::frame_0_pos NOT YET IMPLEMENTED";
+      return result;
+    }
+    Vector frame_0_delta() const {
+      Vector result{};
+      std::cerr << "\nFoldedCubeHullWalker::frame_0_delta NOT YET IMPLEMENTED";
+      return result;
+    }
   };
 
 } // namespace dim3
@@ -477,6 +540,13 @@ Model parse(auto& in) {
         } break;
       }
     }
+    // make all rows a uniform max length
+    auto& strings = result.first;
+    auto max_width = std::accumulate(strings.begin(),strings.end(),std::size_t{0},[](auto acc,auto const& s) { return std::max(acc,s.size());});
+    std::for_each(strings.begin(),strings.end(),[&max_width](auto& s){
+      auto diff =  max_width - s.size();
+      s += std::string(diff,' ');
+    });
     return result;
 }
 
@@ -515,13 +585,6 @@ Faces to_faces(Strings& strings) {
   // We need to figure out face size and face positions on the flat (unfolded) surface.
   // The leftmost map non-space character in the input is on face 0 row 0 col 0.
   // Faces returned are in the order encountered scanning left to right, up to down of strings.
-
-  auto max_width = std::accumulate(strings.begin(),strings.end(),std::size_t{0},[](auto acc,auto const& s) { return std::max(acc,s.size());});
-  std::for_each(strings.begin(),strings.end(),[&max_width](auto& s){
-    auto diff =  max_width - (s.size() - 1);
-    s += std::string(diff,' ');
-  });
-
   std::set<int> widths{};
   for (int grid_row=0;grid_row<strings.size();++grid_row) {      
     auto const& line = strings[grid_row];
@@ -579,13 +642,83 @@ Faces to_faces(Strings& strings) {
   return result;
 }
 
+struct StringsWalker {
+  std::reference_wrapper<Strings const> strings;
+  Vector top_left{0,0};
+  Vector bottom_right{-1,-1}; // empty  
+  Vector face_pos{0,0};
+  Vector face_delta{0,1};
+  StringsWalker(Strings const& rows) : strings{rows} {
+    bottom_right[ROW] = strings.get().size()-1;
+    if (bottom_right[COL] < 0) bottom_right[COL] = strings.get()[0].size()-1;
+    auto first_col{0};
+    for (;first_col<bottom_right[COL];++first_col) {
+      std::cout << "\n[row:0,col:" << first_col << "]=" << strings.get()[0][first_col];
+      if (strings.get()[0][first_col]!=' ') break;
+    }
+    face_pos = Vector{0,first_col};    
+  }
+  StringsWalker& turn_left() {
+    face_delta = dim2::NORM_Z_TURN_LEFT*face_delta;
+    return *this;
+  }
+  StringsWalker& turn_right() {
+    face_delta = dim2::NORM_Z_TURN_RIGHT*face_delta;
+    return *this;
+  }
+  bool in_frame(Vector const& pos) const {
+    return (pos[ROW]>=top_left[ROW] and pos[ROW]<=bottom_right[ROW] and pos[COL]>=top_left[COL] and pos[COL]<=bottom_right[COL]);
+  }
+  char at(Vector const& pos) const {
+    if (in_frame(pos)) return strings.get()[pos[ROW]][pos[COL]];
+    else return ' ';
+  }
+/*
+"        >>^#    "
+"        .#..    "
+"        #...    "
+"        <<<<    "
+"...#.....^.#    "
+"........#^..    "
+"..#....#.^..    "
+".........^#.    "
+"        >^<#.>>>"
+"        >>^..#>>"
+"        .#^....."
+"        ..^...#."
+*/  
+
+  StringsWalker& operator++() {
+    Vector next{face_pos+face_delta}; // optimistic
+    if (at(next)==' ') {
+      // wrap around
+      next -=face_delta; // back off
+      while (at(next)!=' ') next -=face_delta; // back track on map
+      next += face_delta; // back off
+      // std::cout << "\n\tat(" << result << "):" << at(result);
+    }
+    if (at(next)=='#') next = face_pos;
+    // std::cout << "\n\tat(" << result << "):" << at(result);
+    face_pos = next;
+    return *this;
+  }
+  Vector frame_0_pos() const {
+    return face_pos;
+  }
+  Vector frame_0_delta() const {
+    return face_delta;
+  }
+};
+
 class Traveler {
 public:
-  Traveler(Strings const& strings,Path const path) : m_strings{strings} {}
+  Traveler(Strings const& strings,Path const path) : m_strings{strings},m_path{path},rendered{strings} {}
   Vector walk_as_if_flat() {
     // Walk the flat map using the rules of wrap around on the flat grid
     // return the position on the flat strings map
-    return {};
+    StringsWalker walker{m_strings};
+    walk_the_path(walker);
+    return walker.frame_0_pos();
   }
   Vector walk_as_if_cube() {
     // Fold the flat map defined by strings into a cube
@@ -597,15 +730,61 @@ public:
       dim3::Vector pos{face.top_left[0],face.top_left[1],0};
       folder.push_back(dim3::to_xy_square(pos,face.side_size()));
     }
-    return {};
+    auto hull = folder.hull();
+    dim3::FoldedCubeHullWalker walker{hull};
+    walk_the_path(walker);
+    auto frame_0_pos = walker.frame_0_pos();
+    auto row = frame_0_pos[ROW];
+    auto col = frame_0_pos[COL];
+    dim2::Vector strings_pos{row,col};
+    return strings_pos;
   }
   static bool test() {return false;}
 private:
   friend std::ostream& operator<<(std::ostream& os,Traveler const& traveler);
   Strings m_strings{};
-};
+  Path m_path;
+  Strings rendered{};
+  template <class Walker>
+  char char_of_direction(Walker const& walker) {
+    auto delta = walker.frame_0_delta();
+    if (delta[ROW]==0) return (delta[COL]>0)?'>':'<';
+    else return (delta[ROW]>0)?'v':'^';    
+  }
+  template <class Walker>
+  void take_step(Walker& walker) {
+    auto next{walker}; ++next;
+    auto frame_0_pos = walker.frame_0_pos();
+    auto row = frame_0_pos[ROW];
+    auto col = frame_0_pos[COL];
+    dim2::Vector strings_pos{row,col};
+    if (m_strings[row][col]!='#') walker=next;
+    rendered[row][col] = char_of_direction(walker);
+  }
+  template <class Walker>
+  void turn(Walker& walker,char dir) {
+    switch (dir) {
+      case 'R': walker.turn_right();break;
+      case 'L': walker.turn_left(); break;
+      default: break;
+    }    
+    auto frame_0_pos = walker.frame_0_pos();
+    auto row = frame_0_pos[ROW];
+    auto col = frame_0_pos[COL];
+    rendered[row][col] = char_of_direction(walker);
+  }
+  template <class Walker>
+  void walk_the_path(Walker& walker) {
+    for (auto const& step : m_path) {
+      for (int i=0;i<step.first;++i) take_step(walker);
+      turn(walker,step.second);
+    }
+  }
+};  
 
 std::ostream& operator<<(std::ostream& os,Traveler const& traveler) {
+  os << "traveled:" << traveler.m_path;
+  os << "\n" << traveler.rendered;
   return os;
 }
 
@@ -629,329 +808,6 @@ namespace part1 {
 }
 
 namespace part2 {
-
-  /*
-  Define the cube with one corner at top_left_front (tlf) and a diagonally opposite corner bottom_right_back (brb).
-
-                *-------------*
-               /|            /|               sheet (z)
-              / |    1      / |              /
-             /  |      5   /  |             /
-          tlf-------------* 3 |            tlf ---> col (x)
-            | 2 *---------|-- brb           |
-            |  /   0      |  /              |
-            | /      4    | /               v
-            |/            |/               row (y)
-            *-------------*
-
-    - Number the faces counter clockwise from tlf with face 0 in row,col plane.
-    - Number opposite faces so that the sum is 5
-    - Place the coordinate system at tlf with column as x, row as y and sheet as z
-
-    NOTE: In the puzzle example the numbering used is the order of faces found, NOT as above.
-
-    - going right will travel faces 0,3,5,2,0...
-    - going left will travel faces in the opposite order of going right
-    - going up will travel faces 0,1,5,4,0...
-    - going down will faces in the opposite order of going up 1,5,6,2,1,...
-
-    - Define Horizontal Orbits = faces 0,3,5,2,0...
-    - Define Vertical Orbits  = 0,1,5,4,0...
-    - define rotation_direction = clockwise or counter clockwise.
-
-  */
-
-  /*
-    Define a Face in 3D space as follows.
-
-                                             sheet (z)
-                                              /
-                                             /
-                       3                   tlf ---> col (x)
-                0------------ 3             |
-               /             /              |
-            0 /   face n    / 2             v
-             /             /               row (y)
-            1-------------2
-                  1
-
-      - Each face maps to a Square 
-      - each face square has four corners 0...3 and four edges 0..3
-      - each face is originally (unfolded) placed with rows in the 3D y direction and columns in the 3D x direction
-      - Each face square now gets a normal "up" in the -z direction (3D coordinate system right hand rule  x cross-product y = z)
-      - The face square Corners are numbered anti clockwise (right hand rule)
-      - The face square edges are numbered anti clock-wise (right hand rule)
-      - Each face square position in 3D space is defined by the position of corner 0.
-  */
-
-/*
-  class Face {
-  public:
-    using Row = std::string;
-    using Rows = std::vector<std::string>;
-    Face(Vector const&) = delete;
-    explicit Face(Vector top_left = {}, Rows const& rows = {}) : m_top_left{top_left}, m_rows{rows}, m_row_v{X_UNIT},m_col_v{Y_UNIT} {}
-    Face& push_back(Row const& row) {m_rows.push_back(row); return *this;}
-    auto begin() const {return m_rows.begin();}
-    auto end() const {return m_rows.end();}
-    int side() const {return m_rows[0].size();}
-    bool operator<(Face const& other) const {return m_top_left < other.m_top_left;}
-    Vector const& top_left() const {return m_top_left;}
-    Rows const& rows() const {return m_rows;}
-    Vector const& row_v() const {return m_row_v;}
-    Vector const& col_v() const {return m_col_v;}
-    void top_left(Vector const& pos) {m_top_left=pos;}
-    void row_v(Vector const& v) {m_row_v=v;}
-    void col_v(Vector const& v) {m_col_v=v;}
-  private:
-    friend std::ostream& operator<<(std::ostream& os,Face const& face);
-    Rows m_rows; // face markings from top left  as rows in the direction of column vector and rows in the direction of row vector
-    
-    Vector m_top_left; // face top left as defined when unfolded
-    Vector m_row_v,m_col_v; // defines the face plane in 3D space
-  };
-  using ::operator<<; // bring in outer namespace stream operator
-
-  std::ostream& operator<<(std::ostream& os,Face const& face) {
-    os << " top " << face.m_top_left << " col_v" << face.m_col_v << " row_v" << face.m_row_v;
-    return os;
-  }
-  
-  const std::map<int,int> H_ORBIT{{0,3},{3,5},{5,2},{2,0}}; // Horizontal Orbit
-  const std::map<int,int> V_ORBIT{{0,1},{1,5},{5,4},{4,0}}; // Vertical Orbit
-  
-  using Faces = std::vector<Face>;
-
-  class Graph {
-  public:
-    using Index = int;
-    using Bag = std::set<Index>;
-    auto size() const {return m_adj.size();}
-    auto const& adj(Index index) const {return m_adj.at(index);}
-    Graph& insert(Index index1,Index index2) {
-      while (index1>=m_adj.size() or index2>=m_adj.size()) m_adj.push_back({});
-      m_adj[index1].insert(index2);
-      m_adj[index2].insert(index1);
-      return *this;
-    }
-    void disconnect(Index v) {
-      assert(v<m_adj.size());
-      m_adj[v].clear(); // unconnected vertex
-      for (auto& bag : m_adj) {
-        if (bag.contains(v)) bag.erase(v);
-      }
-    }
-    std::string to_string() const {
-      std::ostringstream os{};
-      for (int v=0;v<m_adj.size();++v) {
-        if (v>0) os << "\n";
-        os << "v:" << v << " : ";
-        for (auto iter=m_adj[v].begin();iter!=m_adj[v].end();++iter) {
-          if (iter!=m_adj[v].begin()) os << ',';
-          os << "w:" << *iter;
-        }
-      }
-      return os.str();
-    }
-  private:
-    std::vector<Bag> m_adj{};
-  };
-  
-  class Folder {
-  public:
-    struct FoldEdge {
-      Vector pos{};
-      Vector axis{}; 
-    };
-    using FoldEdges = std::vector<FoldEdge>;
-    Folder(Faces const& faces) : m_faces{faces} {
-      std::cout << "\n" << m_graph.to_string();
-      for (int i=0;i<faces.size();++i) {
-        auto& face = m_faces[i];
-        for (int j=i+1;j<faces.size();++j) {
-          std::cout << "\ni:" << i << " j:" << j;
-          auto& other_face = m_faces[j];
-          if (face.top_left().at(0)==other_face.top_left().at(0)) {
-            // same "row" of faces
-            if (other_face.top_left().at(1) + face.side() == face.top_left().at(1)) {
-              // other is left neighbour
-              std::cout << "\nface:" << j << " is left of face:" << i;
-              m_graph.insert(i,j);              
-            }
-            else if (face.top_left().at(1) + face.side() == other_face.top_left().at(1)) {
-              // other face is right neighbour
-              std::cout << "\nface:" << j << " is right of face:" << i;
-              m_graph.insert(i,j);
-            }
-          }
-          else if (face.top_left().at(1)==other_face.top_left().at(1)) {
-            // same "col" of faces
-            if (other_face.top_left().at(0) + face.side() == face.top_left().at(0)) {
-              // other is neighbour above
-              std::cout << "\nface:" << j << " is above of face:" << i;
-              m_graph.insert(i,j);
-            }
-            else if (face.top_left().at(0) + face.side() == other_face.top_left().at(0)) {
-              // other face is neighbour below
-              std::cout << "\nface:" << j << " is below face:" << i;
-              m_graph.insert(i,j);
-            }
-          }
-        }
-      }
-      m_folds = to_folds();
-    }
-    // A Face edge is defined by a face index 0..5 and a square edge index 0..3
-    struct FaceEdgeR {
-      Graph::Index face; // index into the face graph 
-      int edge; // Square edge 0..3
-    };
-    using Fold = std::pair<Graph::Index,Graph::Index>;
-    // A fold is defined by a face edge and a list of all attached faces that is to be rotated
-    struct FoldR {
-      FaceEdgeR edge{};
-      std::vector<Graph::Index> faces{};
-    };
-    using Folds = std::vector<Fold>;
-    Faces cube() {
-      Faces result{m_faces};
-      fold(result);
-      return result;
-    }
-
-    void fold(Faces& result) {
-      for (int i=0;i<m_folds.size();++i) {
-        auto [fixed,loose] = splitted_graph(m_graph,m_folds[i]);
-        rotate(result,i,loose);
-      }
-    }
-    void rotate(Faces& result,int fold_ix,Graph const& loose) {
-      auto const& fold = m_folds[fold_ix];
-      std::cout << "\nrotate fix:" << fold.first << " w:" << fold.second;
-      Graph::Bag attached{};
-      std::stack<Graph::Index> q{};
-      std::map<Graph::Index,bool> marked{};
-      q.push(fold.second);
-      while (q.size()>0) {
-        auto v = q.top();
-        q.pop();
-        std::cout << "\nq " << q.size() << " v:" << v << " marked:" << marked[v];
-        if (marked[v]) continue;
-        marked[v] = true; // used as parent
-        if (v!=fold.second) attached.insert(v);
-        for (auto w : loose.adj(v)) {
-          if (!marked[w]) q.push(w);          
-        }
-      }
-      if (true) {
-        // LOG
-        std::cout << " attached:";
-        for (auto a : attached) std::cout << " " << a;
-      }
-      auto edge = m_fold_edges[fold_ix];
-      std::cout << "\naxis:" << edge.axis << " X:" << X_UNIT << " Y:" << Y_UNIT << " Z:" << Z_UNIT;
-      std::cout << "\nX?" << inner_product(edge.axis,X_UNIT);
-      std::cout << "\nY?" << inner_product(edge.axis,Y_UNIT);
-      std::cout << "\nZ?" << inner_product(edge.axis,Z_UNIT);
-      char axis_id = std::abs(inner_product(edge.axis,X_UNIT)) + 3*std::abs(inner_product(edge.axis,Y_UNIT)) + 5*std::abs(inner_product(edge.axis,Z_UNIT));
-      std::cout << "\naxis_id:" << static_cast<int>(axis_id);
-      auto offset = m_faces[fold.first].top_left();
-      switch (axis_id) {
-        case 1: rotate(result,fold_ix,attached,offset,ROTATIONS[Rotations::X90_Y0_Z0]); break;
-        case -1: break;
-        case 3: break;
-        case -3: break;
-        case 5: break;
-        case -5: break;
-        default: std::cout << "Wrong axis_id. should be +/-1 (X), +/-3 (Y) or +/-5 (Z)" << std::flush; assert(false);
-      }
-
-      for (auto w : attached) {
-      }      
-    }
-    void rotate(Faces& result,int fold_ix,Graph::Bag const& attached,Vector const& offset,Matrix const& rot) {
-      for (auto a : attached) {
-         auto& face = result[a];
-         std::cout << "\nfold_ix:" << fold_ix << " fix:" << m_folds[fold_ix].first << " w:" << m_folds[fold_ix].second << " face:" << a << ":" << face << " offset:" << offset << " edge axis:" << m_fold_edges[fold_ix].axis << " pos:" << m_fold_edges[fold_ix].pos;
-         face.col_v(rot*face.col_v());
-         face.row_v(rot*face.row_v());
-         face.top_left(rot*(face.top_left()-offset));
-         m_fold_edges[fold_ix].axis = rot*m_fold_edges[fold_ix].axis;
-         m_fold_edges[fold_ix].pos = rot*(m_fold_edges[fold_ix].pos-offset);
-         std::cout << "\nfold_ix:" << fold_ix << " fix:" << m_folds[fold_ix].first << " w:" << m_folds[fold_ix].second << " face:" << a << ":" << face << " offset:" << offset << " edge axis:" << m_fold_edges[fold_ix].axis << " pos:" << m_fold_edges[fold_ix].pos;
-      }
-    }
-    std::pair<Graph,Graph> splitted_graph(Graph const& graph,Fold const& fold) {
-      auto first = graph;
-      auto second = graph;
-      first.disconnect(fold.second);
-      second.disconnect(fold.first);
-      return {first,second};
-    }
-    Folds to_folds() {
-      Folds result{};
-      std::deque<Graph::Index> q{};
-      std::set<Graph::Index> marked{};
-      q.push_back(0);
-      marked.insert(0);
-      while (q.size()>0) {
-        auto v = q.front(); q.pop_front();
-        for (auto w : m_graph.adj(v)) {
-          std::cout << "\ncandidates fix:" << v << " and moving:" << w;
-          if (marked.contains(w)) continue;
-          std::cout << " FOLD " << v << " " << w;
-          result.push_back({v,w});
-          m_fold_edges.push_back(to_fold_edge(v,w));
-          marked.insert(w);
-          q.push_back(w);          
-        }
-      }
-      return result;
-    }
-    FoldEdge to_fold_edge(Graph::Index fixed,Graph::Index loose) {
-      FoldEdge result{};
-      auto const& fixed_face = m_faces[fixed];
-      auto const& loose_face = m_faces[loose]; 
-      // Use the top left of the face "facing" the other to the left or above (top)
-      result.pos = std::max(fixed_face.top_left(),loose_face.top_left());
-      if (fixed_face.top_left().at(0) == loose_face.top_left().at(0)) {
-        // same row
-        if (fixed_face.top_left().at(1) < loose_face.top_left().at(1)) result.axis = {-1,0,0};
-        else result.axis = {1,0,0};
-      }
-      else {
-        // same column
-        assert(fixed_face.top_left().at(1) == loose_face.top_left().at(1));
-        if (fixed_face.top_left().at(0) < loose_face.top_left().at(0)) result.axis = {0,1,0};
-        else result.axis = {0,-1,0};
-      }
-      std::cout << "\nto_fold_edge fix:" << fixed << " w:" << loose << " pos:" << result.pos << " axis:" << result.axis; 
-      return result;
-    }
-    std::string to_string() const {
-      std::ostringstream os{};
-      for (int v=0;v<m_graph.size();++v) {
-        if (v>0) os << "\n";
-        os << v << ":" << face(v).top_left() << " : ";
-        for (auto iter=m_graph.adj(v).begin();iter!=m_graph.adj(v).end();++iter) {
-          if (iter!=m_graph.adj(v).begin()) os << ',';
-          os << *iter << ":" << face(*iter).top_left();
-        }
-      }
-      return os.str();
-    }
-  private:
-    Graph m_graph{};
-    Faces m_faces{};
-    Folds m_folds{};
-    FoldEdges m_fold_edges{};
-    Face const& face(Graph::Index v) const {
-      assert(v<m_faces.size());
-      return m_faces[v];
-    }
-  };
-
-*/
 
   Result solve_for(char const* pData) {
       Result result{};
@@ -979,8 +835,8 @@ int main(int argc, char *argv[])
   }
   else {
     Answers answers{};
-    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    answers.push_back({"Part 1     ",part1::solve_for(pData)});
     answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
     // answers.push_back({"Part 2     ",part2::solve_for(pData)});
     for (auto const& answer : answers) {
