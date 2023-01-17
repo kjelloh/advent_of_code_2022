@@ -21,8 +21,8 @@
 extern char const* pTest;
 extern char const* pData;
 
-using Integer = long long int;
-using Result = long long int;
+using Integer = int64_t;
+using Result = int64_t;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 using Values = std::vector<int>;
@@ -42,8 +42,8 @@ public:
     using reference	= Node;
     using iterator_category = std::bidirectional_iterator_tag;
     Node const* p;
-    int index;
-    int cycle;
+    Integer index;
+    Integer cycle;
     bool is_begin{false};
     Node const* ptr() {return p;}
     int operator*() const {return p->value;}
@@ -61,7 +61,7 @@ public:
       is_begin=false; // no longer begin
       return *this;
     }
-    ConstIterator(Node const* p,int index,int cycle,bool is_begin = false) : p{p},index{index},cycle{cycle},is_begin{is_begin} {}
+    ConstIterator(Node const* p,Integer index,Integer cycle,bool is_begin = false) : p{p},index{index},cycle{cycle},is_begin{is_begin} {}
     ConstIterator& operator--() {
       p=p->prev;
       --index;
@@ -96,7 +96,7 @@ public:
     ++m_size;
     return p;
   }
-  int size() const {return m_size;}
+  Integer size() const {return m_size;}
   ConstIterator begin() const {
     return ConstIterator{m_last->next,0,m_size,true};
   }
@@ -108,7 +108,7 @@ public:
     while (*iter!=val) ++iter;
     return iter;
   }
-  int operator[](int pos) const {
+  Integer operator[](int pos) const {
     // return value at pos relative the member value 0
     if (true) {
       // Test
@@ -127,17 +127,14 @@ public:
           std::cout << "\n\n" << std::flush;        
       }
     }
-    std::cout << " [ " << std::flush;
     auto p = m_last;
     while (p->value!=0) p=p->next;
-    std::cout << " [[ " << std::flush;
     for (int n=0;n<pos;++n) p=p->next;
-    std::cout << " [[[ " << std::flush;
     return p->value;
   }
 
   void move(Node* p,Integer distance) {
-    std::cout << "\nmove(val:" << p->value << ",distance:" << distance;
+    // std::cout << "\nmove(val:" << p->value << ",distance:" << distance;
 
     //    Realization: The move we simulate is an unlink, move,link-in at the new position.
     //    (or move left = swap pos with node to the left and move right = swap position with node to the right)
@@ -145,6 +142,9 @@ public:
     //    and moving right we link in between p->next and p->next->next.
     //    This means that when we do the move the wrap around happens each (size-1) times!
     //    Or put another way, with n items in the list, we get back to where we where after n-1 moves.
+    //    So a move of 2 is the same as the move of 0. In fact a move of 0,2,4,6,8 are all the same as move 0
+    
+    //    This corresponds to modulo (size-1). That is x % 2 = 0,1,0,1,0,1,...
     //
     //    Ex: Say there are 3 items in the list, item a,b,c.
     //        If we move b left
@@ -161,13 +161,45 @@ public:
     //    move 2:            |                   |
     //                       ---------------------
 
-    distance = distance % (this->size() - 1); // cut down to the sufficient move
+    // But we simulate this by first removing the item to move (say b).
+    // Lets see how teh insert_before pointer traverses for left move (pointed to element marked '*')
+    //
+    //                       --- a --- b --- c ---
+    //    move 0:            |                   |
+    //                       ---------------------
+    //                                *
+    //                            |---b-----|
+    //                       --- a -------- c ---
+    //    move 0:            |                   |
+    //                       ---------------------
+    // 
+    //                            |---b-----|
+    //                       --- a --------- c ---
+    //    move 1:            |   *               |
+    //                       ---------------------
+    // 
+    //                            |---b-----|
+    //                       --- a --------- c ---  a->b->c again is inserted before '*'
+    //    move 2:            |               *   |
+    //                       ---------------------
+    //
+    //                       --- a --- b --- c ---
+    //    stop 2:            |                   |
+    //                       ---------------------
+
+    auto full_distance = distance;
+    distance = distance %  (this->size()-1);  // cut down to the sufficient move
                                               // C++ Important: ensure the divisor (in this case this->size()-1) is the SAME TYPE as the dividend.
                                               // This has bitten me several times!
                                               // C++ will treat dividend and divisor "as is" meaning a twos-complement negative number dividend
                                               // with a unsigned divisor gets thrown off by 2.
                                               // My size() function returns a signed integer so we are fine here.
+
+    if (distance<0) assert(full_distance<0);
+    if (distance>0) assert(full_distance>0);
+
     if (distance!=0) {
+
       auto insert_before = p;
 
       // 1. unlink p (IMPORTANT! Otherwise the wrap around will get target item WRONG)
@@ -247,7 +279,7 @@ public:
   }
 private:
   Node* m_last{nullptr};
-  int m_size{0};
+  Integer m_size{0};
   friend bool test();
 };
 
@@ -286,7 +318,7 @@ public:
     for (int n=0;n<mix_count;++n) mix();
   }
   auto size() const {return m_nodes.size();};
-  int operator[](int pos) const {std::cout << " " << pos << std::flush;return m_mixed[pos];}
+  auto operator[](int pos) const {std::cout << " " << pos << std::flush;return m_mixed[pos];}
   static void test() {
     Values values{1,2,3,0};
     Mixed mixed{values};
@@ -397,8 +429,9 @@ namespace korektur {
                   exit(0);
                 }
               }
-              auto delta = nodes[i]->value;
+              auto delta = nodes[i]->value*811589153;
               to_mix.move(nodes[i],delta);
+              std::cout << "\ni:" << i << " " << iterations;
 
               // Korektur part
               auto it = numbers.begin();
@@ -421,8 +454,35 @@ namespace korektur {
       for(int i = 1; i <= 3000; ++i) {
           it++;
           if (it == numbers.end()) it = numbers.begin();
-          if (i % 1000 == 0) ans += it->second * multiplier;
+          if (i % 1000 == 0) {
+            ans += it->second * multiplier;
+            std::cout << "\nkorektur " << i << ":" << it->second << " " << it->second * multiplier;
+          }
       }
+      // auto r1000 = to_mix[1000]*811589153; std::cout << "\nr1000:" << to_mix[1000] << " " << r1000;
+      // auto r2000 = to_mix[2000]*811589153; std::cout << "\nr2000:" << to_mix[2000] << " " << r2000;
+      // auto r3000 = to_mix[3000]*811589153; std::cout << "\nr3000:" << to_mix[3000] << " " << r3000;
+      // auto result =  r1000 + r2000 + r3000;
+      Integer r1000 = to_mix[1000]*811589153; std::cout << "\nr1000:" << to_mix[1000] << " " << r1000;
+      Integer r2000 = to_mix[2000]*811589153; std::cout << "\nr2000:" << to_mix[2000] << " " << r2000;
+      Integer r3000 = to_mix[3000]*811589153; std::cout << "\nr3000:" << to_mix[3000] << " " << r3000;
+      Integer result =  r1000 + r2000 + r3000;
+
+      std::cout << "\n   ans:" << ans;
+      std::cout << "\nresult:" << result;
+/*
+
+korektur 1000:9560 7758792302680
+korektur 2000:3849 3123806649897
+korektur 3000:-1257 -1020167565321
+
+r1000:9560 2081366104
+r2000:3849 1365425705
+r3000:-1257 2034651127
+   ans:9862431387256
+result:1186475640
+
+*/       
       return ans;
   }
 
@@ -471,11 +531,28 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      // The encryption key 811 589 153 is 30 bits.
+      // The values to mix are originally +/- 10000 is 14 bits
+      // We need 44 bits and a sign bit = 45 bits.
+      // An int64_t will suffice
+      if (false) {
+        std::list<std::pair<int, int64_t>> nums{};
+        std::vector<CircularList::Node*> nodes{};
+        CircularList to_mix{};
+
+        for (int num : data_model) {
+          nums.push_back({nums.size(),num});          
+          nodes.push_back(to_mix.push_back(num));
+        }
+        result = korektur::solve_in_concert(nodes,to_mix,nums,10,811589153);
+      }
+      else {
         Mixed mixed{data_model,811589153,10};
         auto r1000 = mixed[1000]; std::cout << "\nr1000:" << r1000;
         auto r2000 = mixed[2000]; std::cout << "\nr2000:" << r2000;
         auto r3000 = mixed[3000]; std::cout << "\nr3000:" << r3000;
         result =  r1000 + r2000 + r3000;
+      }
       return result;
   }
 }
@@ -708,8 +785,8 @@ int main(int argc, char *argv[])
     Answers answers{};
     // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
     // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-    answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-    // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    answers.push_back({"Part 2     ",part2::solve_for(pData)}); // 1186475640 is too low
     for (auto const& answer : answers) {
       std::cout << "\nanswer[" << answer.first << "] " << answer.second;
     }
