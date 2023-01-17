@@ -407,6 +407,16 @@ bool test() {
   return result;
 }
 
+/*
+
+Funny thing, the test for part 2 takes MUCH longer time than the actual puzzle data ;)
+
+duration:3354ms answer[Part 1 Test] 33
+duration:13617ms answer[Part 1     ] 1650
+duration:1105 582ms answer[Part 2 Test] 3472
+duration:53859ms answer[Part 2     ] 5824
+*/
+
 int main(int argc, char *argv[])
 {
   if (argc>1 and std::string{argv[1]}=="test") {
@@ -419,12 +429,12 @@ int main(int argc, char *argv[])
     std::chrono::time_point<std::chrono::system_clock> start_time{};
     std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
     exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-    // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-    // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-    // exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    exec_times.push_back(std::chrono::system_clock::now());
     answers.push_back({"Part 2     ",part2::solve_for(pData)});
     exec_times.push_back(std::chrono::system_clock::now());
     for (int i=0;i<answers.size();++i) {
