@@ -126,9 +126,12 @@ std::ostream& operator<<(std::ostream& os,Resources::Amounts const& amounts) {
 }
 
 std::ostream& operator<<(std::ostream& os,Resources const& r) {
+  int item_count{0};
   for (int index=0;index<r.m_amounts.size();++index) {
-    if (index>0) os << " and ";
-    os << " name:" << to_name(index) << " amount:" << r.m_amounts[index];
+    if (r.m_amounts[index]>0) {
+      if (item_count++>0) os << " and ";
+      os << r.m_amounts[index] << " " << to_name(index);
+    }
   }
   return os;
 }
@@ -286,10 +289,10 @@ private:
       auto state = q.front(); // Breadth first search
       auto [t,a1,a2,a3,a4,r1,r2,r3,r4] = state;
       q.pop_front();
-      best = std::max(best,state[4]); // current geodes count best?
+      best = std::max(best,a4); // current geodes count best?
       if (t==0) continue; // times up = exhausted state
 
-      if (call_count++ % 50000 == 0) std::cout << "\n" << state << " " << best;
+      if (call_count++ % 100000 == 0) std::cout << "\n" << state << " " << best;
 
       auto max1 = m_blueprint.max_required(0);
       auto max2 = m_blueprint.max_required(1);
@@ -360,20 +363,55 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      std::cout << "\n" << data_model;
+      std::vector<Result> best{};
+      for (int index=0;index<std::min(static_cast<std::size_t>(3),data_model.size());++index) {
+        auto const& blueprint = data_model[index];
+        std::cout << "\n\nTRY BLUEPRINT";
+        std::cout << "\n\t" << blueprint;
+        BFS bfs{blueprint};
+        best.push_back(bfs.best(32));
+        std::cout << "\nblueprint:" << index << " best:" << best << " result:" << result;
+      }
+      result = std::accumulate(best.begin(),best.end(),Result{1},std::multiplies{});
       return result;
   }
 }
 
-bool test(char const* pData) {
-  bool result{true};
+bool test() {
+  bool result{false};
+  std::stringstream in{ pData };
+  auto data_model = parse(in);
+  bool loop_again{true};
+  int robot_ix{3};
+  auto& blueprint = data_model[0];
+  while (loop_again) {
+    auto const& cost = blueprint.cost[robot_ix];
+    std::cout << "\nTo build " << robot_ix << " costs:" << cost;
+    std::map<int,int> to_build{};
+    for (int n=0;n<4;++n) {
+      auto cost_n = cost.m_amounts[n];
+      if (cost_n>0) {
+        to_build[n] = cost_n;
+      }
+    }
+    if (to_build.size()>0) {
+      std::cout << "\nOptimal is to build ";
+      for (auto [ix,count] : to_build) {
+        std::cout << count << " robot " << ix << " ";
+      }
+    }    
+    --robot_ix;
+    loop_again = robot_ix>=0;
+  }
   return result;
 }
 
 int main(int argc, char *argv[])
 {
-  if (argc>1 and std::string_view{argv[1]}=="test") {
-    std::cout << "\nTEST";
-    test(pTest);
+  if (argc>1 and std::string{argv[1]}=="test") {
+    if (test()) std::cout << "\nTest: You have arrived at your destination :)";
+    else std::cout << "\nTest: Not there yet...";
   }
   else {
     Answers answers{};
@@ -383,11 +421,11 @@ int main(int argc, char *argv[])
     exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+    answers.push_back({"Part 2     ",part2::solve_for(pData)});
     exec_times.push_back(std::chrono::system_clock::now());
     for (int i=0;i<answers.size();++i) {
       std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms"; 
