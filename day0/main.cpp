@@ -16,6 +16,7 @@
 #include <algorithm> // E.g., std::find, std::all_of,...
 #include <numeric> // E.g., std::accumulate
 #include <limits> // E.g., std::numeric_limits
+#include <functional> // E.g., std::reference_wrapper 
 
 extern char const* pTest;
 extern char const* pData;
