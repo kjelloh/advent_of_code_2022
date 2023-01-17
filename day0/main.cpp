@@ -37,6 +37,7 @@ Model parse(auto& in) {
 
 namespace part1 {
   Result solve_for(char const* pData) {
+      std::cout << "\n\nPART 1";
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
@@ -46,6 +47,7 @@ namespace part1 {
 
 namespace part2 {
   Result solve_for(char const* pData) {
+      std::cout << "\n\nPART 2";
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
@@ -69,6 +71,7 @@ int main(int argc, char *argv[])
     // answers.push_back({"Part 1     ",part1::solve_for(pData)});
     // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
     // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+    std::cout << "\n";
     for (auto const& answer : answers) {
       std::cout << "\nanswer[" << answer.first << "] " << answer.second;
     }
