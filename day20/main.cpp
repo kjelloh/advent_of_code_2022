@@ -57,7 +57,6 @@ public:
       ++index;
       index %= cycle; // Keep within cycle
       if (index<0) index+=cycle; // use positive index 0..(cycle-1)
-      // std::cout << "\n++ index:" << index << " pos:" << pos();
       is_begin=false; // no longer begin
       return *this;
     }
@@ -67,7 +66,6 @@ public:
       --index;
       index %= cycle; // Keep within cycle
       if (index<0) index+=cycle; // use positive index 0..(cycle-1)
-      // std::cout << " --index:" << index << " pos:" << pos();
       is_begin=false; // no longer begin
       return *this;
     }
@@ -110,23 +108,6 @@ public:
   }
   Integer operator[](int pos) const {
     // return value at pos relative the member value 0
-    if (true) {
-      // Test
-      auto p = m_last;
-      int zero_count{0};
-      for (int n=0;n<m_size;++n) {
-        if (p->value==0) {
-          // std::cout << "\n[" << pos << "] n:" << n <<  " NOLL NOLL NOLL NOLL NOLL !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!";
-          // std::cout << "\n\n" << std::flush;
-          ++zero_count;
-        }
-        p=p->next;
-      }
-      if (zero_count!=1) {
-          std::cout << "\n[" << pos << "] " << " FAILED TO FIND 0";
-          std::cout << "\n\n" << std::flush;        
-      }
-    }
     auto p = m_last;
     while (p->value!=0) p=p->next;
     for (int n=0;n<pos;++n) p=p->next;
@@ -226,61 +207,11 @@ public:
       p->prev=insert_before->prev;
       insert_before->prev->next=p;
       insert_before->prev=p;
-      if (p->value==0) std::cout << "\nMOVED 0 ----------------------------------------------";
-      assert(p->next->prev == p);
-      assert(p->prev->next==p);
     }
-  }
-  static void test() {
-    CircularList cl{};
-    cl.push_back(1);
-    // std::cout << "\n" << cl;
-    std::cout << "\n[0]" << cl[0];
-    auto iter=cl.begin();
-    auto end = cl.end();
-    std::cout << "\niter!=end:" << (iter!=end);
-    ++iter;
-    std::cout << "\niter!=end:" << (iter!=end);
-    ++iter;
-    std::cout << "\niter!=end:" << (iter!=end);
-
-    cl.push_back(2);
-    std::cout << "\n" << cl;
-    std::cout << "\n" << cl[1];
-    cl.push_back(3);
-    std::cout << "\n" << cl;
-    std::cout << "\n" << cl[2];
-    for (int i=-10;i<10;++i) cl.push_back(i);
-    iter = cl.begin();
-    std::cout << "\n" << *iter;
-    std::cout << "\n" << cl;
-    std::cout << "\n";
-    for (int i=-30;i<30;++i) std::cout << "," << cl[i];
-    {
-      CircularList cl{};
-      cl.push_back(0);
-      cl.push_back(1);
-      cl.push_back(2);
-      cl.push_back(3);
-      auto iter = const_cast<Node*>(cl.begin().ptr());
-      cl.move(iter,0);
-      std::cout << "\ntest cl:" << cl;
-      cl.move(iter,1);
-      cl.move(iter,-1);
-      cl.move(iter,2);
-      cl.move(iter,-2);
-      cl.move(iter,-1);
-      cl.move(iter,1);
-      cl.move(iter,4); // same as move 0
-      cl.move(iter,5);
-      cl.move(iter,-5);
-    }
-    
   }
 private:
   Node* m_last{nullptr};
   Integer m_size{0};
-  friend bool test();
 };
 
 std::ostream& operator<<(std::ostream& os,CircularList const& cl) {
@@ -300,7 +231,7 @@ std::ostream& operator<<(std::ostream& os,CircularList const& cl) {
 }
 
 std::ostream& operator<<(std::ostream& os,Values const& values) {
-  os << "[";
+  os << values.size() << "[";
   for (int index=0;index<values.size();++index) {
     if (index>0) os << ",";
     os << values[index];
@@ -318,13 +249,7 @@ public:
     for (int n=0;n<mix_count;++n) mix();
   }
   auto size() const {return m_nodes.size();};
-  auto operator[](int pos) const {std::cout << " " << pos << std::flush;return m_mixed[pos];}
-  static void test() {
-    Values values{1,2,3,0};
-    Mixed mixed{values};
-    std::cout << "\ntest:" << mixed;
-  }
-  friend bool test();
+  auto operator[](int pos) const {return m_mixed[pos];}
 private:
   friend std::ostream& operator<<(std::ostream& os,Mixed const& mixed);
   std::vector<CircularList::Node*> m_nodes{};
@@ -333,17 +258,12 @@ private:
     for (int index=0;index<m_nodes.size();++index) {
       auto delta = m_nodes[index]->value;
       m_mixed.move(m_nodes[index],delta);
-      if (m_mixed[0]!=0) {
-        std::cout << "\n[0]!=0 but " << m_mixed[0];
-        exit(0);
-      }
     }
-    std::cout << " !! " << std::flush;
   }
 };
 
 std::ostream& operator<<(std::ostream& os,Mixed const& mixed) {
-  os << "[";
+  os << mixed.size() << "[";
   for (int index=0;index<mixed.size();++index) {
     if (index>0) os << ",";
     os << mixed[index];
@@ -358,7 +278,6 @@ Model parse(auto& in) {
     Model result{};
     Result i;
     while (in >> i) {
-      // std::cout << "\nparsed:" << i;
       result.push_back(i);
     }
     return result;
@@ -459,30 +378,13 @@ namespace korektur {
             std::cout << "\nkorektur " << i << ":" << it->second << " " << it->second * multiplier;
           }
       }
-      // auto r1000 = to_mix[1000]*811589153; std::cout << "\nr1000:" << to_mix[1000] << " " << r1000;
-      // auto r2000 = to_mix[2000]*811589153; std::cout << "\nr2000:" << to_mix[2000] << " " << r2000;
-      // auto r3000 = to_mix[3000]*811589153; std::cout << "\nr3000:" << to_mix[3000] << " " << r3000;
-      // auto result =  r1000 + r2000 + r3000;
-      Integer r1000 = to_mix[1000]*811589153; std::cout << "\nr1000:" << to_mix[1000] << " " << r1000;
-      Integer r2000 = to_mix[2000]*811589153; std::cout << "\nr2000:" << to_mix[2000] << " " << r2000;
-      Integer r3000 = to_mix[3000]*811589153; std::cout << "\nr3000:" << to_mix[3000] << " " << r3000;
-      Integer result =  r1000 + r2000 + r3000;
+      auto r1000 = to_mix[1000]*811589153; std::cout << "\nr1000:" << to_mix[1000] << " " << r1000;
+      auto r2000 = to_mix[2000]*811589153; std::cout << "\nr2000:" << to_mix[2000] << " " << r2000;
+      auto r3000 = to_mix[3000]*811589153; std::cout << "\nr3000:" << to_mix[3000] << " " << r3000;
+      auto result =  r1000 + r2000 + r3000;
 
       std::cout << "\n   ans:" << ans;
       std::cout << "\nresult:" << result;
-/*
-
-korektur 1000:9560 7758792302680
-korektur 2000:3849 3123806649897
-korektur 3000:-1257 -1020167565321
-
-r1000:9560 2081366104
-r2000:3849 1365425705
-r3000:-1257 2034651127
-   ans:9862431387256
-result:1186475640
-
-*/       
       return ans;
   }
 
@@ -490,6 +392,7 @@ result:1186475640
 
 namespace part1 {
   Result solve_for(char const* pData) {
+      std::cout << "\n\nPART 1";
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
@@ -507,20 +410,11 @@ namespace part1 {
       }
       else {
         Mixed mixed{data_model};
-        // std::cout << "\nmixed:" << mixed;
-        std::cout << " !!! " << std::flush;
-        if (false) {
-          // test
-          CircularList::test();
-          // Mixed::test();
-        }
-        else {
-          // for (int i=0;i<20;++i) std::cout << " " << i << " " << mixed.from_0(i);
-          auto r1000 = mixed[1000]; std::cout << "\nr1000:" << r1000;
-          auto r2000 = mixed[2000]; std::cout << "\nr2000:" << r2000;
-          auto r3000 = mixed[3000]; std::cout << "\nr3000:" << r3000;
-          result =  r1000 + r2000 + r3000;
-        }
+        std::cout << "\nmixed:" << mixed;
+        auto r1000 = mixed[1000]; std::cout << "\nr1000:" << r1000;
+        auto r2000 = mixed[2000]; std::cout << "\nr2000:" << r2000;
+        auto r3000 = mixed[3000]; std::cout << "\nr3000:" << r3000;
+        result =  r1000 + r2000 + r3000;
       }
       return result;
   }
@@ -528,6 +422,7 @@ namespace part1 {
 
 namespace part2 {
   Result solve_for(char const* pData) {
+      std::cout << "\n\nPART 2";
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
@@ -557,221 +452,8 @@ namespace part2 {
   }
 }
 bool test() {
-  std::cerr << "\ntest()";
   bool result{true};
-  Values const const_values{-3,-2,-1,1,2,3,-17,-52,0,52,17,-6,-5,-4,4,5,6};
-  if (result) {
-    auto values{const_values};
-    CircularList to_mix{};
-    for (int j=0;j<values.size();++j) to_mix.push_back(values[j]);
-    if (result) {
-      result = false;
-      int ok_count{0};
-      for (int i=0;i<values.size();++i) {
-        std::cout << "\ni:" << i;
-        auto val = values[i];
-        auto iter_0 = to_mix.find_first(0);
-        auto iter_val = to_mix.find_first(val);
-        auto iter=iter_0;
-        // Test that we can iterate from iter_0 to iter_val
-        for (int j=0;j<to_mix.size();++j) {
-          std::cout << "\niter [" << iter.index << "]=" << *iter << " iter_val [" << iter_val.index << "]=" << *iter_val;          
-          if (iter!=iter_val) std::cout << " !=";
-          else {
-            std::cout << " == ";
-            ++ok_count;
-          }
-          ++iter;
-        }
-      }     
-      std::cout << "\nok_count:" << ok_count << " required:" << values.size();
-      result = ok_count==values.size();
-      assert(result);
-    }
-    if (result) {
-      result = false;
-      auto begin = to_mix.begin();
-      auto iter_val = to_mix.end();
-      auto iter=begin;
-      // Test that we can iterate from begin to end
-      for (int j=0;j<to_mix.size()+1 and !result;++j) {
-        std::cout << "\niter [" << iter.index << "]=" << *iter << " end [" << iter_val.index << "]=" << *iter_val;          
-        if (iter!=iter_val) std::cout << " !=";
-        else {
-          std::cout << " == ";
-          result=true;
-          break;
-        }
-        ++iter;
-      }
-    }
-    if (result) {
-      result = false;
-      // Test that we can iterate from begin to end
-      int count = values.size();
-      for (auto iter=to_mix.begin();iter!=to_mix.end();++iter) {
-        std::cout << "\niter [" << iter.index << "]=" << *iter;
-        --count;
-      }
-      result=count==0;
-      assert(result);
-    }
-    if (result) {
-      auto visited = std::set<int>{};
-      for (int j=0;j<values.size();++j) {
-        for (auto iter = to_mix.begin();iter!=to_mix.end();++iter) {
-          visited.insert(*iter);
-        }
-        result = visited.size() == values.size();
-        if (!result) {
-          std::cerr << "\nvisited.size():" << visited.size() << " != values.size():" << values.size(); 
-        }
-      }
-    }
-    if (result) {
-      auto offset = std::map<int,int>{};
-      auto count = values.size();
-      for (auto iter = to_mix.begin();iter!=to_mix.end() and result;++iter) {
-        std::cout << " ! ";
-        offset[*iter] = iter.index;
-        --count;
-        result = result and (count>=0);
-      }
-      std::ostringstream vals_os{};
-      std::ostringstream ix_os{};
-      std::cout << "\noffset.size():" << offset.size();
-      for (auto val : values) {
-        vals_os << std::setw(3) << val;
-        ix_os << std::setw(3) << offset[val];
-      }
-      std::cout << "\n" << vals_os.str();
-      std::cout << "\n" << ix_os.str();
-    }
-  }
-  if (result) {
-    int ok_count{};
-    for (int i=0;i<const_values.size();++i) {
-      auto values{const_values};
-      auto val = values[i];
-      CircularList to_mix{};
-      for (int j=0;j<values.size();++j) to_mix.push_back(values[j]);
-      std::cout << "\n\nbefore move " << val;
-      std::cout << "\n" << to_mix;
-      auto iter_0 = to_mix.find_first(0);
-      auto iter_val = to_mix.find_first(val); // Requires unique values in input!
-      auto distance_before = std::distance(iter_0,iter_val);
-      std::cout << "\ndistance_before:" << distance_before;
-      to_mix.move(const_cast<CircularList::Node*>(to_mix.find_first(values[i]).p),values[i]);
-      std::cout << "\nafter move " << values[i];
-      std::cout << "\n" << to_mix;
-      iter_0 = to_mix.find_first(0);
-      iter_val = to_mix.find_first(val);
-      auto distance_after = std::distance(iter_0,iter_val);
-      std::cout << "\ndistance_after:" << distance_after;
-      auto diff = (distance_after - distance_before) % to_mix.size();
-      if (val>0 and diff<0) diff += to_mix.size()-1; // there are size-1 spaces between size items
-      if (val<0 and diff>0) diff -= to_mix.size()-1; // there are size-1 spaces between size items
-      std::cout << "\ndiff:" << diff << " val:" << val;
-      if (diff==val % to_mix.size()) {
-        ++ok_count;
-        std::cerr << "\nok_count:" << ok_count;
-      }
-      else {
-        std::cerr << "\n\nFAILED\n";
-      }
-    }
-    std::cout << "\nok_count:" << ok_count;
-    result = (ok_count==const_values.size());
-    assert(result);
-  }
-  if (result) {
-    std::istringstream in{pData};
-    auto values = parse(in);
-    std::vector<CircularList::Node*> to_move;
-    CircularList to_mix{};
-    for (int i=0;i<values.size();++i) {
-      auto p = to_mix.push_back(values[i]);
-      to_move.push_back(p);
-    }
-    assert(to_move.size() == to_mix.size());
-    int ok_count{};
-    for (int i=0;i<to_move.size();++i) {
-      std::vector<CircularList::Node const*> node_order_before{};
-      {
-        auto iter = to_mix.find_first(0);
-        for (int n=0;n<to_mix.size();++n) {
-          node_order_before.push_back(iter.p);
-          ++iter;
-        }
-      }
-      auto p = to_move[i];
-      auto dist = p->value;
-      if (dist<0) {
-        auto before_p = p;
-        for (int n=0;n<std::abs(dist);++n) before_p = before_p->prev;
-        to_mix.move(p,dist);
-        if (before_p->prev == p) {
-          ++ok_count;
-          std::cout << "\nok_count:" << ok_count;
-        }
-        else {
-          std::cerr << "\n\nFAILED\n";
-        }
-      }
-      else if (dist>0) {
-        auto after_p = p;
-        for (int n=0;n<std::abs(dist);++n) after_p = after_p->next;
-        to_mix.move(p,dist);
-        if (after_p->next == p) {
-          ++ok_count;
-          std::cout << "\nok_count:" << ok_count;
-        }
-        else {
-          std::cerr << "\n\nFAILED\n";
-        }
-      }
-      assert(std::distance(to_mix.begin(),to_mix.end()) == to_move.size());
-      assert(to_move.size() == to_mix.size());      
-      int missmatch_count{};
-      {
-        auto iter = to_mix.find_first(0);
-        for (int n=0;n<node_order_before.size();++n) {
-          auto p = node_order_before[n];
-          if (p!=iter.p) {
-            if (p==iter.p->prev) {
-              ++missmatch_count;
-              --iter;
-            }
-            else if (p==iter.p->next) {
-              ++missmatch_count;
-              ++iter;
-            }
-          }
-          ++iter;
-        }
-      }
-      std::cout << "\ndist:" << dist <<  " missmatch_count:" << missmatch_count << std::flush;
-      if (dist % static_cast<int>(to_move.size()) != 0) {
-        // one missmatch for node moved one step, otherwise two missmatches (one for location of moved-from and one for location moved-to)
-        assert(missmatch_count==1 or missmatch_count==2);
-      }
-      else {
-        std::cout << "\n" << std::flush;
-        assert(missmatch_count==0);
-      }
-    }
-    auto iter_0 = to_mix.find_first(0);
-    {
-      auto iter=iter_0;
-      for (int i=0;i<=3000;++i) {
-        if (i==1000) std::cout << "\n[1000]=" << *iter;
-        if (i==2000) std::cout << "\n[2000]=" << *iter;
-        if (i==3000) std::cout << "\n[3000]=" << *iter;
-        ++iter;
-      }
-    }
-  }
-  assert(result);
+  std::cerr << "\ntest()";
   return result;
 }
 
@@ -783,10 +465,11 @@ int main(int argc, char *argv[])
   }
   else {
     Answers answers{};
-    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-    answers.push_back({"Part 2     ",part2::solve_for(pData)}); // 1186475640 is too low
+    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    answers.push_back({"Part 2     ",part2::solve_for(pData)});
+    std::cout << "\n\nANSWERS";
     for (auto const& answer : answers) {
       std::cout << "\nanswer[" << answer.first << "] " << answer.second;
     }
