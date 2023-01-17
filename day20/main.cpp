@@ -21,7 +21,8 @@
 extern char const* pTest;
 extern char const* pData;
 
-using Result = long int;
+using Integer = long long int;
+using Result = long long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 using Values = std::vector<int>;
@@ -30,13 +31,13 @@ class CircularList {
 public:
   friend std::ostream& operator<<(std::ostream& os,CircularList const& cl);
   struct Node {
-    int value{};
+    Integer value{};
     Node* next{nullptr};
     Node* prev{nullptr};
   };
   struct ConstIterator {
     using difference_type = int;
-    using value_type = int;	
+    using value_type = Integer;	
     using pointer	= Node*;
     using reference	= Node;
     using iterator_category = std::bidirectional_iterator_tag;
@@ -77,7 +78,7 @@ public:
       return result;
     }
   };
-  Node* push_back(int value) {
+  Node* push_back(Integer value) {
     auto p = new Node{.value=value};
     if (m_size==0) {
       // empty
@@ -135,36 +136,37 @@ public:
     return p->value;
   }
 
-/*
-
-move(val:3230,distance:3230 % 5000 == 3230) insert_before.pos():1770 pp->value:-4873
-
-Differs at n:2103 -8549 3230
-Differs at n:2104 3230 -8549
- n:2088 858 858
- n:2089 -6365 -6365
- n:2090 9414 9414
- n:2091 859 859
- n:2092 5931 5931
- n:2093 -8551 -8551
- n:2094 2196 2196
- n:2095 -7941 -7941
- n:2096 -9454 -9454
- n:2097 9657 9657
- n:2098 -9012 -9012
- n:2099 7108 7108
- n:2100 -9603 -9603
- n:2101 -4545 -4545
- n:2102 -9037 -9037
-
- n:2103 -8549 3230
- n:2104 3230 -8549
- 
- n:2105 -4873 -4873
-
-*/
-  void move(Node* p,int distance) {
+  void move(Node* p,Integer distance) {
     std::cout << "\nmove(val:" << p->value << ",distance:" << distance;
+
+    //    Realization: The move we simulate is an unlink, move,link-in at the new position.
+    //    (or move left = swap pos with node to the left and move right = swap position with node to the right)
+    //    So, moving left we link in between p->prev->prev and p->prev
+    //    and moving right we link in between p->next and p->next->next.
+    //    This means that when we do the move the wrap around happens each (size-1) times!
+    //    Or put another way, with n items in the list, we get back to where we where after n-1 moves.
+    //
+    //    Ex: Say there are 3 items in the list, item a,b,c.
+    //        If we move b left
+    //
+    //                       --- a --- b --- c ---
+    //    move 0:            |                   |
+    //                       ---------------------
+    // 
+    //                       --- b --- a --- c ---
+    //    move 1:            |                   |
+    //                       ---------------------
+    // 
+    //                       --- c --- a --- b ---      a->b->c AGAIN :) (circular list)
+    //    move 2:            |                   |
+    //                       ---------------------
+
+    distance = distance % (this->size() - 1); // cut down to the sufficient move
+                                              // C++ Important: ensure the divisor (in this case this->size()-1) is the SAME TYPE as the dividend.
+                                              // This has bitten me several times!
+                                              // C++ will treat dividend and divisor "as is" meaning a twos-complement negative number dividend
+                                              // with a unsigned divisor gets thrown off by 2.
+                                              // My size() function returns a signed integer so we are fine here.
     if (distance!=0) {
       auto insert_before = p;
 
@@ -277,14 +279,11 @@ std::ostream& operator<<(std::ostream& os,Values const& values) {
 
 class Mixed {
 public:
-  Mixed(Values const& values)  {
+  Mixed(Values const& values,Result encryption_key=1,int mix_count=1)  {
     for (auto const& value : values) {
-      if (value==0) {
-        std::cout << "\n" << m_nodes.size() << ":" << value << " NOLL NOLL NOLL NOLL NOLL -----------------------------";
-      }
-      m_nodes.push_back(m_mixed.push_back(value));
+      m_nodes.push_back(m_mixed.push_back(value*encryption_key));
     }
-    mix();
+    for (int n=0;n<mix_count;++n) mix();
   }
   auto size() const {return m_nodes.size();};
   int operator[](int pos) const {std::cout << " " << pos << std::flush;return m_mixed[pos];}
@@ -472,6 +471,11 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+        Mixed mixed{data_model,811589153,10};
+        auto r1000 = mixed[1000]; std::cout << "\nr1000:" << r1000;
+        auto r2000 = mixed[2000]; std::cout << "\nr2000:" << r2000;
+        auto r3000 = mixed[3000]; std::cout << "\nr3000:" << r3000;
+        result =  r1000 + r2000 + r3000;
       return result;
   }
 }
@@ -703,8 +707,8 @@ int main(int argc, char *argv[])
   else {
     Answers answers{};
     // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-    answers.push_back({"Part 1     ",part1::solve_for(pData)}); // 9663 is NOT the correct answer
-    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
     // answers.push_back({"Part 2     ",part2::solve_for(pData)});
     for (auto const& answer : answers) {
       std::cout << "\nanswer[" << answer.first << "] " << answer.second;
