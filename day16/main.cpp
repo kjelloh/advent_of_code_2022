@@ -4,6 +4,7 @@
 #include <sstream> // E.g., std::istringstream, std::ostringstream
 #include <vector>
 #include <set>
+#include <unordered_set>
 #include <map>
 #include <unordered_map>
 #include <stack>
@@ -19,9 +20,12 @@
 #include <cassert>
 #include <bitset>
 #include <cmath> // pow
+#include <functional> // E.g., std::reference_wrapper 
 
 extern char const* pTest;
 extern char const* pData;
+
+namespace test {bool does_comply();}
 
 using Integer = long int;
 using Result = Integer;
@@ -145,6 +149,7 @@ std::ostream& operator<<(std::ostream& os,CaveSystem const& cave_system) {
 
 class MaxFlow {
 public:
+  friend bool test::does_comply();
   using Index = CaveSystem::Index;
   using BitMap = std::bitset<15>;
   MaxFlow(CaveSystem const& cave_system) 
@@ -159,28 +164,13 @@ public:
     }
   }
   Result operator()(int start_time) {
-    for (int t=0;t<=31;++t) {
-      auto is_open = BitMap(std::string(15,'0'));
-      std::bitset<KEY_BITS> bitmap{to_key(0,is_open,t)};
-      std::cout << "\nkey:" << bitmap.to_ulong() << " " << bitmap.to_string() << std::flush;
-    }
-    for (int i=0;i<15;++i) {
-      auto is_open = BitMap(); is_open[i] = true;
-      std::bitset<KEY_BITS> bitmap{to_key(63,is_open,31)};
-      std::cout << "\nkey:" << bitmap.to_ulong() << " " << bitmap.to_string() << std::flush;
-    }
-    for (int i=0;i<=63;++i) {
-      auto is_open = BitMap(); is_open[14] = true;
-      std::bitset<KEY_BITS> bitmap{to_key(i,is_open,31)};
-      std::cout << "\nkey:" << bitmap.to_ulong() << " " << bitmap.to_string() << std::flush;
-    }
     return max_to_gain(m_cave_system.index("AA"),BitMap{},start_time);
   }
 private:
   using Key = u_int32_t;
   static const int KEY_BITS{26};
   static const Key KEY_RANGE{Key{1} << (KEY_BITS)};
-  Key to_key(Index valve_ix,BitMap is_open,int time_left) {
+  Key to_key(Index at_valve,BitMap is_open,int time_left) {
     // 54 valves = 6 bits
     // 15 possible valves to open (has flowrate > 0)= 15 bits
     // 31 time_left = 5 bits
@@ -190,10 +180,16 @@ private:
     // v = valve index
     // f = flags for open valves (0..14)
     // t = time left
-    Key result = (valve_ix<<20) + (is_open.to_ulong()<<5) + time_left;
+    // Key result = (at_valve<<20) + (is_open.to_ulong()<<5) + time_left;
+    int other_players_count=2;
+    int other_players=0;
+    auto valve_count = m_cave_system.size();
+    int over_max_time_left = 31;
+    Key result = is_open.to_ulong()*valve_count*over_max_time_left*other_players_count + at_valve*over_max_time_left*other_players_count + time_left*other_players_count + other_players;
+    
     if (result>KEY_RANGE) {
       std::bitset<KEY_BITS+1> bitmap{result};
-      std::cout << "\nto_key(" << valve_ix << "," << is_open.to_string() << ":" << is_open.to_ulong() << "," << time_left << " result:" << "[" << bitmap.size() << "]" << bitmap.to_string() << ":" << result << " > " << KEY_RANGE << std::flush;
+      std::cout << "\nto_key(" << at_valve << "," << is_open.to_string() << ":" << is_open.to_ulong() << "," << time_left << " result:" << "[" << bitmap.size() << "]" << bitmap.to_string() << ":" << result << " > " << KEY_RANGE << std::flush;
       std::cout << "\n\n" << std::flush;
       assert(result<=KEY_RANGE);
     }
@@ -202,35 +198,35 @@ private:
   std::vector<Result> m_cache{};
 
   // find the maximal possible flow to gain
-  // from cave with start index, provided open valves and the time left to 0
-  Result max_to_gain(Index start_index,BitMap const& is_open,int time_left) {
+  // from cave index from_cave, provided open valves and the time left to 0
+  Result max_to_gain(Index from_cave,BitMap const& is_open,int time_left) {
     static int call_count{};
     Result result{};
     if (time_left==0) {
       return 0; // nothing to gain
     }
-    auto key = to_key(start_index,is_open,time_left);
-    if (auto cached = m_cache[to_key(start_index,is_open,time_left)]>=0) return cached;
-    if (m_flowrate[start_index]>0 and !is_open[start_index]) {
+    auto key = to_key(from_cave,is_open,time_left);
+    if (auto cached = m_cache[to_key(from_cave,is_open,time_left)]>=0) return cached;
+    if (m_flowrate[from_cave]>0 and !is_open[from_cave]) {
       // try open the valve here
-      assert(start_index<is_open.size());
+      assert(from_cave<is_open.size());
       auto new_is_open = is_open;
-      new_is_open[start_index] = true;
-      auto new_candidate = m_flowrate[start_index]*(time_left-1) + max_to_gain(start_index,new_is_open,time_left-1);
+      new_is_open[from_cave] = true;
+      auto new_candidate = m_flowrate[from_cave]*(time_left-1) + max_to_gain(from_cave,new_is_open,time_left-1);
       if (new_candidate>result) {
         result = new_candidate;        
       }
     }
-    for (auto adj : m_cave_system.graph().adj(start_index)) {
+    for (auto adj : m_cave_system.graph().adj(from_cave)) {
       // try going to adjacent valve
       auto new_candidate = max_to_gain(adj,is_open,time_left-1);
       if (new_candidate>result) {
         result = new_candidate;
       }
     }
-    assert(key = to_key(start_index,is_open,time_left));
+    assert(key = to_key(from_cave,is_open,time_left));
     assert(result<1648);
-    m_cache[to_key(start_index,is_open,time_left)] = result;
+    m_cache[to_key(from_cave,is_open,time_left)] = result;
     if (call_count++ % 1000 == 0) std::cout << "\n" << is_open.to_string() << " best:" << result << std::flush;
     return result;
   }
@@ -284,8 +280,19 @@ namespace jonathanpaulsson {
 
   ll best = 0;
   vector<ll> DP;
+  // KoH note: U is a bitmap for open valves
+  //           R is the flow rates of valves
+  //           from and p1 are valves and we have stepped from valve "from" to valve p1
+  //           time is the time left (we stop at time == 0)
+  //           other_players are the count of simultaneous players running around opening valves
   ll f(ll from, ll p1, ll U, ll time, ll other_players) {
     if(time == 0) {
+      // Each time we arrive at time==0 we have one candidate of many for a best "path" for all players so far running around opening valves until times up.
+      // If all valves are not open we may improve on this by letting another player loose on these open valves (giving this new player its 26 minutes to do its best).
+      // Observation: Players run around independent of each other. So it does not matter if they run simultaneously or one after the other,
+      //              as long as each player gets a run on all the candidates previous players have come up with!
+      //              And because of the nature of this depth first search approach, we can be sure this will be true.
+      //              That is, we will arrive here at time==0 for each of the possible opened_valves candidates possible for all previous players.
       return other_players>0 ? f(-1,0,U,26,other_players-1) : 0LL;
     }
 
@@ -413,26 +420,145 @@ namespace part2 {
   }
 }
 
+namespace test {
+  bool does_comply() {
+    bool result{true};
+    if (result) {
+      std::stringstream in{ pTest };
+      auto data_model = parse(in);
+      std::cout << "\n" << data_model;
+      MaxFlow max_flow{data_model};
+      if (result) {
+        if (result) {
+          using BitMap = MaxFlow::BitMap;
+          using Index = MaxFlow::Index;
+          using Key = MaxFlow::Key;
+          auto const KEY_BITS = MaxFlow::KEY_BITS;
+          auto const KEY_RANGE = MaxFlow::KEY_RANGE;
+          auto to_key = [&max_flow](Index at_valve,BitMap is_open,int time_left){
+            return max_flow.to_key(at_valve,is_open,time_left);
+          };   
+          std::set<Key> seen{};
+          // Test the key
+          int loop_counts{0};
+          for (int t=0;t<30;++t) {
+            auto is_open = BitMap(std::string(15,'0'));
+            std::bitset<KEY_BITS> key_bitmap{to_key(0,is_open,t)};
+            seen.insert(key_bitmap.to_ulong());
+            ++loop_counts;
+            std::cout << "\n" << std::setw(4) << loop_counts << " key:"<< std::setw(10) << key_bitmap.to_ulong() <<  " " << key_bitmap.to_string() << std::flush;
+          }
+          for (int i=1;i<15;++i) {
+            auto is_open = BitMap(); is_open[i] = true;
+            std::bitset<KEY_BITS> key_bitmap{to_key(0,is_open,31)};
+            seen.insert(key_bitmap.to_ulong());
+            ++loop_counts;
+            std::cout << "\n" << std::setw(4) << loop_counts << " key:"<< std::setw(10) << key_bitmap.to_ulong() <<  " " << key_bitmap.to_string() << std::flush;
+          }
+          for (int i=1;i<=63;++i) {
+            auto is_open = BitMap(); is_open[14] = true;
+            std::bitset<KEY_BITS> key_bitmap{to_key(i,is_open,31)};
+            seen.insert(key_bitmap.to_ulong());
+            ++loop_counts;
+            std::cout << "\n" << std::setw(4) << loop_counts << " key:"<< std::setw(10) << key_bitmap.to_ulong() <<  " " << key_bitmap.to_string() << std::flush;
+          }
+          std::cout << "\n" << seen.size() << " == " << loop_counts << "?";
+          result = (seen.size() == loop_counts);
+          assert(result);
+        }
+        if (result) {
+          using ll = int64_t;
+          using BitMap = std::bitset<64>;
+          using Index = ll;
+          using Key = ll;
+          auto const KEY_BITS = 64;
+          std::vector<ll> R{};
+          auto paulson_to_key = [&R](ll from, ll p1, ll U, ll time, ll other_players) {
+            // Paulson key
+            auto key = U*R.size()*31*2 + p1*31*2 + time*2 + other_players;
+            // Assume other players can be 0 or 1, that is 2 states
+            // Time can be 1..30, that is 30 states
+            // The possible valves out of n valves to be at constitutes n states.
+            // The number of combinations of open valves of of N valves are 2^N (independent valve combinations)
+            // Now vector R contains the flowrate of all N valves, so R.size() i the valve count N.
+            // So to mix all this into a unique state integer we can,
+            // Start at 0.
+            // Add other_players (can be 0,1)
+            // Add time multiplied by 2 (to make unique for possible other_players or (0..29)*2 + (0..1))
+            // Add at_valve index multiplied by 2 (for other_players) and 31 (make unique given 30 possible time values)
+            // Add open_valves bitmap multiplied by N (to make unique for valve_index 0..(N-1)) and also multiplied by 2 and 31 to not confuse at_valve, time and other_players influence.
+            return key;
+          };
+          auto to_key = [&paulson_to_key](size_t valve_count,int over_max_time_left,Index at_valve,BitMap is_open,int time_left){
+            int other_players_count=2;
+            int other_players=0;
+            auto p_key =  paulson_to_key(0,at_valve,is_open.to_ulong(),time_left,0);
+            auto key = is_open.to_ulong()*valve_count*over_max_time_left*other_players_count + at_valve*over_max_time_left*other_players_count + time_left*other_players_count + other_players;
+            std::cout << "\n\n";
+            assert(p_key==key);
+            return key;
+          };   
+          std::set<Key> seen{};
+          R.resize(data_model.size());
+          // Test the key
+          int loop_counts{0};
+          for (int t=0;t<30;++t) {
+            auto is_open = BitMap(std::string(15,'0'));
+            std::bitset<KEY_BITS> key_bitmap{to_key(data_model.size(),31,0,is_open,t)};
+            seen.insert(key_bitmap.to_ulong());
+            ++loop_counts;
+            std::cout << "\n" << std::setw(4) << loop_counts << " key:"<< std::setw(10) << key_bitmap.to_ulong() <<  " " << key_bitmap.to_string() << std::flush;
+          }
+          for (int i=1;i<15;++i) {
+            auto is_open = BitMap(); is_open[i] = true;
+            std::bitset<KEY_BITS> key_bitmap{to_key(data_model.size(),31,0,is_open,31)};
+            seen.insert(key_bitmap.to_ulong());
+            ++loop_counts;
+            std::cout << "\n" << std::setw(4) << loop_counts << " key:"<< std::setw(10) << key_bitmap.to_ulong() <<  " " << key_bitmap.to_string() << std::flush;
+          }
+          for (int i=1;i<=63;++i) {
+            auto is_open = BitMap(); is_open[14] = true;
+            std::bitset<KEY_BITS> key_bitmap{to_key(data_model.size(),31,i,is_open,31)};
+            seen.insert(key_bitmap.to_ulong());
+            ++loop_counts;
+            std::cout << "\n" << std::setw(4) << loop_counts << " key:"<< std::setw(10) << key_bitmap.to_ulong() <<  " " << key_bitmap.to_string() << std::flush;
+          }
+          std::cout << "\n" << seen.size() << " == " << loop_counts << "?";
+          result = (seen.size() == loop_counts);
+          assert(result);
+        }
+      }
+    }
+    return result;
+  }
+}
+
+
 int main(int argc, char *argv[])
 {
-  Answers answers{};
-
-  std::chrono::time_point<std::chrono::system_clock> start_time{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-  answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-  // exec_times.push_back(std::chrono::system_clock::now());
-  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-  // exec_times.push_back(std::chrono::system_clock::now());
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-  // exec_times.push_back(std::chrono::system_clock::now());
-  // answers.push_back({"Part 2     ",part2::solve_for(pData)});
-  exec_times.push_back(std::chrono::system_clock::now());
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms"; 
-    std::cout << " answer[" << answers[i].first << "] " << answers[i].second;
+  if (argc>1 and std::string{argv[1]}=="test") {
+    if (test::does_comply()) std::cout << "\nTest: You have arrived at your destination :)";
+    else std::cout << "\nTest: Not there yet...";
   }
-  std::cout << "\n";
+  else {
+    Answers answers{};
+    std::chrono::time_point<std::chrono::system_clock> start_time{};
+    std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
+    exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    // exec_times.push_back(std::chrono::system_clock::now());
+    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    // exec_times.push_back(std::chrono::system_clock::now());
+    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    // exec_times.push_back(std::chrono::system_clock::now());
+    // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+    exec_times.push_back(std::chrono::system_clock::now());
+    for (int i=0;i<answers.size();++i) {
+      std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms"; 
+      std::cout << " answer[" << answers[i].first << "] " << answers[i].second;
+    }
+    std::cout << "\n";
+  }
   return 0;
 }
 
