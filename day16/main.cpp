@@ -180,12 +180,12 @@ private:
     // v = valve index
     // f = flags for open valves (0..14)
     // t = time left
-    // Key result = (at_valve<<20) + (is_open.to_ulong()<<5) + time_left;
-    int other_players_count=2;
-    int other_players=0;
-    auto valve_count = m_cave_system.size();
-    int over_max_time_left = 31;
-    Key result = is_open.to_ulong()*valve_count*over_max_time_left*other_players_count + at_valve*over_max_time_left*other_players_count + time_left*other_players_count + other_players;
+    Key result = (at_valve<<20) + (is_open.to_ulong()<<5) + time_left;
+    // int other_players_count=2;
+    // int other_players=0;
+    // auto valve_count = m_cave_system.size();
+    // int over_max_time_left = 31;
+    // Key result = is_open.to_ulong()*valve_count*over_max_time_left*other_players_count + at_valve*over_max_time_left*other_players_count + time_left*other_players_count + other_players;
     
     if (result>KEY_RANGE) {
       std::bitset<KEY_BITS+1> bitmap{result};
