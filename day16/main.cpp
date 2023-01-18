@@ -219,7 +219,7 @@ private:
     //   return 0;
     // }
     if (time_left==0) {
-      if (second_player) return max_to_gain(0,is_open,m_time_to_run,false);
+      if (second_player) return max_to_gain(m_cave_system.index("AA"),is_open,m_time_to_run,false);
       else return 0;
     }
 
