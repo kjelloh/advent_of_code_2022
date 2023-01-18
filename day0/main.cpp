@@ -25,7 +25,10 @@
 extern char const* pTest;
 extern char const* pData;
 
-using Result = size_t;
+namespace test {bool does_comply();}
+
+using Integer = int;
+using Result = Integer;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
 using Model = std::vector<std::string>;
@@ -59,14 +62,16 @@ namespace part2 {
   }
 }
 
-bool test() {
-  return false;
+namespace test {
+  bool does_comply() {
+    return false;
+  }
 }
 
 int main(int argc, char *argv[])
 {
   if (argc>1 and std::string{argv[1]}=="test") {
-    if (test()) std::cout << "\nTest: You have arrived at your destination :)";
+    if (test::does_comply()) std::cout << "\nTest: You have arrived at your destination :)";
     else std::cout << "\nTest: Not there yet...";
   }
   else {
