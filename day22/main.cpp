@@ -4,7 +4,9 @@
 #include <sstream> // E.g., std::istringstream, std::ostringstream
 #include <vector>
 #include <set>
+#include <unordered_set>
 #include <map>
+#include <unordered_map>
 #include <stack>
 #include <queue>
 #include <deque>
@@ -14,10 +16,15 @@
 #include <algorithm> // E.g., std::find, std::all_of,...
 #include <numeric> // E.g., std::accumulate
 #include <limits> // E.g., std::numeric_limits
+#include <chrono>
 #include <cassert>
+#include <bitset>
+#include <cmath> // pow
+#include <functional> // E.g., std::reference_wrapper 
 
 extern char const* pTest;
 extern char const* pData;
+namespace test {bool does_comply();}
 
 using Result = long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
@@ -200,58 +207,30 @@ namespace dim3 {
   class Rotations {
   public:
 
-  static const int X0_Y0_Z0{0};
-  static const int X90_Y0_Z0{1};
-  static const int X180_Y0_Z0{2};
-  static const int X270_Y0_Z0{3};
-  static const int Z90_Y0_X0{4};
-  static const int Z90_Y90_X0{5};
-  static const int Z90_Y180_X0{6};
-  static const int Z90_Y270_X0{7};
-  static const int Z180_X0_Y0{8};
-  static const int Z180_X90_Y0{9};
-  static const int Z180_X180_Y0{10};
-  static const int Z180_X270_Y0{11};
-  static const int Z270_Y0_X0{12};
-  static const int Z270_Y90_X0{13};
-  static const int Z270_Y180_X0{14};
-  static const int Z270_Y270_X0{15};
-  static const int Y90_Z0_X0{16};
-  static const int Y90_Z90_X0{17};
-  static const int Y90_Z180_X0{18};
-  static const int Y90_Z270_X0{19};
-  static const int Y270_Z0_X0{20};
-  static const int Y270_Z90_X0{21};
-  static const int Y270_Z180_X0{22};
-  static const int Y270_Z270_X0{23};
-
-/*
-TEST
-rot:0[1,0,0] [0,1,0] [0,0,1] OK
-rot:1[1,0,0] [0,0,1] [0,-1,0] OK
-rot:2[1,0,0] [0,-1,0] [0,0,-1] OK
-rot:3[1,0,0] [0,0,-1] [0,1,0] OK 
-rot:4[0,1,0] [-1,0,0] [0,0,1] 
-rot:5[0,1,0] [0,0,1] [1,0,0]
-rot:6[0,1,0] [1,0,0] [0,0,-1]
-rot:7[0,1,0] [0,0,-1] [-1,0,0] 
-rot:8[0,1,0] [-1,0,0] [0,0,1]
-rot:9[0,0,1] [-1,0,0] [0,-1,0]
-rot:10[0,-1,0] [-1,0,0] [0,0,-1]
-rot:11[0,0,-1] [-1,0,0] [0,1,0]
-rot:12[0,1,0] [-1,0,0] [0,0,1]
-rot:13[0,1,0] [0,0,1] [1,0,0]
-rot:14[0,1,0] [1,0,0] [0,0,-1]
-rot:15[0,1,0] [0,0,-1] [-1,0,0]
-rot:16[0,0,-1] [0,1,0] [1,0,0]
-rot:17[0,0,-1] [-1,0,0] [0,1,0]
-rot:18[0,0,-1] [0,-1,0] [-1,0,0]
-rot:19[0,0,-1] [1,0,0] [0,-1,0]
-rot:20[0,0,1] [0,1,0] [-1,0,0]
-rot:21[0,0,1] [-1,0,0] [0,-1,0]
-rot:22[0,0,1] [0,-1,0] [1,0,0]
-rot:23[0,0,1] [1,0,0] [0,1,0]%              
-*/    
+    static const int X0_Y0_Z0{0};
+    static const int X90_Y0_Z0{1};
+    static const int X180_Y0_Z0{2};
+    static const int X270_Y0_Z0{3};
+    static const int Z90_Y0_X0{4};
+    static const int Z90_Y90_X0{5};
+    static const int Z90_Y180_X0{6};
+    static const int Z90_Y270_X0{7};
+    static const int Z180_X0_Y0{8};
+    static const int Z180_X90_Y0{9};
+    static const int Z180_X180_Y0{10};
+    static const int Z180_X270_Y0{11};
+    static const int Z270_Y0_X0{12};
+    static const int Z270_Y90_X0{13};
+    static const int Z270_Y180_X0{14};
+    static const int Z270_Y270_X0{15};
+    static const int Y90_Z0_X0{16};
+    static const int Y90_Z90_X0{17};
+    static const int Y90_Z180_X0{18};
+    static const int Y90_Z270_X0{19};
+    static const int Y270_Z0_X0{20};
+    static const int Y270_Z90_X0{21};
+    static const int Y270_Z180_X0{22};
+    static const int Y270_Z270_X0{23};
 
     Rotations() {
       // Generate all 24 rotations
@@ -673,21 +652,6 @@ struct StringsWalker {
     if (in_frame(pos)) return strings.get()[pos[ROW]][pos[COL]];
     else return ' ';
   }
-/*
-"        >>^#    "
-"        .#..    "
-"        #...    "
-"        <<<<    "
-"...#.....^.#    "
-"........#^..    "
-"..#....#.^..    "
-".........^#.    "
-"        >^<#.>>>"
-"        >>^..#>>"
-"        .#^....."
-"        ..^...#."
-*/  
-
   StringsWalker& operator++() {
     Vector next{face_pos+face_delta}; // optimistic
     if (at(next)==' ') {
@@ -739,7 +703,6 @@ public:
     dim2::Vector strings_pos{row,col};
     return strings_pos;
   }
-  static bool test() {return false;}
 private:
   friend std::ostream& operator<<(std::ostream& os,Traveler const& traveler);
   Strings m_strings{};
@@ -794,15 +757,10 @@ namespace part1 {
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << data_model;
-      if (false) {
-        Traveler::test();        
-      }
-      else {
-        Traveler traveler{data_model.first,data_model.second};
-        auto pos = traveler.walk_as_if_flat();
-        result = 1000*(pos[ROW]+1) + 4*(pos[COL]+1);
-        std::cout << traveler;
-      }
+      Traveler traveler{data_model.first,data_model.second};
+      auto pos = traveler.walk_as_if_flat();
+      result = 1000*(pos[ROW]+1) + 4*(pos[COL]+1);
+      std::cout << traveler;
       return result;
   }
 }
@@ -814,39 +772,69 @@ namespace part2 {
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << data_model;
-      if (false) {
-        Traveler::test();        
-      }
-      else {
-        Traveler traveler{data_model.first,data_model.second};
-        auto pos = traveler.walk_as_if_cube();
-        result = 1000*(pos[ROW]+1) + 4*(pos[COL]+1);
-        std::cout << traveler;
-      }
+      Traveler traveler{data_model.first,data_model.second};
+      auto pos = traveler.walk_as_if_cube();
+      result = 1000*(pos[ROW]+1) + 4*(pos[COL]+1);
+      std::cout << traveler;
       return result;
+  }
+}
+
+namespace test {
+
+
+  /* Part 1 example
+  "        >>^#    "
+  "        .#..    "
+  "        #...    "
+  "        <<<<    "
+  "...#.....^.#    "
+  "........#^..    "
+  "..#....#.^..    "
+  ".........^#.    "
+  "        >^<#.>>>"
+  "        >>^..#>>"
+  "        .#^....."
+  "        ..^...#."
+  */  
+
+  bool does_comply() {
+    bool result{true};
+    if (result) {
+      // Generate x,y,z csv
+
+    }
+    return result;
   }
 }
 
 int main(int argc, char *argv[])
 {
   if (argc>1 and std::string{argv[1]}=="test") {
-    std::cout << "\nTEST";
-    dim3::Rotations::test();
+    if (test::does_comply()) std::cout << "\nTest: You have arrived at your destination :)";
+    else std::cout << "\nTest: Not there yet...";
   }
   else {
     Answers answers{};
+    std::chrono::time_point<std::chrono::system_clock> start_time{};
+    std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
+    exec_times.push_back(std::chrono::system_clock::now());
     answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-    answers.push_back({"Part 1     ",part1::solve_for(pData)});
-    answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    // exec_times.push_back(std::chrono::system_clock::now());
+    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    // exec_times.push_back(std::chrono::system_clock::now());
+    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 2     ",part2::solve_for(pData)});
-    for (auto const& answer : answers) {
-      std::cout << "\nanswer[" << answer.first << "] " << answer.second;
+    exec_times.push_back(std::chrono::system_clock::now());
+    std::cout << "\n\nANSWERS";
+    for (int i=0;i<answers.size();++i) {
+      std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms"; 
+      std::cout << " answer[" << answers[i].first << "] " << answers[i].second;
     }
-    // std::cout << "\nPress <enter>...";
-    // std::cin.get();
     std::cout << "\n";
-    return 0;    
   }
+  return 0;
 }
 
 // char const* pTest = R"(        ...#
