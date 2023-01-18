@@ -198,35 +198,71 @@ private:
   std::vector<Result> m_cache{};
 
   // find the maximal possible flow to gain
-  // from cave index from_cave, provided open valves and the time left to 0
-  Result max_to_gain(Index from_cave,BitMap const& is_open,int time_left) {
+  // from cave index at_valve, provided open valves and the time left to 0
+  Result max_to_gain(Index at_valve,BitMap const& is_open,int time_left) {
+
     static int call_count{};
-    Result result{};
+    // // KoH note: U is a bitmap for open valves
+    // //           R is the flow rates of valves (R.size() is then the valve count)
+    // //           from and p1 are valves and we have stepped from valve "from" to valve p1
+    // //           time is the time left (we stop at time == 0)
+    // //           other_players are the count of simultaneous players running around opening valves
+    // if(time == 0) {
+    //   // Each time we arrive at time==0 we have one candidate of many for a best "path" for all players so far running around opening valves until times up.
+    //   // If all valves are not open we may improve on this by letting another player loose on these open valves (giving this new player its 26 minutes to do its best).
+    //   // Observation: Players run around independent of each other. So it does not matter if they run simultaneously or one after the other,
+    //   //              as long as each player gets a run on all the candidates previous players have come up with!
+    //   //              And because of the nature of this depth first search approach, we can be sure this will be true.
+    //   //              That is, we will arrive here at time==0 for each of the possible opened_valves candidates possible for all previous players.
+    //   return 0;
+    // }
     if (time_left==0) {
       return 0; // nothing to gain
     }
-    auto key = to_key(from_cave,is_open,time_left);
-    if (auto cached = m_cache[to_key(from_cave,is_open,time_left)]>=0) return cached;
-    if (m_flowrate[from_cave]>0 and !is_open[from_cave]) {
+
+    // auto key = U*R.size()*31*2 + p1*31*2 + time*2 + other_players;
+    auto key = to_key(at_valve,is_open,time_left);
+
+    // if(DP[key]>=0) {
+    //   return DP[key];
+    // }
+    // if (auto cached = m_cache[to_key(at_valve,is_open,time_left)]>=0) return cached;
+    if (auto cached = m_cache[to_key(at_valve,is_open,time_left)];cached>=0) return cached;
+
+    // ll ans = 0;
+    Result result{0};
+
+    // bool no_p1 = ((U & (1LL<<p1)) == 0);
+    // if(no_p1 && R[p1]>0) {
+    //   ll newU = U | (1LL<<p1);
+    //   assert(newU > U);
+    //   ans = max(ans, (time-1)*R[p1] + f(p1,p1, newU, time-1, other_players));
+    // }
+    if (m_flowrate[at_valve]>0 and !is_open[at_valve]) {
       // try open the valve here
-      assert(from_cave<is_open.size());
+      assert(at_valve<is_open.size());
       auto new_is_open = is_open;
-      new_is_open[from_cave] = true;
-      auto new_candidate = m_flowrate[from_cave]*(time_left-1) + max_to_gain(from_cave,new_is_open,time_left-1);
+      new_is_open[at_valve] = true;
+      auto new_candidate = m_flowrate[at_valve]*(time_left-1) + max_to_gain(at_valve,new_is_open,time_left-1);
       if (new_candidate>result) {
         result = new_candidate;        
       }
     }
-    for (auto adj : m_cave_system.graph().adj(from_cave)) {
+    // for(auto& y : E[p1]) {
+    //   ans = max(ans, f(p1,y, U, time-1, other_players));
+    // }
+    for (auto adj : m_cave_system.graph().adj(at_valve)) {
       // try going to adjacent valve
       auto new_candidate = max_to_gain(adj,is_open,time_left-1);
       if (new_candidate>result) {
         result = new_candidate;
       }
     }
-    assert(key = to_key(from_cave,is_open,time_left));
-    assert(result<1648);
-    m_cache[to_key(from_cave,is_open,time_left)] = result;
+    assert(key = to_key(at_valve,is_open,time_left));
+    // DP[key] = ans;
+    // }*/
+    // return ans;
+    m_cache[to_key(at_valve,is_open,time_left)] = result;
     if (call_count++ % 1000 == 0) std::cout << "\n" << is_open.to_string() << " best:" << result << std::flush;
     return result;
   }
@@ -281,7 +317,7 @@ namespace jonathanpaulsson {
   ll best = 0;
   vector<ll> DP;
   // KoH note: U is a bitmap for open valves
-  //           R is the flow rates of valves
+  //           R is the flow rates of valves (R.size() is then the valve count)
   //           from and p1 are valves and we have stepped from valve "from" to valve p1
   //           time is the time left (we stop at time == 0)
   //           other_players are the count of simultaneous players running around opening valves
