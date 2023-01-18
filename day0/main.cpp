@@ -16,6 +16,10 @@
 #include <algorithm> // E.g., std::find, std::all_of,...
 #include <numeric> // E.g., std::accumulate
 #include <limits> // E.g., std::numeric_limits
+#include <chrono>
+#include <cassert>
+#include <bitset>
+#include <cmath> // pow
 #include <functional> // E.g., std::reference_wrapper 
 
 extern char const* pTest;
@@ -67,16 +71,21 @@ int main(int argc, char *argv[])
   }
   else {
     Answers answers{};
+    std::chrono::time_point<std::chrono::system_clock> start_time{};
+    std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
+    exec_times.push_back(std::chrono::system_clock::now());
     answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 2     ",part2::solve_for(pData)});
-    std::cout << "\n";
-    for (auto const& answer : answers) {
-      std::cout << "\nanswer[" << answer.first << "] " << answer.second;
+    exec_times.push_back(std::chrono::system_clock::now());
+    for (int i=0;i<answers.size();++i) {
+      std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms"; 
+      std::cout << " answer[" << answers[i].first << "] " << answers[i].second;
     }
-    // std::cout << "\nPress <enter>...";
-    // std::cin.get();
     std::cout << "\n";
   }
   return 0;
