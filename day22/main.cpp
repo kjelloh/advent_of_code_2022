@@ -179,6 +179,20 @@ namespace dim3 {
   }
 
   using Matrix = std::array<Vector,3>;
+
+  std::ostream& operator<<(std::ostream& os,Matrix const& m) {
+    for (int r=0;r<m.size();++r) {
+      if (r>0) os << "\n";
+      os << "[";
+      for (int c=0;c<m[0].size();++c) {
+        if (c>0) os << ',';
+        os << std::setw(4) << m[r][c];
+      }
+      os << "]";
+    }
+    return os;
+  }
+
   Vector operator*(Matrix const& m, Vector const& v) {
     Vector result{};
     for (int r=0;r<m.size();r++) {
@@ -200,17 +214,14 @@ namespace dim3 {
     return result;
   }
 
-  std::ostream& operator<<(std::ostream& os,Matrix const& m) {
+  Matrix to_transposed(Matrix const& m) {
+    Matrix result{};
     for (int r=0;r<m.size();++r) {
-      if (r>0) os << "\n";
-      os << "[";
       for (int c=0;c<m[0].size();++c) {
-        if (c>0) os << ',';
-        os << std::setw(4) << m[r][c];
+        result[c][r] = m[r][c];
       }
-      os << "]";
     }
-    return os;
+    return result;
   }
 
   // Helper class to create rotations that turn any 3d object into any of its 24 possible orientations in 3D space.
@@ -398,6 +409,9 @@ namespace dim3 {
 
   // -----------------------------------------------------------------
   namespace affine {
+    using dim3::operator*;
+    using dim3::operator-;
+    using dim3::operator<<;
 
     using Vector = std::array<int,4>;
 
@@ -466,9 +480,33 @@ namespace dim3 {
       return result;
     }
 
-    Matrix to_inverse(Matrix const& am) {
+    std::pair<dim3::Matrix,dim3::Vector> to_rotation_and_translation(Matrix const& m) {
+      dim3::Matrix rot{};
+      dim3::Vector trans{};
+      for (int r=0;r<m.size();++r) {
+        for (int c=0;c<m[0].size();++c) {
+          if (r<rot.size() and c<rot[0].size()) rot[r][c] = m[r][c];
+          if (r<trans.size() and c==rot.size()) trans[r]=m[r][c]; 
+        }
+      }
+      return {rot,trans};
+    }
+
+    Matrix to_inverse(Matrix const& m) {
       Matrix result{};
-      std::cerr << "\nto_inverse NOT YET IMPLEMENTED";
+      // Trust m to be an affine transformation matrix with a pure rotation matrix rot and translation vector t in m.
+      //
+      // m = [  Rot    t ] ; where rot is a 3x3 orthonormal matrix and t is a dim3::vector 
+      //     [ 0 0 0   1 ]
+      //
+      // Then inverse(m) is then inv(m) =  [ inv(rot)  -inv(rot*t) ]
+      //                                   [ 0 0 0          1      ]
+      // And further,
+      // rot being orthonormal means inv(rot) is transpose of rot      
+      auto [rot,t] = to_rotation_and_translation(m);
+      auto inv_rot = dim3::to_transposed(rot);
+      auto inv_t = -(inv_rot*t);
+      result = to_matrix(inv_rot,inv_t);
       return result;
     }
 
@@ -947,6 +985,18 @@ namespace test {
       std::cout << "\npp:" << pp; // pp:[4,9,-1,1] :)       
       auto ppp = (Tr*Trr)*p;
       std::cout << "\nppp:" << ppp; // ppp:[4,9,-1,1] :)
+
+      // So we now have a way to fold face 3 into 3D space so we can use it to "walk on" as a cube face
+      // What is missing is the reverse transformation so we can get back the original position on the flat map.
+      // We want the inverse of the (Tr*Trr) matrix so that:
+      // inv(Tr*Trr)pp = inv(Tr*Trr)*(Tr*Trr)p = I*p;
+      auto T = Tr*Trr;
+      auto Tinv = dim3::affine::to_inverse(T);
+      std::cout << "\nT\n" << T;
+      std::cout << "\nTinv\n" << Tinv;
+      std::cout << "\nExpected I\n" << Tinv*T;
+      auto p_again = Tinv*pp;
+      std::cout << "\np:" << p << " p_again:" << p_again;
 
       for (int n=0;n<faces.size();++n) {   
         switch (n) {
