@@ -340,13 +340,17 @@ namespace dim3 {
 
   /*
     Define a Square in 3D space as follows.
-                                        
+
+                                            z
+                                            ^
+                                            |
+                                            |
                        3                   tlf ---> col (y)
-                0------------ 3            /|
-               /             /            / |
-            0 / Square   / 2             /  |
-             /             /            /   v
-            1-------------2            z    row (x)
+                0------------ 3            /
+               /             /            / 
+            0 / Square   / 2             /  
+             /             /            v   
+            1-------------2           row x    
                   1
 
       - each square has four corners 0...3 and four edges 0..3
@@ -392,60 +396,115 @@ namespace dim3 {
 
   using Squares = std::vector<Square>;
 
-  using EnhancedVector = std::array<int,4>;
-  using EnhancedMatrix = std::array<EnhancedVector,4>;
+  namespace affine {
 
-  EnhancedVector operator*(EnhancedMatrix const& m,EnhancedVector const& v) {
-    EnhancedVector result{};
-    for (int mr=0;mr<m.size();++mr) {
-      for (int mc=0;mc<v.size();++mc) {
-        result[mr] += m[mr][mc]*v[mc];
-      }
+    using Vector = std::array<int,4>;
+
+    Vector to_vector(dim3::Vector const& v) {
+      return affine::Vector{v[0],v[1],v[2],1};
     }
-    return result;
-  }
 
-  std::ostream& operator<<(std::ostream& os,EnhancedVector const& v) {
-    os << "[";
-    for (int c=0;c<v.size();++c) {
-      if (c>0) os << ',';
-      os << v[c];
-    }
-    os << "]";
-    return os;
-  }
-
-  std::ostream& operator<<(std::ostream& os,EnhancedMatrix const& m) {
-    for (int r=0;r<m.size();++r) {
-      if (r>0) os << "\n";
+    std::ostream& operator<<(std::ostream& os,affine::Vector const& v) {
       os << "[";
-      for (int c=0;c<m[0].size();++c) {
+      for (int c=0;c<v.size();++c) {
         if (c>0) os << ',';
-        os << std::setw(4) << m[r][c];
+        os << v[c];
       }
       os << "]";
+      return os;
     }
-    return os;
-  }
-  
-  // See https://en.wikipedia.org/wiki/Transformation_matrix#Affine_transformations
-  EnhancedMatrix to_transformation_matrix(Matrix const& rotation,Vector const& translation) {
-    EnhancedMatrix result{};
-    for (int mr=0;mr<result.size();++mr) {
-      for (int mc=0;mc<result[0].size();++mc) {
-        if (mr<rotation.size() and mc<rotation[0].size()) result[mr][mc] = rotation[mr][mc];
-        else if (mc==(result[0].size()-1) and mr<translation.size()) result[mr][mc]=translation[mr];
-        else if (mr==(result.size()-1) and mc<rotation[0].size()) result[mr][mc]=0;
-        else result[mr][mc]=1;
-      }
-    }
-    return result;
-  }
 
-  EnhancedMatrix to_inverse(EnhancedMatrix const& am) {
-    EnhancedMatrix result{};
-    std::cerr << "\nto_inverse NOT YET IMPLEMENTED";
-    return result;
+    using Frame = std::array<affine::Vector,3>;
+
+    Frame to_frame(int dx,int dy,int dz) {
+      return Frame{
+        to_vector({dx,0,0})
+        ,to_vector({0,dy,0})
+        ,to_vector({0,0,dz})
+      };
+    }
+
+    std::ostream& operator<<(std::ostream& os,Frame const& f) {
+      for (int i=0;i<f.size();++i) {
+        if (i>0) os << "\n";
+        switch (i) {
+          case COORD::x: os << std::setw(4) << "dx:" << std::setw(4) << f[i];break;
+          case COORD::y: os << std::setw(4) << "dy:" << std::setw(4) << f[i];break;
+          case COORD::z: os << std::setw(4) << "dz:" << std::setw(4) << f[i];break;
+        }
+      }
+      return os;
+    }
+
+    struct Square {
+      Vector pos; // Position in host system
+      Frame f; // orientation relative pos
+    };
+
+    using Matrix = std::array<affine::Vector,4>;
+
+    std::ostream& operator<<(std::ostream& os,Matrix const& m) {
+      for (int r=0;r<m.size();++r) {
+        if (r>0) os << "\n";
+        os << "[";
+        for (int c=0;c<m[0].size();++c) {
+          if (c>0) os << ',';
+          os << std::setw(4) << m[r][c];
+        }
+        os << "]";
+      }
+      return os;
+    }
+
+    Vector operator*(Matrix const& m,Vector const& v) {
+      affine::Vector result{};
+      for (int mr=0;mr<m.size();++mr) {
+        for (int mc=0;mc<v.size();++mc) {
+          result[mr] += m[mr][mc]*v[mc];
+        }
+      }
+      return result;
+    }
+
+    Matrix operator*(Matrix const& m1, Matrix const& m2){
+      Matrix result{};
+      for (int r=0;r<m1.size();r++) {
+        for (int c=0;c<m2[0].size();c++) {
+          for (int k=0;k<m1[0].size();k++) {
+            result[r][c] += m1[r][k]*m2[k][c];
+          }
+        }
+      }
+      return result;
+    }
+
+    Frame operator*(Matrix const& m,Frame const& f) {
+      return {
+         m*f[0]
+        ,m*f[1]
+        ,m*f[2]
+      };
+    }
+
+    // See https://en.wikipedia.org/wiki/Transformation_matrix#Affine_transformations
+    Matrix to_matrix(dim3::Matrix const& rotation,dim3::Vector const& translation) {
+      Matrix result{};
+      for (int mr=0;mr<result.size();++mr) {
+        for (int mc=0;mc<result[0].size();++mc) {
+          if (mr<rotation.size() and mc<rotation[0].size()) result[mr][mc] = rotation[mr][mc];
+          else if (mc==(result[0].size()-1) and mr<translation.size()) result[mr][mc]=translation[mr];
+          else if (mr==(result.size()-1) and mc<rotation[0].size()) result[mr][mc]=0;
+          else result[mr][mc]=1;
+        }
+      }
+      return result;
+    }
+
+    Matrix to_inverse(Matrix const& am) {
+      Matrix result{};
+      std::cerr << "\nto_inverse NOT YET IMPLEMENTED";
+      return result;
+    }
   }
 
   /*
@@ -523,6 +582,8 @@ namespace dim3 {
 using dim3::operator<<;
 using dim3::operator+;
 using dim3::operator*;
+using dim3::affine::operator<<;
+using dim3::affine::operator*;
 
 using namespace dim2;
 
@@ -827,22 +888,7 @@ namespace part2 {
 }
 
 namespace test {
-  using dim3::operator<<;
-
-  /* Part 1 example
-  "        >>^#    "
-  "        .#..    "
-  "        #...    "
-  "        <<<<    "
-  "...#.....^.#    "
-  "........#^..    "
-  "..#....#.^..    "
-  ".........^#.    "
-  "        >^<#.>>>"
-  "        >>^..#>>"
-  "        .#^....."
-  "        ..^...#."
-  */  
+  using ::operator<<;
 
   struct CSV {
     dim3::Vector v{};
@@ -861,14 +907,111 @@ namespace test {
     bool result{true};
     if (result) {
       result = false;
-      dim3::EnhancedVector v0{0,50,0,1};
+      dim3::affine::Vector v0{0,50,0,1};
       std::cout << "\n" << v0;
       dim3::Vector translation{0,50,0};
       std::cout << "\n" << translation;
-      auto T01 = dim3::to_transformation_matrix(dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0],translation);
+      auto T01 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0],translation);
       std::cout << "\n" << T01;
       auto v1 = T01*v0;
       std::cout << "\n" << v1;
+      result = true;
+    }
+    if (result) {
+      // Hard code folding example faces into a cube
+      std::stringstream in{ pTest };
+      auto data_model = parse(in);
+      Faces faces = to_faces(data_model.first);
+
+      /*
+      "        >>^#    " face 0 x:0 y:8
+      "        .#..    "
+      "        #...    "
+      "        <<<<    "
+      "...#.....^.#    " face 1,2,3 x:4 y:0,4,8
+      "........#^..    "
+      "..#....#.^..    "
+      ".........^#.    "
+      "        >^<#.>>>" face 4,5 x:8 y:8.12
+      "        >>^..#>>"
+      "        .#^....."
+      "        ..^...#."
+      */  
+
+      std::vector<dim3::Vector> translations{};
+      for (int n=0;n<faces.size();++n) {
+        auto const& face = faces[n];
+        dim3::Vector pos{face.top_left[0],face.top_left[1],0};
+        translations.push_back(pos);
+      };
+      // Hard code for test layout!
+      std::array<dim3::affine::Matrix,6> Ts{}; // Translations of faces to their x,y,0 position
+      std::array<dim3::affine::Square,6> squares{};
+      auto origo = dim3::affine::to_vector({0,0,0});
+      auto base_f = dim3::affine::to_frame(4,4,0);
+      auto base_square = dim3::affine::Square{origo,base_f};
+      for (int n=0;n<translations.size();++n) {        
+        Ts[n] = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X0_Y0_Z0],translations[n]);
+        auto v = Ts[n]*dim3::affine::Vector{0,0,0,1};
+        std::cout << "\n" << n << "\n" << Ts[n] << " " << v;
+        auto f = Ts[n]*base_f; // transposed frame
+        std::cout << "\nf" << n << " flat";
+        std::cout << "\n" << f << " at " << v;
+        switch (n) {
+          case 0: {
+            // face_id:0 [0,8]
+            //   "...#"
+            //   ".#.."
+            //   "#..."
+            //   "...."
+          } break;
+          case 1: {
+            // face_id:1 [4,0]
+            //   "...#"
+            //   "...."
+            //   "..#."
+            //   "...."            
+          } break;
+          case 2: {
+            // face_id:2 [4,4]
+            //   "...."
+            //   "...."
+            //   "...#"
+            //   "...."
+          } break;
+          case 3: {
+            // face_id:3 [4,8]
+            //   "...#"
+            //   "#..."
+            //   "...."
+            //   "..#."
+            auto rotn = dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0];
+            auto CTn = Ts[n]*dim3::affine::to_matrix(rotn,{0,0,0}); // Rotate around Y, translate to 4,8
+            auto fn = CTn*dim3::affine::to_frame(4,4,0);
+            std::cout << "\n" << n << "\n" << CTn;
+            std::cout << "\n" << n << "\n" << fn;
+          } break;
+          case 4: {
+            // face_id:4 [8,8]
+            //   "...#"
+            //   "...."
+            //   ".#.."
+            //   "...."
+            auto rot = dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0];
+            auto CT = Ts[n]*dim3::affine::to_matrix(rot,{0,0,0}); // Rotate around Y, translate to 8,8
+            auto  vx = CT*dim3::affine::Vector{4,0,0,1}; // 
+            std::cout << "\n" << n << "\n" << CT << " " << vx;
+          } break;
+          case 5: {
+            // face_id:5 [8,12]
+            //   "...."
+            //   ".#.."
+            //   "...."
+            //   "..#."
+          } break;
+        }
+      }
+      result = false;
     }
     if (result) {
       // Generate x,y,z csv for input flat map
