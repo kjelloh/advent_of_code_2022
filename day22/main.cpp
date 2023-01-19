@@ -396,6 +396,7 @@ namespace dim3 {
 
   using Squares = std::vector<Square>;
 
+  // -----------------------------------------------------------------
   namespace affine {
 
     using Vector = std::array<int,4>;
@@ -413,33 +414,6 @@ namespace dim3 {
       os << "]";
       return os;
     }
-
-    using Frame = std::array<affine::Vector,3>;
-
-    Frame to_frame(int dx,int dy,int dz) {
-      return Frame{
-        to_vector({dx,0,0})
-        ,to_vector({0,dy,0})
-        ,to_vector({0,0,dz})
-      };
-    }
-
-    std::ostream& operator<<(std::ostream& os,Frame const& f) {
-      for (int i=0;i<f.size();++i) {
-        if (i>0) os << "\n";
-        switch (i) {
-          case COORD::x: os << std::setw(4) << "dx:" << std::setw(4) << f[i];break;
-          case COORD::y: os << std::setw(4) << "dy:" << std::setw(4) << f[i];break;
-          case COORD::z: os << std::setw(4) << "dz:" << std::setw(4) << f[i];break;
-        }
-      }
-      return os;
-    }
-
-    struct Square {
-      Vector pos; // Position in host system
-      Frame f; // orientation relative pos
-    };
 
     using Matrix = std::array<affine::Vector,4>;
 
@@ -478,14 +452,6 @@ namespace dim3 {
       return result;
     }
 
-    Frame operator*(Matrix const& m,Frame const& f) {
-      return {
-         m*f[0]
-        ,m*f[1]
-        ,m*f[2]
-      };
-    }
-
     // See https://en.wikipedia.org/wiki/Transformation_matrix#Affine_transformations
     Matrix to_matrix(dim3::Matrix const& rotation,dim3::Vector const& translation) {
       Matrix result{};
@@ -505,7 +471,12 @@ namespace dim3 {
       std::cerr << "\nto_inverse NOT YET IMPLEMENTED";
       return result;
     }
-  }
+
+    struct Joint {
+      Matrix m_from_prev;
+    };
+  } // affine
+  // -----------------------------------------------------------------
 
   /*
   Define the cube with one corner at top_left_front (tlf) and a diagonally opposite corner bottom_right_back (brb).
@@ -945,18 +916,11 @@ namespace test {
         translations.push_back(pos);
       };
       // Hard code for test layout!
-      std::array<dim3::affine::Matrix,6> Ts{}; // Translations of faces to their x,y,0 position
-      std::array<dim3::affine::Square,6> squares{};
-      auto origo = dim3::affine::to_vector({0,0,0});
-      auto base_f = dim3::affine::to_frame(4,4,0);
-      auto base_square = dim3::affine::Square{origo,base_f};
-      for (int n=0;n<translations.size();++n) {        
-        Ts[n] = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X0_Y0_Z0],translations[n]);
-        auto v = Ts[n]*dim3::affine::Vector{0,0,0,1};
-        std::cout << "\n" << n << "\n" << Ts[n] << " " << v;
-        auto f = Ts[n]*base_f; // transposed frame
-        std::cout << "\nf" << n << " flat";
-        std::cout << "\n" << f << " at " << v;
+      // Use forward transformations of joints.
+      // Each joint is oriented relative its parent joint
+      std::map<int,std::map<int,dim3::affine::Matrix>> parent{};
+      parent[-1][-1] = dim3::affine::to_matrix(dim3::Rotations::RUNIT,{0,0,0}); // base joint at 0,0,0
+      for (int n=0;n<translations.size();++n) {   
         switch (n) {
           case 0: {
             // face_id:0 [0,8]
@@ -964,6 +928,7 @@ namespace test {
             //   ".#.."
             //   "#..."
             //   "...."
+            parent[0][-1] = dim3::affine::to_matrix(dim3::Rotations::RUNIT,{0,8,0}); // joint face 0 adjacent to base
           } break;
           case 1: {
             // face_id:1 [4,0]
@@ -971,6 +936,7 @@ namespace test {
             //   "...."
             //   "..#."
             //   "...."            
+            parent[2][1] = dim3::affine::to_matrix(dim3::Rotations::RUNIT,{0,-4,0}); // joint face 1 adjacent to face 2
           } break;
           case 2: {
             // face_id:2 [4,4]
@@ -978,6 +944,7 @@ namespace test {
             //   "...."
             //   "...#"
             //   "...."
+            parent[3][2] = dim3::affine::to_matrix(dim3::Rotations::RUNIT,{0,-4,0}); // joint face 2 to the left of 3
           } break;
           case 3: {
             // face_id:3 [4,8]
@@ -985,11 +952,7 @@ namespace test {
             //   "#..."
             //   "...."
             //   "..#."
-            auto rotn = dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0];
-            auto CTn = Ts[n]*dim3::affine::to_matrix(rotn,{0,0,0}); // Rotate around Y, translate to 4,8
-            auto fn = CTn*dim3::affine::to_frame(4,4,0);
-            std::cout << "\n" << n << "\n" << CTn;
-            std::cout << "\n" << n << "\n" << fn;
+            parent[0][3]  = dim3::affine::to_matrix(dim3::Rotations::RUNIT,{4,0,0}); // joint face 3 below face 0
           } break;
           case 4: {
             // face_id:4 [8,8]
@@ -997,10 +960,7 @@ namespace test {
             //   "...."
             //   ".#.."
             //   "...."
-            auto rot = dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0];
-            auto CT = Ts[n]*dim3::affine::to_matrix(rot,{0,0,0}); // Rotate around Y, translate to 8,8
-            auto  vx = CT*dim3::affine::Vector{4,0,0,1}; // 
-            std::cout << "\n" << n << "\n" << CT << " " << vx;
+            parent[3][4]  = dim3::affine::to_matrix(dim3::Rotations::RUNIT,{4,0,0}); // joint face 4 below face 3
           } break;
           case 5: {
             // face_id:5 [8,12]
@@ -1008,7 +968,14 @@ namespace test {
             //   ".#.."
             //   "...."
             //   "..#."
+            parent[4][5]  = dim3::affine::to_matrix(dim3::Rotations::RUNIT,{0,4,0}); // joint face 5 to the right of face 4
           } break;
+        }
+      }
+      for (int n=0;n<faces.size();++n) {
+        std::vector<dim3::affine::Matrix> t_chain{};
+        int i=n;
+        while (i!=-1) {
         }
       }
       result = false;
