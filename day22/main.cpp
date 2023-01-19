@@ -20,7 +20,8 @@
 #include <cassert>
 #include <bitset>
 #include <cmath> // pow
-#include <functional> // E.g., std::reference_wrapper 
+#include <functional> // E.g., std::reference_wrapper
+#include <fstream> // std::ofstream
 
 extern char const* pTest;
 extern char const* pData;
@@ -197,6 +198,19 @@ namespace dim3 {
       }
     }
     return result;
+  }
+
+  std::ostream& operator<<(std::ostream& os,Matrix const& m) {
+    for (int r=0;r<m.size();++r) {
+      if (r>0) os << "\n";
+      os << "[";
+      for (int c=0;c<m[0].size();++c) {
+        if (c>0) os << ',';
+        os << std::setw(4) << m[r][c];
+      }
+      os << "]";
+    }
+    return os;
   }
 
   // Helper class to create rotations that turn any 3d object into any of its 24 possible orientations in 3D space.
@@ -379,23 +393,57 @@ namespace dim3 {
   using Squares = std::vector<Square>;
 
   using EnhancedVector = std::array<int,4>;
-  using AffineTransformationMatrix = std::array<EnhancedVector,4>;
+  using EnhancedMatrix = std::array<EnhancedVector,4>;
 
-  EnhancedVector operator*(AffineTransformationMatrix const& m,Vector const& v) {
+  EnhancedVector operator*(EnhancedMatrix const& m,EnhancedVector const& v) {
     EnhancedVector result{};
-    std::cerr << "\noperator*(AffineTransformationMatrix const& m,Vector const& v) NOT YET IMPLEMENTED";
+    for (int mr=0;mr<m.size();++mr) {
+      for (int mc=0;mc<v.size();++mc) {
+        result[mr] += m[mr][mc]*v[mc];
+      }
+    }
     return result;
+  }
+
+  std::ostream& operator<<(std::ostream& os,EnhancedVector const& v) {
+    os << "[";
+    for (int c=0;c<v.size();++c) {
+      if (c>0) os << ',';
+      os << v[c];
+    }
+    os << "]";
+    return os;
+  }
+
+  std::ostream& operator<<(std::ostream& os,EnhancedMatrix const& m) {
+    for (int r=0;r<m.size();++r) {
+      if (r>0) os << "\n";
+      os << "[";
+      for (int c=0;c<m[0].size();++c) {
+        if (c>0) os << ',';
+        os << std::setw(4) << m[r][c];
+      }
+      os << "]";
+    }
+    return os;
   }
   
   // See https://en.wikipedia.org/wiki/Transformation_matrix#Affine_transformations
-  AffineTransformationMatrix to_transformation_matrix(Matrix const& rotation,Vector const& translation) {
-    AffineTransformationMatrix result{};
-    std::cerr << "\nto_transformation_matrix NOT YET IMPLEMENTED";
+  EnhancedMatrix to_transformation_matrix(Matrix const& rotation,Vector const& translation) {
+    EnhancedMatrix result{};
+    for (int mr=0;mr<result.size();++mr) {
+      for (int mc=0;mc<result[0].size();++mc) {
+        if (mr<rotation.size() and mc<rotation[0].size()) result[mr][mc] = rotation[mr][mc];
+        else if (mc==(result[0].size()-1) and mr<translation.size()) result[mr][mc]=translation[mr];
+        else if (mr==(result.size()-1) and mc<rotation[0].size()) result[mr][mc]=0;
+        else result[mr][mc]=1;
+      }
+    }
     return result;
   }
 
-  AffineTransformationMatrix to_inverse(AffineTransformationMatrix const& am) {
-    AffineTransformationMatrix result{};
+  EnhancedMatrix to_inverse(EnhancedMatrix const& am) {
+    EnhancedMatrix result{};
     std::cerr << "\nto_inverse NOT YET IMPLEMENTED";
     return result;
   }
@@ -473,6 +521,8 @@ namespace dim3 {
 
 } // namespace dim3
 using dim3::operator<<;
+using dim3::operator+;
+using dim3::operator*;
 
 using namespace dim2;
 
@@ -580,26 +630,22 @@ Faces to_faces(Strings& strings) {
   std::cout << "\nCUBE SIDE SIZE " << cube_side;
 
   // Loop over grid of unfolded faces
-  int offset{0};
+  // int offset{0};
   auto vert_cube_side_counts = strings.size() / cube_side;
   for (int r=0;r<vert_cube_side_counts;++r) {
     auto hor_cube_side_counts = strings[0].size() / cube_side;
     for (int c=0;c<hor_cube_side_counts;++c) {
-      result.push_back(Face{}); result.back().top_left = Vector{r*cube_side,(c-offset)*cube_side};
+      result.push_back(Face{}); result.back().top_left = Vector{r*cube_side,c*cube_side};
       std::cout << "\n";
       for (int dr=0;dr<cube_side;++dr) {
         auto row = r*cube_side+dr;
         auto const& line = strings[row];
         auto first = c*cube_side;
-        std::cout << "\n" << std::quoted(line) << " " << r << " " << c << " " << dr << " " << first << " " << offset << " " <<  result.back().top_left << std::flush;
+        std::cout << "\n" << std::quoted(line) << " " << r << " " << c << " " << dr << " " << first  << " " <<  result.back().top_left << std::flush;
         if (first+cube_side <= line.size()) {
           auto snippet = line.substr(first,cube_side);
           std::cout << " " << std::quoted(snippet);
           if (snippet.find_first_not_of(' ')==0) {
-            if (result.size()==1 and row==0 and result.back().rows.size()==0) {
-              offset = first/cube_side;
-              result.back().top_left = Vector{r*cube_side,(c-offset)*cube_side};
-            }
             result.back().rows.push_back(snippet);
             std::cout << " :)";
           }
@@ -781,7 +827,7 @@ namespace part2 {
 }
 
 namespace test {
-
+  using dim3::operator<<;
 
   /* Part 1 example
   "        >>^#    "
@@ -798,10 +844,48 @@ namespace test {
   "        ..^...#."
   */  
 
+  struct CSV {
+    dim3::Vector v{};
+  };
+
+  std::ostream& operator<<(std::ostream& os,CSV const& csv) {
+    os << "\n";
+    for (int i=0;i<csv.v.size();++i) {
+      if (i>0) os << ',';
+      os << csv.v[i];
+    }
+    return os;
+  }
+
   bool does_comply() {
     bool result{true};
     if (result) {
-      // Generate x,y,z csv
+      result = false;
+      dim3::EnhancedVector v0{0,50,0,1};
+      std::cout << "\n" << v0;
+      dim3::Vector translation{0,50,0};
+      std::cout << "\n" << translation;
+      auto T01 = dim3::to_transformation_matrix(dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0],translation);
+      std::cout << "\n" << T01;
+      auto v1 = T01*v0;
+      std::cout << "\n" << v1;
+    }
+    if (result) {
+      // Generate x,y,z csv for input flat map
+      std::stringstream in{ pData };
+      auto data_model = parse(in);
+      Faces faces = to_faces(data_model.first);
+      dim3::Squares squares{};
+      for (auto const& face : faces) {
+        dim3::Vector pos{face.top_left[0],face.top_left[1],0};
+        squares.push_back(dim3::to_xy_square(pos,face.side_size()));
+      }
+      std::ofstream of{"day22.csv"};
+      for (auto const& square : squares) {
+        auto pos = square.pos; 
+        of << CSV{pos};
+        for (auto v : square.corners) of << CSV{pos+v};
+      }
 
     }
     return result;
@@ -819,11 +903,11 @@ int main(int argc, char *argv[])
     std::chrono::time_point<std::chrono::system_clock> start_time{};
     std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
     exec_times.push_back(std::chrono::system_clock::now());
-    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 1     ",part1::solve_for(pData)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 2     ",part2::solve_for(pData)});
     exec_times.push_back(std::chrono::system_clock::now());
