@@ -552,6 +552,7 @@ namespace dim3 {
 } // namespace dim3
 using dim3::operator<<;
 using dim3::operator+;
+using dim3::operator-;
 using dim3::operator*;
 using dim3::affine::operator<<;
 using dim3::affine::operator*;
@@ -893,7 +894,6 @@ namespace test {
       std::stringstream in{ pTest };
       auto data_model = parse(in);
       Faces faces = to_faces(data_model.first);
-
       /*
       "        >>^#    " face 0 x:0 y:8
       "        .#..    "
@@ -909,18 +909,46 @@ namespace test {
       "        ..^...#."
       */  
 
-      std::vector<dim3::Vector> translations{};
-      for (int n=0;n<faces.size();++n) {
-        auto const& face = faces[n];
-        dim3::Vector pos{face.top_left[0],face.top_left[1],0};
-        translations.push_back(pos);
-      };
-      // Hard code for test layout!
-      // Use forward transformations of joints.
-      // Each joint is oriented relative its parent joint
-      std::map<int,std::map<int,dim3::affine::Matrix>> parent{};
-      parent[-1][-1] = dim3::affine::to_matrix(dim3::Rotations::RUNIT,{0,0,0}); // base joint at 0,0,0
-      for (int n=0;n<translations.size();++n) {   
+      // we want to transform between a position p´ in 3D space relative (0,0,0) and
+      // the corresponding 2D position p on the given map (unfolded faces)
+      // We assume we can express this as a rotation followed by a translation.
+      // If we express this as a 4D affine transformation matrix T' we get:
+      // p = T´*p´ (transform position p´ to position p using transformation matrix T´)
+
+      // In the puzzle example I get the face numbering as above (numbered in the order discovered left to right, upp to down).
+      // So face 3 is to be folded against face 0.
+      // If T03 is the transformation matrix that folds face 3 against its edge with face 0 we get:
+      // p´= T03*p (transform a position on the flat surface to a position in 3D space when face 3 is folded)
+      // Can we construct T03?
+
+      // To keep the face on the "outside" of the cube, we need to rotate it 90 degrees counter clockwise around the edge parallel to the y-axis.
+      // We can accomplish this by first translate the face in the x-direction to have the face on the y-axis.
+      // p´= (Rotate(p-delta)+delta), where delta is (-X,0,0).
+      
+      // Let us look at position (4,8,0) + (1,1,0) which is at 1,1 from upper left corner of face 3 on the flat space.
+      // If we fold down face 3 the corner remains at (4,8,0) but the corner relative position rotates from (1,1,0) to (0,0,-4)
+      // So p = (4,8,0) + (1,1,0) = T´*((4,8,0) + (0,1,-1))
+      // So T´ should be indifferent to (4,8,0) but rotate (0,1,-1) 90 degrees clockwise around the y axis
+
+      // But the known is p and the folding. So we should first look for:
+      // p' = T*p (the 3D folded position given the flat position p and the fold transformation T of face 3)
+      // p' = T*((4,8,0) + (1,1,0)) = (4,8,0) + (0,1,-1).
+      // Again, T should be indifferent to (4,8,0) but rotate (0,1,-1) "back" around the y-axis. We can wright this
+      // p' = I*(4,8,0) + RotY(1,1,0), or
+      // p'= RotY*(1,1,0) + (4,8,0) = RotY*((p-(4,8,0))) + (4,8,0)
+
+      // This we can in in fact describe with a translation Trr followed by a rotation RotY followed by a translation Tr
+      // p' = RotY*(Trr*p) + Tr*p = (Tr*RotY*Trr)*p
+      dim3::Vector corner30{4,8,0};
+      auto Trr = dim3::affine::to_matrix(dim3::Rotations::RUNIT,-corner30);
+      auto Tr = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],corner30);
+      auto p = dim3::affine::to_vector({5,9,0});
+      auto pp = Tr*(Trr*p);
+      std::cout << "\npp:" << pp; // pp:[4,9,-1,1] :)       
+      auto ppp = (Tr*Trr)*p;
+      std::cout << "\nppp:" << ppp; // ppp:[4,9,-1,1] :)
+
+      for (int n=0;n<faces.size();++n) {   
         switch (n) {
           case 0: {
             // face_id:0 [0,8]
@@ -928,7 +956,6 @@ namespace test {
             //   ".#.."
             //   "#..."
             //   "...."
-            parent[0][-1] = dim3::affine::to_matrix(dim3::Rotations::RUNIT,{0,8,0}); // joint face 0 adjacent to base
           } break;
           case 1: {
             // face_id:1 [4,0]
@@ -936,7 +963,6 @@ namespace test {
             //   "...."
             //   "..#."
             //   "...."            
-            parent[2][1] = dim3::affine::to_matrix(dim3::Rotations::RUNIT,{0,-4,0}); // joint face 1 adjacent to face 2
           } break;
           case 2: {
             // face_id:2 [4,4]
@@ -944,7 +970,6 @@ namespace test {
             //   "...."
             //   "...#"
             //   "...."
-            parent[3][2] = dim3::affine::to_matrix(dim3::Rotations::RUNIT,{0,-4,0}); // joint face 2 to the left of 3
           } break;
           case 3: {
             // face_id:3 [4,8]
@@ -952,7 +977,6 @@ namespace test {
             //   "#..."
             //   "...."
             //   "..#."
-            parent[0][3]  = dim3::affine::to_matrix(dim3::Rotations::RUNIT,{4,0,0}); // joint face 3 below face 0
           } break;
           case 4: {
             // face_id:4 [8,8]
@@ -960,7 +984,6 @@ namespace test {
             //   "...."
             //   ".#.."
             //   "...."
-            parent[3][4]  = dim3::affine::to_matrix(dim3::Rotations::RUNIT,{4,0,0}); // joint face 4 below face 3
           } break;
           case 5: {
             // face_id:5 [8,12]
@@ -968,14 +991,7 @@ namespace test {
             //   ".#.."
             //   "...."
             //   "..#."
-            parent[4][5]  = dim3::affine::to_matrix(dim3::Rotations::RUNIT,{0,4,0}); // joint face 5 to the right of face 4
           } break;
-        }
-      }
-      for (int n=0;n<faces.size();++n) {
-        std::vector<dim3::affine::Matrix> t_chain{};
-        int i=n;
-        while (i!=-1) {
         }
       }
       result = false;
