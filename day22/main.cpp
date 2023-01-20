@@ -1135,7 +1135,7 @@ namespace test {
       auto p32 = dim3::Vector{0,-4,0};
       // Ouups! We seem to need an intermediate frame to be able to rotate at the edge to face 3 and then translate to frame 2 at corner 0?
       // face 3 to intermediate i
-      auto p32i = dim3::Vector{0,0,0};
+      auto p32i = dim3::Vector{0,-1,0}; // offset -1 to y==8
       auto T32i = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X90_Y0_Z0],p32i);
       // Intermediate to face 2
       auto p32i2 = dim3::Vector{0,-4,0}; // translate to corner 0 of face 2 in intermediate frame
@@ -1143,7 +1143,7 @@ namespace test {
       // face 2 frame to face 1 frame
       // Ouups! We seem to need an intermediate frame to be able to rotate at the edge to face 2 and then translate to frame 1 at corner 0?
       // face 2 to intermediate i
-      auto p21i = dim3::Vector{0,0,0};
+      auto p21i = dim3::Vector{0,-1,0}; // offset 1 to x==0
       auto T21i = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X90_Y0_Z0],p21i);
       // Intermediate to face 1
       auto p21i1 = dim3::Vector{0,-4,0}; // translate to corner 0 of face 1 in intermediate frame
@@ -1193,11 +1193,15 @@ namespace test {
         auto const& face = faces[n];
         for (int row=0;row<face.side_size();++row) {
           for (int col=0;col<face.side_size();++col) {
-            std::cout << "\n" << ++m << " " << n << " " << row << " " << col << " " << face.rows[row][col];
             auto face_pos_3d = dim3::Vector{row,col,0};
             auto affine_face_pos = dim3::affine::to_vector(face_pos_3d);
             auto affine_cube_pos = to_base_3d[n]*affine_face_pos;
             auto cube_pos_3d = dim3::Vector{affine_cube_pos[0],affine_cube_pos[1],affine_cube_pos[2]};
+            std::cout << "\n" << ++m << " " << n << " " << face_pos_3d << " " << cube_pos_3d << face.rows[row][col];
+            if (cube.contains(cube_pos_3d)) {
+              // Overlap error
+              std::cout << "\nERROR: face:" << n << " " << face_pos_3d << " maps to previous " << cube_pos_3d;
+            }
             cube[cube_pos_3d] = face.rows[row][col];
           }
         }
