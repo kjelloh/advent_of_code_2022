@@ -673,7 +673,7 @@ std::ostream& operator<<(std::ostream& os,Model const& model) {
 class Face {
 public:
   Vector top_left{};
-  Vector bottom_right() const {return top_left + Vector{static_cast<int>(rows[0].size()),static_cast<int>(rows.size())};}
+  Vector bottom_right() const {return top_left + Vector{static_cast<int>(rows[0].size()-1),static_cast<int>(rows.size()-1)};}
   Strings rows{};
   int side_size() const {return bottom_right()[COORD::x] - top_left[COORD::x] + 1;}
 private:
@@ -931,6 +931,8 @@ namespace test {
       result = true;
     }
     if (result) {
+      result = false; // pessimistic ;)
+
       // Hard code folding example faces into a cube
       std::stringstream in{ pTest };
       auto data_model = parse(in);
@@ -1085,6 +1087,7 @@ namespace test {
 
       std::array<dim3::affine::Matrix,6> to_base_3d{}; // face n transformation to 3D space
 
+      int side_size=4;
       // base frame to face 0 frame
       auto pb0 = dim3::Vector{0,8,0}; // face 0 frame position in base frame
       auto Tb0 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,pb0);
@@ -1182,31 +1185,26 @@ namespace test {
         to_base_3d[5] = Tb0*T03*T34*T45;
       }
 
-      // Now test if we can walk on the folded cube?
-      // We need a way to identify what face we are currently on
-      // Ok, se player walks on folded cube in 3D.
-      // The player is on a face if its position maps back to a position on the 2D map.
-      // We have stored transformations so that to_base_3d[n] maps a position in the frame of face n back to a position relative base.
-      // Thus, if we define the player to walk in the frame of the current face we know when the face ends.
-      // Because we can only walk the x,y plane from (0,0) to (side-1,side-1) on that face.
-      struct Player {
-        int face; // face index we are on (0..5)
-        dim2::Vector pos;
-        dim2::Vector forward; // +/-x or y on the face
-      };
-      Player player{0,{0,0},{0,1}};
-      int side{4};
-      for (int m=0;m<4*4+1;++m) {
-        // We expect to walk a full revolution around the 4x4 example cube
-        player.pos += player.forward;
-        if (player.pos[0]>(side-1) or player.pos[1]>(side-1)) {
-          // Move to adjacent side
-          // The adjacent side is "over the horizon" (i.e. the cube edge we have passed).
-          // Hm... may it is simpler to first generate the 3D cube (values and all),
-          //       walk with a 3D player in this 3D space
-          // then map back to 2D when we stop?
-          // ...
+      // So how do we walk the 3D cube given the 2D map obstacles?
+      // Let's do the "simple" thing and create the 3D map to walk in 3D space.
+      int m{0};
+      std::map<dim3::Vector,char> cube{};
+      for (int n=0;n<faces.size();++n) {
+        auto const& face = faces[n];
+        for (int row=0;row<face.side_size();++row) {
+          for (int col=0;col<face.side_size();++col) {
+            std::cout << "\n" << ++m << " " << n << " " << row << " " << col << " " << face.rows[row][col];
+            auto face_pos_3d = dim3::Vector{row,col,0};
+            auto affine_face_pos = dim3::affine::to_vector(face_pos_3d);
+            auto affine_cube_pos = to_base_3d[n]*affine_face_pos;
+            auto cube_pos_3d = dim3::Vector{affine_cube_pos[0],affine_cube_pos[1],affine_cube_pos[2]};
+            cube[cube_pos_3d] = face.rows[row][col];
+          }
         }
+      }
+      int n{0};
+      for (auto const& [pos,ch] : cube) {
+        std::cout << "\n" << ++n << pos << " : " << ch;
       }
     }
     if (result) {
