@@ -494,6 +494,7 @@ namespace dim3 {
 
     Matrix to_inverse(Matrix const& m) {
       Matrix result{};
+      //
       // Trust m to be an affine transformation matrix with a pure rotation matrix rot and translation vector t in m.
       //
       // m = [  Rot    t ] ; where rot is a 3x3 orthonormal matrix and t is a dim3::vector 
@@ -502,7 +503,8 @@ namespace dim3 {
       // Then inverse(m) is then inv(m) =  [ inv(rot)  -inv(rot*t) ]
       //                                   [ 0 0 0          1      ]
       // And further,
-      // rot being orthonormal means inv(rot) is transpose of rot      
+      // rot being orthonormal means inv(rot) is transpose of rot :)
+      //    
       auto [rot,t] = to_rotation_and_translation(m);
       auto inv_rot = dim3::to_transposed(rot);
       auto inv_t = -(inv_rot*t);
@@ -945,7 +947,16 @@ namespace test {
       "        >>^..#>>"
       "        .#^....."
       "        ..^...#."
-      */  
+      */
+
+      /*
+        face "map" of the puzzle example
+
+        [     ][     ][  0  ][     ]
+        [  1  ][  2  ][  3  ][     ]
+        [     ][     ][  4  ][  5  ]
+
+      */
 
       // we want to transform between a position p´ in 3D space relative (0,0,0) and
       // the corresponding 2D position p on the given map (unfolded faces)
@@ -996,7 +1007,144 @@ namespace test {
       std::cout << "\nTinv\n" << Tinv;
       std::cout << "\nExpected I\n" << Tinv*T;
       auto p_again = Tinv*pp;
-      std::cout << "\np:" << p << " p_again:" << p_again;
+      std::cout << "\np:" << p << " p_again:" << p_again; // p:[5,9,0,1] p_again:[5,9,0,1] :)
+
+      // Now to the next trix to fold face 4 relative face 3. It will end up "upside down" aligned under face 0
+      // at z = -4 (the side size of face 3)
+      // It seems we should repeat the trick from previous to split the vector p on the flat surface into sections between origins?
+      // Let's examine the position (1,1) from corner 0 on face 4
+      /*
+
+
+      (0,0,0)
+         \
+          \ p3
+           \
+            \
+             v (4,8,0) (corner 0 of face 3)
+             |
+             | p34 (4,0,0)
+             |
+             v (8,8,0) (corner 0 of face 4 relative 0,0,0)
+             \
+          p4  \ 
+               v (1,1) from corner 0 on face 4
+      */
+
+      // The position p on the 2D unfolded plane relative 0,0 becomes:
+      // p = p3 + p34 + p4 = (4,8,0) + (4,0,0) + (1,1,0)
+      // We are now looking for the transformation T that transforms p to the 3D space position p'
+      // When face 4 is folded p´becomes (4,8,0) + (0,0,-4) + (-1,1,0). That is:
+      // p' = T*p = T*((4,8,0) + (4,0,0) + (1,1,0)) = (4,8,0) + (0,0,-4) + (-1,1,0)
+      // But this is "just" the vector to the face 3 folding corner + the folded edge of face 3 + the folded relative vector on face 4.
+      // If we call the folding impact transformation 2D to 3D for Tb3 (base to 3) we can write 
+      // p' = Tb3(corner30 + p34 + rot4*(1,1,0)) = (4,8,0) + (0,0,-4) + (-1,1,0)
+      // Which we then can call the effect of the total transformation Tb4 from base to face 4 on 2D vector p.
+      // p´= Tb4*p
+      // In a sense we first rotate (1,1,0) relative face 3,. Then we rotate the whole face 3 relative face 0 and then we add corner30 to get the p' from 0,0,0
+      // If we call the rotation of face 4 relative face 3 for T34 and the rotation of face 3 relative face 0 for T03, we get:
+      // T34*p4 = the rotation of a vector p4 on face 4 (p4 in face 4 system)
+      // T03*p34 = the rotation of the edge on face 3 to face 4 corner 0 (p34 in face 3 system)
+      // The final p' in 3D space from 0,0,0 now becomes:
+      // p' = p3 + T03*p34 + T34*T03*p4 = (4,8,0) + (0,0,-4) + (-1,1,0) = Tb4*((4,8,0) + (4,0,0) + (1,1,0))
+      // If we separate rotations from translations we can say that Tb4 is:
+      // translate to face 3, rotate p34+p4, translate rotated p34+p4, rotate p4, translate rotated p4
+      // Let's express that in matrix multiplications. define:
+      // TTb3 = translate from base to face 3
+      // T03 = rotate face 3 coordinates (as defined by rotation relative face 0)
+      // TT3 = translate in rotated face 3 coordinates
+      // T34 = rotate face 4 coordinates (as defined by rotation relative rotated face 3)
+      // TT4 = translate in rotated face 4 coordinates
+      // Hm... we need a way to "stack" forward so that each forward operation operates on coordinates defined by previous transformations?
+      // Looking backwards we can say.
+      // A position in face 4 frame,
+      // Is a position in face 3 frame but rotated around the edge between face 4 and 3 and translated from face 3 origo,
+      // Is a position in face 0 frame but rotated around the edge between face 3 and 0 and translated from face 0 origo,
+      // is a position in base frame but translated from base origo.
+      // Question is, how do I use this way of modelling to get from 3D pos in base frame to 2D pos in base frame?
+      // Well, the face frame coordinates are the same!
+      // So starting with the face coordinate in 3D chain and in 2D chain I get a mapping between that face coordinate and its 3D and 2D equivalent :)
+      // And the 2D forward transformations are just translations.
+      // While the 3D forward transformations are rotations + translations.
+
+      // Let's start over. So, given a point p3 in face 3 frame.
+      // We can get the same position in face 0 (parent) frame using a forward transformation T03 as:
+      // p2 = T03*p3 = rotate p3 defined by the fold face 0 to face 3 + the translation from face 0 frame to face 3 frame.
+      // Going back to the base frame we can now repeat this to get pb = the p2 position in base frame as:
+      // pb = Tb0*p2 = Tb0*T03*p3.
+
+      /*
+        face "map" of the puzzle example
+
+        [     ][     ][  0  ][     ]
+        [  1  ][  2  ][  3  ][     ]
+        [     ][     ][  4  ][  5  ]
+
+      */
+
+      // base frame to face 0 frame
+      auto pb0 = dim3::Vector{0,8,0}; // face 0 frame position in base frame
+      auto Tb0 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,pb0);
+
+      // Face 0 frame to face 3 frame
+      auto p03 = dim3::Vector{4,0,0}; // face 3 frame position in face 0 frame
+      auto T03 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],p03);
+
+      // Face 3 frame to face 4 frame
+      auto p34 = dim3::Vector{4,0,0}; // face 4 frame position in face 3 frame
+      auto T34 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],p34);
+
+      // So let's test this.
+      // Given a vector frame_p = (1,1,0) in each frame. What is the base frame position of that vector?
+      auto frame_p = dim3::affine::to_vector({1,1,0});
+      // Given frame_p in face 0 frame, what is the same position in the base frame?
+      {
+        auto pb = Tb0*frame_p; // Expected to be (0,8,0) + (1,1,0) = (1,9,0)
+        std::cout << "\nface 0 pb:" << pb; // face 0 pb:[1,9,0,1] :)
+      }
+      // Given frame_p in face 3 frame, what is the same position in the base frame?
+      {
+        auto pb = (Tb0*T03)*frame_p; // Expected to be (0,8,0) + (4,0,0) + (0,1,-1) = (4,9,-1)
+        std::cout << "\nface 3 pb:" << pb; // face 3 pb:[4,9,-1,1]
+      }
+      // Given frame_p in face 4 frame, what is the same position in the base frame?
+      {
+        auto pb = (Tb0*T03*T34)*frame_p; // Expected to be (0,8,0) + (4,0,0) + (0,0,-4) + (-1,1,0) = (3,9,-4)
+        std::cout << "\nface 4 pb:" << pb; // face 4 pb:[3,9,-4,1] :)
+      }
+
+      // Let's continue wth the rest of the faces
+      /*
+        face "map" of the puzzle example
+
+        [     ][     ][  0  ][     ]
+        [  1  ][  2  ][  3  ][     ]
+        [     ][     ][  4  ][  5  ]
+
+      */
+      // Face 3 frame to face 2 frame
+      auto p32 = dim3::Vector{1,1,0};
+      // Hm... We seem to need an intermediate frame to be able to rotate at the edge to face 3 and then translate to frame 2 at corner 0?
+      // face 3 to intermediate i
+      auto p32i = dim3::Vector{0,0,0};
+      auto T32i = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X90_Y0_Z0],p32i);
+      // Given frame_p in face intermediate frame, what is the same position in the base frame?
+      {
+        auto pb = (Tb0*T03*T32i)*frame_p; // Expected to be (0,8,0) + (4,0,0) + (1,0,-1) = (5,8,-1)
+        std::cout << "\nface 32i pb:" << pb; // face 32i pb:[5,8,-1,1] :)
+      }
+
+      // Intermediate to face 2
+      auto p32i2 = dim3::Vector{0,-4,0}; // translate to corner 0 of face 2 in intermediate frame
+      auto T32i2 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,p32i2);
+      // Given frame_p in face 2 frame, what is the same position in the base frame?
+      {
+        auto pb = (Tb0*T03*T32i*T32i2)*frame_p; // Expected to be (0,8,0) + (4,0,0) + (0,0,0) + (-4,0,0) + (1,0,-1) = (1,8,-1)
+        std::cout << "\nface 2 pb:" << pb; // face 2 pb:[1,8,-1,1] :)
+      }
+
+
+
 
       for (int n=0;n<faces.size();++n) {   
         switch (n) {
@@ -1047,6 +1195,16 @@ namespace test {
       result = false;
     }
     if (result) {
+      /*
+        NOTE: face "map" of the puzzle input differs from the example ;)
+
+        [     ][  0  ][  1  ]
+        [     ][  2  ][     ]
+        [  3  ][  4  ][     ]
+        [  5  ][     ][     ]
+
+      */
+
       // Generate x,y,z csv for input flat map
       std::stringstream in{ pData };
       auto data_model = parse(in);
