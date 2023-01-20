@@ -592,6 +592,7 @@ namespace dim3 {
 } // namespace dim3
 using dim3::operator<<;
 using dim3::operator+;
+using dim3::operator+=;
 using dim3::operator-;
 using dim3::operator*;
 using dim3::affine::operator<<;
@@ -1082,6 +1083,8 @@ namespace test {
 
       */
 
+      std::array<dim3::affine::Matrix,6> to_base_3d{}; // face n transformation to 3D space
+
       // base frame to face 0 frame
       auto pb0 = dim3::Vector{0,8,0}; // face 0 frame position in base frame
       auto Tb0 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,pb0);
@@ -1101,16 +1104,19 @@ namespace test {
       {
         auto pb = Tb0*frame_p; // Expected to be (0,8,0) + (1,1,0) = (1,9,0)
         std::cout << "\nface 0 pb:" << pb; // face 0 pb:[1,9,0,1] :)
+        to_base_3d[0] = Tb0;
       }
       // Given frame_p in face 3 frame, what is the same position in the base frame?
       {
         auto pb = (Tb0*T03)*frame_p; // Expected to be (0,8,0) + (4,0,0) + (0,1,-1) = (4,9,-1)
         std::cout << "\nface 3 pb:" << pb; // face 3 pb:[4,9,-1,1]
+        to_base_3d[3] = Tb0*T03;
       }
       // Given frame_p in face 4 frame, what is the same position in the base frame?
       {
         auto pb = (Tb0*T03*T34)*frame_p; // Expected to be (0,8,0) + (4,0,0) + (0,0,-4) + (-1,1,0) = (3,9,-4)
         std::cout << "\nface 4 pb:" << pb; // face 4 pb:[3,9,-4,1] :)
+        to_base_3d[4] = Tb0*T03*T34;
       }
 
       // Let's continue wth the rest of the faces
@@ -1154,6 +1160,7 @@ namespace test {
       {
         auto pb = (Tb0*T03*T32i*T32i2)*frame_p; // Expected to be (0,8,0) + (4,0,0) + (0,0,0) + (-4,0,0) + (1,0,-1) = (1,8,-1)
         std::cout << "\nface 2 pb:" << pb; // face 2 pb:[1,8,-1,1] :)
+        to_base_3d[2] = Tb0*T03*T32i*T32i2;
       }
 
       // Given frame_p in face 2-to-1 intermediate frame, what is the same position in the base frame?
@@ -1165,63 +1172,42 @@ namespace test {
       // Given frame_p in face 1 frame, what is the same position in the base frame?
       {
         auto pb = (Tb0*T03*T32i*T32i2*T21i*T21i1)*frame_p; // Expected (0,8,0) + (4,0,0) + (-4,0,0) + (0,4,0) + (0,-1,-1) = (0,11,-1)
-        std::cout << "\nface 2 pb:" << pb; // face 2 pb:[0,11,-1,1] :)
+        std::cout << "\nface 1 pb:" << pb; // face 1 pb:[0,11,-1,1] :)
+        to_base_3d[1] = Tb0*T03*T32i*T32i2*T21i*T21i1;
       }
       // Given frame_p in face 5 frame, what is the same position in the base frame?
       {
         auto pb = (Tb0*T03*T34*T45)*frame_p; // Expected to be (0,8,0) + (4,0,0) + (0,0,-4) + (0,4,0) + (-1,0,1) = (3,12,-3)
         std::cout << "\nface 5 pb:" << pb; // face 5 pb:[3,12,-3,1] :)
+        to_base_3d[5] = Tb0*T03*T34*T45;
       }
 
-
-
-      for (int n=0;n<faces.size();++n) {   
-        switch (n) {
-          case 0: {
-            // face_id:0 [0,8]
-            //   "...#"
-            //   ".#.."
-            //   "#..."
-            //   "...."
-          } break;
-          case 1: {
-            // face_id:1 [4,0]
-            //   "...#"
-            //   "...."
-            //   "..#."
-            //   "...."            
-          } break;
-          case 2: {
-            // face_id:2 [4,4]
-            //   "...."
-            //   "...."
-            //   "...#"
-            //   "...."
-          } break;
-          case 3: {
-            // face_id:3 [4,8]
-            //   "...#"
-            //   "#..."
-            //   "...."
-            //   "..#."
-          } break;
-          case 4: {
-            // face_id:4 [8,8]
-            //   "...#"
-            //   "...."
-            //   ".#.."
-            //   "...."
-          } break;
-          case 5: {
-            // face_id:5 [8,12]
-            //   "...."
-            //   ".#.."
-            //   "...."
-            //   "..#."
-          } break;
+      // Now test if we can walk on the folded cube?
+      // We need a way to identify what face we are currently on
+      // Ok, se player walks on folded cube in 3D.
+      // The player is on a face if its position maps back to a position on the 2D map.
+      // We have stored transformations so that to_base_3d[n] maps a position in the frame of face n back to a position relative base.
+      // Thus, if we define the player to walk in the frame of the current face we know when the face ends.
+      // Because we can only walk the x,y plane from (0,0) to (side-1,side-1) on that face.
+      struct Player {
+        int face; // face index we are on (0..5)
+        dim2::Vector pos;
+        dim2::Vector forward; // +/-x or y on the face
+      };
+      Player player{0,{0,0},{0,1}};
+      int side{4};
+      for (int m=0;m<4*4+1;++m) {
+        // We expect to walk a full revolution around the 4x4 example cube
+        player.pos += player.forward;
+        if (player.pos[0]>(side-1) or player.pos[1]>(side-1)) {
+          // Move to adjacent side
+          // The adjacent side is "over the horizon" (i.e. the cube edge we have passed).
+          // Hm... may it is simpler to first generate the 3D cube (values and all),
+          //       walk with a 3D player in this 3D space
+          // then map back to 2D when we stop?
+          // ...
         }
       }
-      result = false;
     }
     if (result) {
       /*
