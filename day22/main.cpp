@@ -1123,26 +1123,55 @@ namespace test {
 
       */
       // Face 3 frame to face 2 frame
-      auto p32 = dim3::Vector{1,1,0};
-      // Hm... We seem to need an intermediate frame to be able to rotate at the edge to face 3 and then translate to frame 2 at corner 0?
+      auto p32 = dim3::Vector{0,-4,0};
+      // Ouups! We seem to need an intermediate frame to be able to rotate at the edge to face 3 and then translate to frame 2 at corner 0?
       // face 3 to intermediate i
       auto p32i = dim3::Vector{0,0,0};
       auto T32i = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X90_Y0_Z0],p32i);
-      // Given frame_p in face intermediate frame, what is the same position in the base frame?
+      // Intermediate to face 2
+      auto p32i2 = dim3::Vector{0,-4,0}; // translate to corner 0 of face 2 in intermediate frame
+      auto T32i2 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,p32i2);
+      // face 2 frame to face 1 frame
+      // Ouups! We seem to need an intermediate frame to be able to rotate at the edge to face 2 and then translate to frame 1 at corner 0?
+      // face 2 to intermediate i
+      auto p21i = dim3::Vector{0,0,0};
+      auto T21i = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X90_Y0_Z0],p21i);
+      // Intermediate to face 1
+      auto p21i1 = dim3::Vector{0,-4,0}; // translate to corner 0 of face 1 in intermediate frame
+      auto T21i1 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,p21i1);
+      // face 4 frame to face 5 frame
+      auto p45 = dim3::Vector{0,4,0}; // face 5 frame position in face 4 frame
+      auto T45 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0],p45);
+
+
+      // Given frame_p in face 3-to-2 intermediate frame, what is the same position in the base frame?
       {
         auto pb = (Tb0*T03*T32i)*frame_p; // Expected to be (0,8,0) + (4,0,0) + (1,0,-1) = (5,8,-1)
         std::cout << "\nface 32i pb:" << pb; // face 32i pb:[5,8,-1,1] :)
       }
 
-      // Intermediate to face 2
-      auto p32i2 = dim3::Vector{0,-4,0}; // translate to corner 0 of face 2 in intermediate frame
-      auto T32i2 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,p32i2);
       // Given frame_p in face 2 frame, what is the same position in the base frame?
       {
         auto pb = (Tb0*T03*T32i*T32i2)*frame_p; // Expected to be (0,8,0) + (4,0,0) + (0,0,0) + (-4,0,0) + (1,0,-1) = (1,8,-1)
         std::cout << "\nface 2 pb:" << pb; // face 2 pb:[1,8,-1,1] :)
       }
 
+      // Given frame_p in face 2-to-1 intermediate frame, what is the same position in the base frame?
+      {
+        auto pb = (Tb0*T03*T32i*T32i2*T21i)*frame_p;  // Expected (0,8,0) + (4,0,0) + (-4,0,0) + (0,-1,-1) = (0,7,-1)
+        std::cout << "\nface 21i pb:" << pb; // face 21i pb:[0,7,-1,1] :)
+      }
+
+      // Given frame_p in face 1 frame, what is the same position in the base frame?
+      {
+        auto pb = (Tb0*T03*T32i*T32i2*T21i*T21i1)*frame_p; // Expected (0,8,0) + (4,0,0) + (-4,0,0) + (0,4,0) + (0,-1,-1) = (0,11,-1)
+        std::cout << "\nface 2 pb:" << pb; // face 2 pb:[0,11,-1,1] :)
+      }
+      // Given frame_p in face 5 frame, what is the same position in the base frame?
+      {
+        auto pb = (Tb0*T03*T34*T45)*frame_p; // Expected to be (0,8,0) + (4,0,0) + (0,0,-4) + (0,4,0) + (-1,0,1) = (3,12,-3)
+        std::cout << "\nface 5 pb:" << pb; // face 5 pb:[3,12,-3,1] :)
+      }
 
 
 
