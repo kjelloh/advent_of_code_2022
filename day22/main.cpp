@@ -1093,11 +1093,11 @@ namespace test {
       auto Tb0 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,pb0);
 
       // Face 0 frame to face 3 frame
-      auto p03 = dim3::Vector{4,0,0}; // face 3 frame position in face 0 frame
+      auto p03 = dim3::Vector{4,0,-1}; // face 3 frame position in face 0 frame
       auto T03 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],p03);
 
       // Face 3 frame to face 4 frame
-      auto p34 = dim3::Vector{4,0,0}; // face 4 frame position in face 3 frame
+      auto p34 = dim3::Vector{4,0,-1}; // face 4 frame position in face 3 frame
       auto T34 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],p34);
 
       // So let's test this.
@@ -1132,7 +1132,6 @@ namespace test {
 
       */
       // Face 3 frame to face 2 frame
-      auto p32 = dim3::Vector{0,-4,0};
       // Ouups! We seem to need an intermediate frame to be able to rotate at the edge to face 3 and then translate to frame 2 at corner 0?
       // face 3 to intermediate i
       auto p32i = dim3::Vector{0,-1,0}; // offset -1 to y==8
@@ -1149,7 +1148,7 @@ namespace test {
       auto p21i1 = dim3::Vector{0,-4,0}; // translate to corner 0 of face 1 in intermediate frame
       auto T21i1 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,p21i1);
       // face 4 frame to face 5 frame
-      auto p45 = dim3::Vector{0,4,0}; // face 5 frame position in face 4 frame
+      auto p45 = dim3::Vector{0,4,-1}; // face 5 frame position in face 4 frame
       auto T45 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0],p45);
 
 
@@ -1209,6 +1208,41 @@ namespace test {
       int n{0};
       for (auto const& [pos,ch] : cube) {
         std::cout << "\n" << ++n << pos << " : " << ch;
+      }
+      // Now make a Player that walks in 3D space
+      struct Player {
+        dim3::Vector pos; // Position in base frame
+        dim3::Matrix orientation; // rotation of player frame
+      };
+
+      auto TURN_LEFT = dim3::ROTATIONS[dim3::Rotations::Z90_Y0_X0];
+      dim3::Vector start{faces[0].top_left[0],faces[0].top_left[1],0};
+      Player player{start,dim3::Rotations::RUNIT}; // Start at corner 0 of face 0
+      auto delta = player.orientation*dim3::Y_UNIT; // start with Forward = +y relative base frame
+      for (int lap=0;lap<4;++lap) {
+        auto delta = player.orientation*dim3::Y_UNIT; // start with Forward = +y relative base frame
+        for (int i=0;i<16;++i) {
+          std::cout << "\nplayer:" << player.pos << " " << delta << std::flush;
+          auto next = player.pos+delta;
+          std::cout << " next:" << next << std::flush;
+          if (cube.contains(next)) {
+            player.pos = next;
+          }
+          else {
+            // wrap around to next face
+            // We expect the next face on a cube to be found by rotating next "forward" and go one step
+            // Forward means rotating +90 clockwise around the x-axis (using the y-axis as the "forward" for our player)
+            auto const& LEAN_FORWARD = dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0];
+            player.orientation = player.orientation*LEAN_FORWARD; // Apply lean forward to y=forward, then reorient player in base frame
+            delta = player.orientation*dim3::Y_UNIT; 
+            player.pos = next+delta; // walk the offset to next frame
+            std::cout << " wrapped to " << player.pos << " " << delta << std::flush;
+            assert(cube.contains(player.pos));
+          }
+        }
+        // Turn left
+        player.orientation = player.orientation*TURN_LEFT;
+        delta = player.orientation*dim3::Y_UNIT; 
       }
     }
     if (result) {
