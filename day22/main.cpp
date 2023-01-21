@@ -1266,6 +1266,7 @@ namespace test {
       player.orientation = dim3::Rotations::RUNIT; 
       delta = player.orientation*dim3::Y_UNIT; // start with Forward = +y relative base frame
       int facing{0}; // Facing is 0 for right (>), 1 for down (v), 2 for left (<), and 3 for up (^)
+      int step_count{0};
       for (auto move : path) {
         if (true) {
           // LOG
@@ -1295,6 +1296,7 @@ namespace test {
                   if (true) {
                     // LOG
                     std::cout << "\n\t" << i << " delta:" << delta << " next:" << next << " " << cube[next] << std::flush;
+                    ++step_count;
                   }
                 }
                 else {
@@ -1304,10 +1306,19 @@ namespace test {
               else {
                 // wrap "forward"
                 auto const& LEAN_FORWARD = dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0];
-                player.orientation = player.orientation*LEAN_FORWARD; // Apply lean forward to y=forward, then reorient player in base frame
-                delta = player.orientation*dim3::Y_UNIT; 
-                player.pos = next+delta; // walk the offset to next frame
-                std::cout << "\n\t" << i << " wrapped to " << player.pos << " " << delta << std::flush;
+                auto next_orientation = player.orientation*LEAN_FORWARD; // Apply lean forward to y=forward, then reorient player in base frame 
+                auto next_delta = next_orientation*dim3::Y_UNIT;
+                next = next + next_delta; // cross the edge
+                if (cube.contains(next) and cube[next]=='.') {
+                  player.orientation = next_orientation;
+                  player.pos = next; // walk the offset to next frame
+                  delta = next_delta;
+                  std::cout << "\n\t" << i << " wrapped to " << player.pos << " " << delta << std::flush;
+                  ++step_count;
+                }
+                else {
+                  std::cout << "\n\t " << i << " BLOCKED";
+                }
               }
               if (true) {
                 // LOG
@@ -1316,7 +1327,8 @@ namespace test {
                 auto flat_pos = face.top_left + v;
                 std::cout << " face:" << fix << " " << v << " rendered:" << flat_pos << " " << to_facing_char(facing);
                 auto [r,c] = flat_pos;
-                rendered[r][c] = to_facing_char(facing);
+                // rendered[r][c] = to_facing_char(facing);
+                rendered[r][c] = 'a'+(step_count%25);
               }
             }
           } break;
@@ -1328,7 +1340,8 @@ namespace test {
           auto flat_pos = face.top_left + v;
           std::cout << " face:" << fix << " " << v << " rendered:" << flat_pos << " " << to_facing_char(facing);
           auto [r,c] = flat_pos;
-          rendered[r][c] = to_facing_char(facing);
+          // rendered[r][c] = to_facing_char(facing);
+          rendered[r][c] = 'a'+(step_count%25);
         }
       }
       std::cout << "\n" << rendered;
@@ -1400,20 +1413,6 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-// char const* pTest = R"(        ...#
-//         .#..
-//         #...
-//         ....
-// ...#.......#
-// ........#...
-// ..#....#....
-// ..........#.
-//         ...#....
-//         .....#..
-//         .#......
-//         ......#.
-
-// 10R5L5R10L4R5L5)";
 char const* pTest = R"(        ...#
         .#..
         #...
@@ -1427,7 +1426,7 @@ char const* pTest = R"(        ...#
         .#......
         ......#.
 
-10R3R4R0R4R2L5R10L4R5L5)";
+10R5L5R10L4R5L5)";
 
 char const* pData = R"(                                                  ..........#..................#...........#.................#......#..................#...........#..
                                                   .........................#.......#.....#..............................#...........#.......#.........
