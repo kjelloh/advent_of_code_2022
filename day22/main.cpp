@@ -30,6 +30,17 @@ namespace test {bool does_comply();}
 using Result = long int;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
+// Facing is 0 for right (>), 1 for down (v), 2 for left (<), and 3 for up (^)
+char to_facing_char(int facing) {
+  switch (facing) {
+    case 0: return '>';break;
+    case 1: return 'v';break;
+    case 2: return '<';break;
+    case 3: return '^';break;
+  }
+  return '?';
+}
+
 namespace dim2 {
 
   enum COORD : int {
@@ -1188,10 +1199,12 @@ namespace test {
       // Let's do the "simple" thing and create the 3D map to walk in 3D space.
       int m{0};
       std::map<dim3::Vector,char> cube{};
+      std::map<dim3::Vector,std::pair<int,dim2::Vector>> cube2flat{};
       for (int n=0;n<faces.size();++n) {
         auto const& face = faces[n];
         for (int row=0;row<face.side_size();++row) {
           for (int col=0;col<face.side_size();++col) {
+            auto face_pos = dim2::Vector{row,col};
             auto face_pos_3d = dim3::Vector{row,col,0};
             auto affine_face_pos = dim3::affine::to_vector(face_pos_3d);
             auto affine_cube_pos = to_base_3d[n]*affine_face_pos;
@@ -1202,6 +1215,7 @@ namespace test {
               std::cout << "\nERROR: face:" << n << " " << face_pos_3d << " maps to previous " << cube_pos_3d;
             }
             cube[cube_pos_3d] = face.rows[row][col];
+            cube2flat[cube_pos_3d] = {n,face_pos};
           }
         }
       }
@@ -1244,6 +1258,86 @@ namespace test {
         player.orientation = player.orientation*TURN_LEFT;
         delta = player.orientation*dim3::Y_UNIT; 
       }
+
+      // test walking the actual path
+      auto path = data_model.second;
+      auto rendered = data_model.first;
+      player.pos = start; // Start at corner 0 of face 0
+      player.orientation = dim3::Rotations::RUNIT; 
+      delta = player.orientation*dim3::Y_UNIT; // start with Forward = +y relative base frame
+      int facing{0}; // Facing is 0 for right (>), 1 for down (v), 2 for left (<), and 3 for up (^)
+      for (auto move : path) {
+        if (true) {
+          // LOG
+          std::cout << "\nmove:" << move;
+          std::cout << " player:" << player.pos << std::flush;
+        }
+        switch (move.second) {
+          case 'R': {
+            facing = (facing+1)%4;
+            player.orientation = player.orientation*dim3::ROTATIONS[dim3::Rotations::Z270_Y0_X0];
+            auto delta = player.orientation*dim3::Y_UNIT; 
+            std::cout << " delta:" << delta << to_facing_char(facing);
+          } break;
+          case 'L': {
+            facing = (facing+3)%4; // -1 the same as +3 in modulus 4
+            player.orientation = player.orientation*dim3::ROTATIONS[dim3::Rotations::Z90_Y0_X0];
+            auto delta = player.orientation*dim3::Y_UNIT; 
+            std::cout << " delta:" << delta << to_facing_char(facing);
+          } break;
+          default: {
+            for (int i=0;i<move.first;++i) {
+              auto delta = player.orientation*dim3::Y_UNIT;
+              auto next = player.pos+delta;
+              if (cube.contains(next)) {
+                if (cube[next]=='.') {
+                  player.pos = next;
+                  if (true) {
+                    // LOG
+                    std::cout << "\n\t" << i << " delta:" << delta << " next:" << next << " " << cube[next] << std::flush;
+                  }
+                }
+                else {
+                  std::cout << "\n\t " << i << " BLOCKED";
+                }
+              }
+              else {
+                // wrap "forward"
+                auto const& LEAN_FORWARD = dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0];
+                player.orientation = player.orientation*LEAN_FORWARD; // Apply lean forward to y=forward, then reorient player in base frame
+                delta = player.orientation*dim3::Y_UNIT; 
+                player.pos = next+delta; // walk the offset to next frame
+                std::cout << "\n\t" << i << " wrapped to " << player.pos << " " << delta << std::flush;
+              }
+              if (true) {
+                // LOG
+                auto [fix,v] = cube2flat[player.pos];
+                auto const& face = faces[fix];
+                auto flat_pos = face.top_left + v;
+                std::cout << " face:" << fix << " " << v << " rendered:" << flat_pos << " " << to_facing_char(facing);
+                auto [r,c] = flat_pos;
+                rendered[r][c] = to_facing_char(facing);
+              }
+            }
+          } break;
+        }
+        if (true) {
+          // LOG
+          auto [fix,v] = cube2flat[player.pos];
+          auto const& face = faces[fix];
+          auto flat_pos = face.top_left + v;
+          std::cout << " face:" << fix << " " << v << " rendered:" << flat_pos << " " << to_facing_char(facing);
+          auto [r,c] = flat_pos;
+          rendered[r][c] = to_facing_char(facing);
+        }
+      }
+      std::cout << "\n" << rendered;
+      std::cout << "\nENDED at " << player.pos << " " << cube[player.pos];
+      // So, where are we on the flat map?
+      auto [fix,v] = cube2flat[player.pos];
+      auto const& face = faces[fix];
+      auto flat_pos = face.top_left + v;
+      std::cout << " = 2D map " << flat_pos;
     }
     if (result) {
       /*
