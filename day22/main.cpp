@@ -1354,9 +1354,18 @@ namespace test {
       auto [fix,v] = cube2flat[player.pos];
       auto const& face = faces[fix];
       auto flat_pos = face.top_left + v;
-      std::cout << " = 2D map " << flat_pos;
-    }
-    if (result) {
+      auto puzzle_coordinates = flat_pos+dim2::Vector{1,1};
+      std::cout << " = 2D map " << flat_pos << " puzzle coordinates " << puzzle_coordinates;
+      std::cout << "\nANSWER:" << 1000*puzzle_coordinates[0] + 4*puzzle_coordinates[1] + facing;
+      result = puzzle_coordinates==dim2::Vector{5,7};
+      assert(result);
+    }    
+    if (result) {      result = false; // pessimistic ;)
+
+      // Hard code folding the puzzle input
+      std::stringstream in{ pData };
+      auto data_model = parse(in);
+      Faces faces = to_faces(data_model.first);
       /*
         NOTE: face "map" of the puzzle input differs from the example ;)
 
@@ -1366,6 +1375,214 @@ namespace test {
         [  5  ][     ][     ]
 
       */
+
+      std::array<dim3::affine::Matrix,6> to_base_3d{}; // face n transformation to 3D space
+
+      int side_size=50;
+      // base frame to face 0 frame
+      auto pb0 = dim3::Vector{0,side_size,0}; // face 0 frame position in base frame
+      auto Tb0 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,pb0);
+      to_base_3d[0] = Tb0;
+
+      // 0 -> 1 (and 1 right of 0)
+      auto p01 = dim3::Vector{0,side_size,-1};
+      auto T01 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0],p01);
+      to_base_3d[1] = Tb0*T01;
+
+      // 0 -> 2 (and 2 under 0)
+      auto p02 = dim3::Vector{side_size,0,-1};
+      auto T02 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],p02);
+      to_base_3d[2] = Tb0*T02;
+
+      // 2 -> 4 (and 4 under 2)
+      auto p24 = dim3::Vector{side_size,0,-1};
+      auto T24 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],p24);
+      to_base_3d[4] = Tb0*T02*T24;
+
+      // 4 -> 3 (and face 3 left of face 4)
+      auto p43i = dim3::Vector{0,-1,0}; // Intermediate to rotate at right edge of face 3
+      auto T43i = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X90_Y0_Z0],p43i);
+      // face 3 left of intermediate (intermediate -> 3)
+      auto p43i3 = dim3::Vector{0,-side_size,0};
+      auto T43i3 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,p43i3);
+      to_base_3d[3] = Tb0*T02*T24*T43i*T43i3;
+
+      // 3 -> 5 (and face 5 under face 3)
+      auto p35 = dim3::Vector{side_size,0,-1};
+      auto T35 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],p35);
+      to_base_3d[5] = Tb0*T02*T24*T43i*T43i3*T35;
+
+      // So how do we walk the 3D cube given the 2D map obstacles?
+      // Let's do the "simple" thing and create the 3D map to walk in 3D space.
+      int m{0};
+      std::map<dim3::Vector,char> cube{};
+      std::map<dim3::Vector,std::pair<int,dim2::Vector>> cube2flat{};
+      for (int n=0;n<faces.size();++n) {
+        auto const& face = faces[n];
+        for (int row=0;row<face.side_size();++row) {
+          for (int col=0;col<face.side_size();++col) {
+            auto face_pos = dim2::Vector{row,col};
+            auto face_pos_3d = dim3::Vector{row,col,0};
+            auto affine_face_pos = dim3::affine::to_vector(face_pos_3d);
+            auto affine_cube_pos = to_base_3d[n]*affine_face_pos;
+            auto cube_pos_3d = dim3::Vector{affine_cube_pos[0],affine_cube_pos[1],affine_cube_pos[2]};
+            if (row < 10 and col < 10) std::cout << "\n" << ++m << " " << n << " " << face_pos_3d << " " << cube_pos_3d << face.rows[row][col];
+            if (cube.contains(cube_pos_3d)) {
+              // Overlap error
+              std::cout << "\nERROR: face:" << n << " " << face_pos_3d << " maps to previous " << cube_pos_3d;
+            }
+            cube[cube_pos_3d] = face.rows[row][col];
+            cube2flat[cube_pos_3d] = {n,face_pos};
+          }
+        }
+      }
+      // Now make a Player that walks in 3D space
+      struct Player {
+        dim3::Vector pos; // Position in base frame
+        dim3::Matrix orientation; // rotation of player frame
+      };
+
+      auto const& TURN_LEFT = dim3::ROTATIONS[dim3::Rotations::Z90_Y0_X0];
+      auto const& TURN_RIGHT = dim3::ROTATIONS[dim3::Rotations::Z270_Y0_X0];
+      auto const& LEAN_FORWARD = dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0];
+      
+      // Test walking free-runs around created 3D cube  
+      if (true) {
+        dim3::Vector start{faces[0].top_left[0],faces[0].top_left[1],0};
+        Player player{start,dim3::Rotations::RUNIT}; // Start at corner 0 of face 0
+        auto delta = player.orientation*dim3::Y_UNIT; // start with Forward = +y relative base frame
+        for (int lap=0;lap<4;++lap) {
+          auto delta = player.orientation*dim3::Y_UNIT; // start with Forward = +y relative base frame
+          for (int i=0;i<side_size*4;++i) {
+            std::cout << "\nplayer:" << player.pos << " " << delta << std::flush;
+            auto next = player.pos+delta;
+            std::cout << " next:" << next << std::flush;
+            if (cube.contains(next)) {
+              player.pos = next;
+            }
+            else {
+              // wrap around to next face
+              // We expect the next face on a cube to be found by rotating next "forward" and go one step
+              // Forward means rotating +90 clockwise around the x-axis (using the y-axis as the "forward" for our player)
+              player.orientation = player.orientation*LEAN_FORWARD; // Apply lean forward to y=forward, then reorient player in base frame
+              delta = player.orientation*dim3::Y_UNIT; 
+              player.pos = next+delta; // walk the offset to next frame
+              std::cout << " wrapped to " << player.pos << " " << delta << std::flush;
+              assert(cube.contains(player.pos));
+            }
+          }
+          // Turn left
+          player.orientation = player.orientation*TURN_LEFT;
+          delta = player.orientation*dim3::Y_UNIT; 
+        }
+      }
+
+      // test walking the actual path
+      if (true) {
+        dim3::Vector start{faces[0].top_left[0],faces[0].top_left[1],0};
+        Player player{start,dim3::Rotations::RUNIT}; // Start at corner 0 of face 0
+        auto delta = player.orientation*dim3::Y_UNIT; // start with Forward = +y relative base frame
+
+        auto path = data_model.second;
+        auto rendered = data_model.first;
+        player.pos = start; // Start at corner 0 of face 0
+        player.orientation = dim3::Rotations::RUNIT; 
+        delta = player.orientation*dim3::Y_UNIT; // start with Forward = +y relative base frame
+        int facing{0}; // Facing is 0 for right (>), 1 for down (v), 2 for left (<), and 3 for up (^)
+        int step_count{0};
+        for (auto move : path) {
+          if (true) {
+            // LOG
+            std::cout << "\nmove:" << move;
+            std::cout << " player:" << player.pos << std::flush;
+          }
+          switch (move.second) {
+            case 'R': {
+              facing = (facing+1)%4;
+              player.orientation = player.orientation*dim3::ROTATIONS[dim3::Rotations::Z270_Y0_X0];
+              auto delta = player.orientation*dim3::Y_UNIT; 
+              std::cout << " delta:" << delta << to_facing_char(facing);
+            } break;
+            case 'L': {
+              facing = (facing+3)%4; // -1 the same as +3 in modulus 4
+              player.orientation = player.orientation*dim3::ROTATIONS[dim3::Rotations::Z90_Y0_X0];
+              auto delta = player.orientation*dim3::Y_UNIT; 
+              std::cout << " delta:" << delta << to_facing_char(facing);
+            } break;
+            default: {
+              for (int i=0;i<move.first;++i) {
+                auto delta = player.orientation*dim3::Y_UNIT;
+                auto next = player.pos+delta;
+                if (cube.contains(next)) {
+                  if (cube[next]=='.') {
+                    player.pos = next;
+                    if (true) {
+                      // LOG
+                      std::cout << "\n\t" << i << " delta:" << delta << " next:" << next << " " << cube[next] << std::flush;
+                      ++step_count;
+                    }
+                  }
+                  else {
+                    std::cout << "\n\t " << i << " BLOCKED";
+                  }
+                }
+                else {
+                  // wrap "forward"
+                  auto const& LEAN_FORWARD = dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0];
+                  auto next_orientation = player.orientation*LEAN_FORWARD; // Apply lean forward to y=forward, then reorient player in base frame 
+                  auto next_delta = next_orientation*dim3::Y_UNIT;
+                  next = next + next_delta; // cross the edge
+                  if (cube.contains(next) and cube[next]=='.') {
+                    player.orientation = next_orientation;
+                    player.pos = next; // walk the offset to next frame
+                    delta = next_delta;
+                    std::cout << "\n\t" << i << " wrapped to " << player.pos << " " << delta << std::flush;
+                    ++step_count;
+                    auto flat_delta = cube2flat[next+next_delta].second - cube2flat[next].second;
+                    if (flat_delta[0]==0) facing = (flat_delta[1]>0)?0:2;
+                    else facing = (flat_delta[0]>0)?1:3;
+                  }
+                  else {
+                    std::cout << "\n\t " << i << " BLOCKED";
+                  }
+                }
+                if (true) {
+                  // LOG
+                  auto [fix,v] = cube2flat[player.pos];
+                  auto const& face = faces[fix];
+                  auto flat_pos = face.top_left + v;
+                  std::cout << " face:" << fix << " " << v << " rendered:" << flat_pos << " " << to_facing_char(facing);
+                  auto [r,c] = flat_pos;
+                  rendered[r][c] = to_facing_char(facing);
+                  // rendered[r][c] = 'a'+(step_count%25);
+                }
+              }
+            } break;
+          }
+          if (true) {
+            // LOG
+            auto [fix,v] = cube2flat[player.pos];
+            auto const& face = faces[fix];
+            auto flat_pos = face.top_left + v;
+            std::cout << " face:" << fix << " " << v << " rendered:" << flat_pos << " " << to_facing_char(facing);
+            auto [r,c] = flat_pos;
+            rendered[r][c] = to_facing_char(facing);
+            // rendered[r][c] = 'a'+(step_count%25);
+          }
+        }
+        std::cout << "\n" << rendered;
+        std::cout << "\nENDED at " << player.pos << " " << cube[player.pos];
+        // So, where are we on the flat map?
+        auto [fix,v] = cube2flat[player.pos];
+        auto const& face = faces[fix];
+        auto flat_pos = face.top_left + v;
+        auto puzzle_coordinates = flat_pos+dim2::Vector{1,1};
+        std::cout << " = 2D map " << flat_pos << " puzzle coordinates " << puzzle_coordinates;
+        std::cout << "\nANSWER:" << 1000*puzzle_coordinates[0] + 4*puzzle_coordinates[1] + facing;
+      }
+
+    }
+    if (result) {
 
       // Generate x,y,z csv for input flat map
       std::stringstream in{ pData };
