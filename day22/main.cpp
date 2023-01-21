@@ -127,6 +127,7 @@ namespace dim2 {
 
 } // namespace dim2
 using dim2::operator<<;
+using dim2::operator-;
 
 namespace dim3 {
   using Vector = std::array<int,3>;
@@ -1315,6 +1316,9 @@ namespace test {
                   delta = next_delta;
                   std::cout << "\n\t" << i << " wrapped to " << player.pos << " " << delta << std::flush;
                   ++step_count;
+                  auto flat_delta = cube2flat[next+next_delta].second - cube2flat[next].second;
+                  if (flat_delta[0]==0) facing = (flat_delta[1]>0)?0:2;
+                  else facing = (flat_delta[0]>0)?1:3;
                 }
                 else {
                   std::cout << "\n\t " << i << " BLOCKED";
@@ -1327,8 +1331,8 @@ namespace test {
                 auto flat_pos = face.top_left + v;
                 std::cout << " face:" << fix << " " << v << " rendered:" << flat_pos << " " << to_facing_char(facing);
                 auto [r,c] = flat_pos;
-                // rendered[r][c] = to_facing_char(facing);
-                rendered[r][c] = 'a'+(step_count%25);
+                rendered[r][c] = to_facing_char(facing);
+                // rendered[r][c] = 'a'+(step_count%25);
               }
             }
           } break;
@@ -1340,8 +1344,8 @@ namespace test {
           auto flat_pos = face.top_left + v;
           std::cout << " face:" << fix << " " << v << " rendered:" << flat_pos << " " << to_facing_char(facing);
           auto [r,c] = flat_pos;
-          // rendered[r][c] = to_facing_char(facing);
-          rendered[r][c] = 'a'+(step_count%25);
+          rendered[r][c] = to_facing_char(facing);
+          // rendered[r][c] = 'a'+(step_count%25);
         }
       }
       std::cout << "\n" << rendered;
