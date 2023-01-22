@@ -1598,11 +1598,11 @@ namespace test {
       // Standard Tree
       struct Tree {
         auto adj(int v) const {
-          assert(m_adj.contains(v));
-          return m_adj.at(v);
+          if (m_adj.contains(v)) return m_adj.at(v);
+          else throw(std::runtime_error("No adj found"));
         }
-        void add_branch(int v,int w) {m_adj[v] = w;} // top-down only
-        std::map<int,int> m_adj{};
+        void add_branch(int v,int w) {m_adj[v].insert(w);} // top-down only
+        std::map<int,std::set<int>> m_adj{};
       };
 
       // Standard DFS - Tree to Paths
@@ -1614,11 +1614,12 @@ namespace test {
           dfs(tree,s);
         }
         void dfs(Tree const& tree,int v) {
-          std::cerr << "\nTODO: Implement dfs to build paths";
-          // m_marked[v] = true;
-          // for (auto w : tree.adj(v)) {
-
-          // }
+          m_marked[v] = true;
+          for (auto const& w : tree.adj(v)) {
+            if (!m_marked[w]) {
+              m_parent[w] = v;
+            }
+          }
         }
         auto operator()(int v) const {
           using Result = std::vector<int>;
@@ -1633,16 +1634,17 @@ namespace test {
               case 4: result = Result{4,2,0}; break;
               case 5: result = Result{5,3,4,2,0}; break;
             }
+            std::reverse(result.begin(),result.end());
           }
           else {
             assert(m_parent.contains(v));
-            std::stack<int> path{};
+            std::deque<int> path{};
+            path.push_front(m_s);
             for (int x=v;x!=m_s;x=m_parent.at(v)) {
-              result.push_back(x);
+              path.push_front(x);
             }
-            result.push_back(m_s);
+            std::copy(path.begin(),path.end(),std::back_inserter(result));
           }
-          std::reverse(result.begin(),result.end());
           return result;
         }
       };
@@ -1655,7 +1657,15 @@ namespace test {
       Tree tree{};
       for (int n=0;n<faces.size();++n) {
         // TODO: Build tree of faces
-        std::cerr << "\nTODO: Add to tree face:" << n;
+        std::cerr << "\nTODO: Remove hard coded tree with actual face position tree generation:" << n;
+        switch (n) {
+          case 0: tree.add_branch(0,1);tree.add_branch(0,2);break;
+          case 1: break;
+          case 2: tree.add_branch(2,4);break;
+          case 3: tree.add_branch(3,5);break;
+          case 4: tree.add_branch(4,3);break;
+          case 5: break;
+        }
       }
       auto path_to = PathsTo(tree,0);
 
