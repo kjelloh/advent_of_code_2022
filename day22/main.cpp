@@ -1599,9 +1599,9 @@ namespace test {
       struct Tree {
         auto adj(int v) const {
           if (m_adj.contains(v)) return m_adj.at(v);
-          else throw(std::runtime_error("No adj found"));
+          else return std::set<int>{};
         }
-        void add_branch(int v,int w) {m_adj[v].insert(w);} // top-down only
+        void add_branch(int v,int w) {m_adj[v].insert(w);}
         std::map<int,std::set<int>> m_adj{};
       };
 
@@ -1614,17 +1614,21 @@ namespace test {
           dfs(tree,s);
         }
         void dfs(Tree const& tree,int v) {
+          std::cerr << "\ndfs(tree," << v << ")" << std::flush;
           m_marked[v] = true;
           for (auto const& w : tree.adj(v)) {
             if (!m_marked[w]) {
               m_parent[w] = v;
+              std::cerr << " " << v << " parent to " << w;
+              dfs(tree,w);
             }
           }
         }
         auto operator()(int v) const {
+          std::cerr << "\npath_to(" << v << ")" << std::flush;
           using Result = std::vector<int>;
           Result result{};
-          if (true) {
+          if (false) {
             std::cerr << "\nTODO: Remove hard code paths to 0 for Puzzle input";
             switch (v) {
               case 0: result = Result{0}; break;
@@ -1634,17 +1638,19 @@ namespace test {
               case 4: result = Result{4,2,0}; break;
               case 5: result = Result{5,3,4,2,0}; break;
             }
-            std::reverse(result.begin(),result.end());
           }
           else {
-            assert(m_parent.contains(v));
-            std::deque<int> path{};
-            path.push_front(m_s);
-            for (int x=v;x!=m_s;x=m_parent.at(v)) {
-              path.push_front(x);
+            std::vector<int> path{};
+            int break_count{10};
+            for (int x=v;x!=m_s;x=m_parent.at(x)) {
+              path.push_back(x);
+              if (--break_count==0) exit(0);
             }
+            path.push_back(m_s);
             std::copy(path.begin(),path.end(),std::back_inserter(result));
           }
+          std::reverse(result.begin(),result.end());
+          for (auto x : result) std::cout << "," << x;
           return result;
         }
       };
