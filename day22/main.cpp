@@ -1657,6 +1657,7 @@ namespace test {
 
       std::array<dim3::affine::Matrix,6> forward_T{}; // forward_T[w] is the forward transformation from parent frame to frame w
 
+      // std::stringstream in{ pTest };
       std::stringstream in{ pData };
       auto data_model = parse(in);
       Faces faces = to_faces(data_model.first);
@@ -1719,11 +1720,49 @@ namespace test {
 
       auto to_base_3d = std::vector<dim3::affine::Matrix>(6,dim3::affine::to_matrix(dim3::Rotations::RUNIT,{0,0,0})); // face n transformation to 3D space
 
+      std::set<int> marked{};
+      for (int n=tree.m_adj.size()-1;n>0;--n) {
+        auto path_to_n = path_to(n);
+        for (int k=path_to_n.size()-1;k>0;--k) {
+          auto i=path_to_n[k-1]; // ex 3
+          auto j=path_to_n[k]; // ex 5
+          std::cout << "\n" << n << " " << i << " " << j;
+          if (j<6 and !marked.contains(j)) {
+            auto& parent = faces[i];
+            auto& child = faces[j];
+            marked.insert(j);
+            if (child.top_left.at(0)==parent.top_left.at(0)) {
+              // same "row" of faces
+              if (child.top_left.at(1) + side_size == parent.top_left.at(1)) {
+                // child is left of parent
+                std::cout << "\nchild:" << j << " is left of parent:" << i;
+              }
+              else if (parent.top_left.at(1) + side_size == child.top_left.at(1)) {
+                // child is right of parent
+                std::cout << "\nchild:" << j << " is right of parent:" << i;
+              }
+            }
+            else if (child.top_left.at(1)==parent.top_left.at(1)) {
+              // same "col" of faces
+              if (child.top_left.at(0) + side_size == parent.top_left.at(0)) {
+                // child is above parent
+                std::cout << "\nchild:" << j << " is above parent:" << i;
+              }
+              else if (parent.top_left.at(0) + side_size == child.top_left.at(0)) {
+                // child is below
+                std::cout << "\nchild:" << j << " is below parent:" << i;
+              }
+            }          
+          }
+        }
+      }
+      exit(0);
+
       {
-        // base frame to face 0 frame
-        auto pb0 = dim3::Vector{0,side_size,0}; // face 0 frame position in base frame
-        auto Tb0 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,pb0);
-        forward_T[0] = Tb0;
+        // // base frame to face 0 frame
+        // auto pb0 = dim3::Vector{0,side_size,0}; // face 0 frame position in base frame
+        // auto Tb0 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,pb0);
+        // forward_T[0] = Tb0;
 
         // 0 -> 1 (and 1 right of 0)
         auto p01 = dim3::Vector{0,side_size,-1};
