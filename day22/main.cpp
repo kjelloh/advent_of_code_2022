@@ -1678,7 +1678,7 @@ namespace test {
       int side_size=faces[0].side_size();
 
       // base frame to face 0 frame
-      auto pb0 = dim3::Vector{0,side_size,0}; // face 0 frame position in base frame
+      auto pb0 = dim3::Vector{faces[0].top_left[0],faces[0].top_left[1],0}; // face 0 frame position in base frame
       auto Tb0 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,pb0);
       forward_T[0] = Tb0;
 
@@ -1724,8 +1724,8 @@ namespace test {
       for (int n=tree.m_adj.size()-1;n>0;--n) {
         auto path_to_n = path_to(n);
         for (int k=path_to_n.size()-1;k>0;--k) {
-          auto i=path_to_n[k-1]; // ex 3
-          auto j=path_to_n[k]; // ex 5
+          auto i=path_to_n[k-1]; // parent
+          auto j=path_to_n[k]; // child
           std::cout << "\n" << n << " " << i << " " << j;
           if (j<6 and !marked.contains(j)) {
             auto& parent = faces[i];
@@ -1736,10 +1736,21 @@ namespace test {
               if (child.top_left.at(1) + side_size == parent.top_left.at(1)) {
                 // child is left of parent
                 std::cout << "\nchild:" << j << " is left of parent:" << i;
+                // Use an intermediate frame to rotate at touching edge
+                auto pijI = dim3::Vector{0,-1,0}; // Intermediate to rotate at right edge of face j
+                auto TijI = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X90_Y0_Z0],pijI);
+                // Use an intermediate frame to translate to face child origo (upper left corner)
+                auto pijIj = dim3::Vector{0,-side_size,0};
+                auto TijIj = dim3::affine::to_matrix(dim3::Rotations::RUNIT,pijIj);
+                forward_T[j] = TijI*TijIj;
               }
               else if (parent.top_left.at(1) + side_size == child.top_left.at(1)) {
                 // child is right of parent
                 std::cout << "\nchild:" << j << " is right of parent:" << i;
+                auto pij = dim3::Vector{0,side_size,-1};
+                auto Tij = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0],pij);
+                forward_T[j] = Tij;
+
               }
             }
             else if (child.top_left.at(1)==parent.top_left.at(1)) {
@@ -1751,12 +1762,16 @@ namespace test {
               else if (parent.top_left.at(0) + side_size == child.top_left.at(0)) {
                 // child is below
                 std::cout << "\nchild:" << j << " is below parent:" << i;
+                // 0 -> 2 (and 2 under 0)
+                auto p02 = dim3::Vector{side_size,0,-1};
+                auto T02 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],p02);
+                forward_T[j] = T02;
+
               }
             }          
           }
         }
       }
-      exit(0);
 
       {
         // // base frame to face 0 frame
@@ -1764,33 +1779,33 @@ namespace test {
         // auto Tb0 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,pb0);
         // forward_T[0] = Tb0;
 
-        // 0 -> 1 (and 1 right of 0)
-        auto p01 = dim3::Vector{0,side_size,-1};
-        auto T01 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0],p01);
-        forward_T[1] = T01;
+        // // 0 -> 1 (and 1 right of 0)
+        // auto p01 = dim3::Vector{0,side_size,-1};
+        // auto T01 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0],p01);
+        // forward_T[1] = T01;
 
-        // 0 -> 2 (and 2 under 0)
-        auto p02 = dim3::Vector{side_size,0,-1};
-        auto T02 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],p02);
-        forward_T[2] = T02;
+        // // 0 -> 2 (and 2 under 0)
+        // auto p02 = dim3::Vector{side_size,0,-1};
+        // auto T02 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],p02);
+        // forward_T[2] = T02;
 
-        // 2 -> 4 (and 4 under 2)
-        auto p24 = dim3::Vector{side_size,0,-1};
-        auto T24 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],p24);
-        forward_T[4] = T24;
+        // // 2 -> 4 (and 4 under 2)
+        // auto p24 = dim3::Vector{side_size,0,-1};
+        // auto T24 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],p24);
+        // forward_T[4] = T24;
 
-        // 4 -> 3 (and face 3 left of face 4)
-        auto p43i = dim3::Vector{0,-1,0}; // Intermediate to rotate at right edge of face 3
-        auto T43i = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X90_Y0_Z0],p43i);
-        // face 3 left of intermediate (intermediate -> 3)
-        auto p43i3 = dim3::Vector{0,-side_size,0};
-        auto T43i3 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,p43i3);
-        forward_T[3] = T43i*T43i3;
+        // // 4 -> 3 (and face 3 left of face 4)
+        // auto p43i = dim3::Vector{0,-1,0}; // Intermediate to rotate at right edge of face 3
+        // auto T43i = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X90_Y0_Z0],p43i);
+        // // face 3 left of intermediate (intermediate -> 3)
+        // auto p43i3 = dim3::Vector{0,-side_size,0};
+        // auto T43i3 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,p43i3);
+        // forward_T[3] = T43i*T43i3;
 
-        // 3 -> 5 (and face 5 under face 3)
-        auto p35 = dim3::Vector{side_size,0,-1};
-        auto T35 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],p35);
-        forward_T[5] = T35;
+        // // 3 -> 5 (and face 5 under face 3)
+        // auto p35 = dim3::Vector{side_size,0,-1};
+        // auto T35 = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],p35);
+        // forward_T[5] = T35;
       }
 
       // // to_base_3d[0] = forward_T[0];
