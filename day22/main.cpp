@@ -1673,6 +1673,38 @@ namespace test {
           case 5: break;
         }
       }
+
+
+      for (int i=0;i<faces.size();++i) {
+        auto& face = faces[i];
+        for (int j=i+1;j<faces.size();++j) {
+          std::cout << "\ni:" << i << " j:" << j;
+          auto& other_face = faces[j];
+          if (face.top_left.at(0)==other_face.top_left.at(0)) {
+            // same "row" of faces
+            if (other_face.top_left.at(1) + face.side_size() == face.top_left.at(1)) {
+              // other is left neighbour
+              std::cout << "\nface:" << j << " is left of face:" << i;
+            }
+            else if (face.top_left.at(1) + face.side_size() == other_face.top_left.at(1)) {
+              // other face is right neighbour
+              std::cout << "\nface:" << j << " is right of face:" << i;
+            }
+          }
+          else if (face.top_left.at(1)==other_face.top_left.at(1)) {
+            // same "col" of faces
+            if (other_face.top_left.at(0) + face.side_size() == face.top_left.at(0)) {
+              // other is neighbour above
+              std::cout << "\nface:" << j << " is above of face:" << i;
+            }
+            else if (face.top_left.at(0) + face.side_size() == other_face.top_left.at(0)) {
+              // other face is neighbour below
+              std::cout << "\nface:" << j << " is below face:" << i;
+            }
+          }
+        }
+      }
+
       auto path_to = PathsTo(tree,0);
 
       auto to_base_3d = std::vector<dim3::affine::Matrix>(6,dim3::affine::to_matrix(dim3::Rotations::RUNIT,{0,0,0})); // face n transformation to 3D space
