@@ -1601,7 +1601,7 @@ namespace test {
           if (m_adj.contains(v)) return m_adj.at(v);
           else return std::set<int>{};
         }
-        void add_branch(int v,int w) {m_adj[v].insert(w);}
+        void add_branch(int v,int w) {m_adj[v].insert(w);m_adj[w].insert(v);}
         std::map<int,std::set<int>> m_adj{};
       };
 
@@ -1661,19 +1661,25 @@ namespace test {
       auto data_model = parse(in);
       Faces faces = to_faces(data_model.first);
       Tree tree{};
-      for (int n=0;n<faces.size();++n) {
-        // TODO: Build tree of faces
-        std::cerr << "\nTODO: Remove hard coded tree with actual face position tree generation:" << n;
-        switch (n) {
-          case 0: tree.add_branch(0,1);tree.add_branch(0,2);break;
-          case 1: break;
-          case 2: tree.add_branch(2,4);break;
-          case 3: tree.add_branch(3,5);break;
-          case 4: tree.add_branch(4,3);break;
-          case 5: break;
-        }
-      }
+      // for (int n=0;n<faces.size();++n) {
+      //   // TODO: Build tree of faces
+      //   std::cerr << "\nTODO: Remove hard coded tree with actual face position tree generation:" << n;
+      //   switch (n) {
+      //     case 0: tree.add_branch(0,1);tree.add_branch(0,2);break;
+      //     case 1: break;
+      //     case 2: tree.add_branch(2,4);break;
+      //     case 3: tree.add_branch(3,5);break;
+      //     case 4: tree.add_branch(4,3);break;
+      //     case 5: break;
+      //   }
+      // }
 
+      int side_size=faces[0].side_size();
+
+      // base frame to face 0 frame
+      auto pb0 = dim3::Vector{0,side_size,0}; // face 0 frame position in base frame
+      auto Tb0 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,pb0);
+      forward_T[0] = Tb0;
 
       for (int i=0;i<faces.size();++i) {
         auto& face = faces[i];
@@ -1685,10 +1691,12 @@ namespace test {
             if (other_face.top_left.at(1) + face.side_size() == face.top_left.at(1)) {
               // other is left neighbour
               std::cout << "\nface:" << j << " is left of face:" << i;
+              tree.add_branch(i,j);
             }
             else if (face.top_left.at(1) + face.side_size() == other_face.top_left.at(1)) {
               // other face is right neighbour
               std::cout << "\nface:" << j << " is right of face:" << i;
+              tree.add_branch(i,j);
             }
           }
           else if (face.top_left.at(1)==other_face.top_left.at(1)) {
@@ -1696,10 +1704,12 @@ namespace test {
             if (other_face.top_left.at(0) + face.side_size() == face.top_left.at(0)) {
               // other is neighbour above
               std::cout << "\nface:" << j << " is above of face:" << i;
+              tree.add_branch(i,j);
             }
             else if (face.top_left.at(0) + face.side_size() == other_face.top_left.at(0)) {
               // other face is neighbour below
               std::cout << "\nface:" << j << " is below face:" << i;
+              tree.add_branch(i,j);
             }
           }
         }
@@ -1708,7 +1718,6 @@ namespace test {
       auto path_to = PathsTo(tree,0);
 
       auto to_base_3d = std::vector<dim3::affine::Matrix>(6,dim3::affine::to_matrix(dim3::Rotations::RUNIT,{0,0,0})); // face n transformation to 3D space
-      int side_size=faces[0].side_size();
 
       {
         // base frame to face 0 frame
