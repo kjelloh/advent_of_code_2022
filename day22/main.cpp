@@ -41,6 +41,13 @@ char to_facing_char(int facing) {
   return '?';
 }
 
+int to_facing(char facing_char) {
+  for (int i=0;i<4;++i) {
+    if (to_facing_char(i)==facing_char) return i;
+  }
+  return -1;
+}
+
 namespace dim2 {
 
   enum COORD : int {
@@ -549,58 +556,6 @@ namespace dim3 {
     - Place the coordinate system at tlf with column as x, row as y and "sheet" as z
   */
 
-
-  // The hull of a cube that is the result of folding cube faces arranged on a 2D surface
-  // The FoldedCube hull keeps a record of where the folds are, to enable transformation
-  // between the cube hull reference frame and the unfolded cube reference frame.
-  // The Hull reference frame is corner 0 of the first face in the faces array.
-  struct FoldedCubeHull {
-    using Cubefaces = std::array<Square,6>;
-    Cubefaces faces{};
-  };
-
-  // Folds a collection of 6 squares in the xy-plane into a convex hull of a cube
-  class CubeHullFolder {
-  public:
-    void push_back(Square const& square) {m_anonymous_faces.push_back(square); std::cout << "\n" << square;}
-    FoldedCubeHull hull() {
-      // Folds anonymous faces into a cube
-      return FoldedCubeHull{};
-    }
-  private:
-    Squares m_anonymous_faces{};
-  };
-
-  struct FoldedCubeHullWalker {
-    std::reference_wrapper<FoldedCubeHull const> hull;
-    int face_index{0};
-    Vector face_pos{0,0,0};
-    Vector face_delta{0,1,0};
-    FoldedCubeHullWalker(FoldedCubeHull const& hull) : hull{hull} {}
-    FoldedCubeHullWalker& turn_left() {
-      face_delta = dim3::ROTATIONS[dim3::Rotations::Z90_Y0_X0]*face_delta;
-      return *this;
-    }
-    FoldedCubeHullWalker& turn_right() {
-      face_delta = dim3::ROTATIONS[dim3::Rotations::Z270_Y0_X0]*face_delta;
-      return *this;
-    }
-    FoldedCubeHullWalker& operator++() {
-      face_pos += face_delta;
-      return *this;
-    }
-    Vector frame_0_pos() const {
-      Vector result{};
-      std::cerr << "\nFoldedCubeHullWalker::frame_0_pos NOT YET IMPLEMENTED";
-      return result;
-    }
-    Vector frame_0_delta() const {
-      Vector result{};
-      std::cerr << "\nFoldedCubeHullWalker::frame_0_delta NOT YET IMPLEMENTED";
-      return result;
-    }
-  };
-
 } // namespace dim3
 using dim3::operator<<;
 using dim3::operator+;
@@ -806,35 +761,379 @@ struct StringsWalker {
   }
 };
 
+// Standard Tree
+struct Tree {
+  auto adj(int v) const {
+    if (m_adj.contains(v)) return m_adj.at(v);
+    else return std::set<int>{};
+  }
+  void add_branch(int v,int w) {m_adj[v].insert(w);m_adj[w].insert(v);}
+  std::map<int,std::set<int>> m_adj{};
+};
+
+// Standard DFS - Tree to Paths
+struct PathsTo{
+  int m_s;
+  std::map<int,int> m_parent{}; // parent[i] is the parent vertex of i
+  std::map<int,bool> m_marked{}; // true if dfs called on vertex
+  PathsTo(Tree const& tree,int s) : m_s{s} {
+    dfs(tree,s);
+  }
+  void dfs(Tree const& tree,int v) {
+    m_marked[v] = true;
+    for (auto const& w : tree.adj(v)) {
+      if (!m_marked[w]) {
+        m_parent[w] = v;
+        dfs(tree,w);
+      }
+    }
+  }
+  auto operator()(int v) const {
+    using Result = std::vector<int>;
+    Result result{};
+    for (int x=v;x!=m_s;x=m_parent.at(x)) {result.push_back(x);}
+    result.push_back(m_s);
+    std::reverse(result.begin(),result.end());
+    return result;
+  }
+};
+
+class FoldedCubeHullWalker {
+public:
+  FoldedCubeHullWalker(Strings const& strings,Path const& path) : m_strings{strings},m_faces{to_faces(m_strings)} {
+    walk(path);
+  }
+  FoldedCubeHullWalker& turn_left() {
+    return *this;
+  }
+  FoldedCubeHullWalker& turn_right() {
+    return *this;
+  }
+  FoldedCubeHullWalker& operator++() {
+    return *this;
+  }
+  Vector frame_0_pos() const {
+    Vector result{};
+    return m_frame_0_pos;
+  }
+  Vector frame_0_delta() const {
+    Vector result{};
+    switch (m_facing) {
+      case 0: return Vector{0,1}; break;
+      case 1: return Vector{1,0}; break;
+      case 2: return Vector{0,-1}; break;
+      case 3: return Vector{-1,0}; break;
+    }
+    return result;
+  }
+  std::pair<Vector,int> result() {
+    return {m_frame_0_pos,m_facing};
+  }
+private:
+  int m_facing{};
+  Vector m_frame_0_pos{};
+  Strings m_strings{};
+  Faces m_faces{};
+  void walk(Path const& path) {
+
+    std::array<dim3::affine::Matrix,6> forward_T{}; // forward_T[w] is the forward transformation from parent frame to frame w
+
+    auto const& faces = m_faces;
+    Tree tree{};
+
+    int side_size=faces[0].side_size();
+
+    // base frame to face 0 frame
+    auto pb0 = dim3::Vector{faces[0].top_left[0],faces[0].top_left[1],0}; // face 0 frame position in base frame
+    auto Tb0 = dim3::affine::to_matrix(dim3::Rotations::RUNIT,pb0);
+    forward_T[0] = Tb0;
+
+    // Build the tree of faces to fold
+    for (int i=0;i<faces.size();++i) {
+      auto& face = faces[i];
+      for (int j=i+1;j<faces.size();++j) {
+        std::cout << "\ni:" << i << " j:" << j;
+        auto& other_face = faces[j];
+        if (face.top_left.at(0)==other_face.top_left.at(0)) {
+          // same "row" of faces
+          if (other_face.top_left.at(1) + face.side_size() == face.top_left.at(1)) {
+            // other is left neighbour
+            std::cout << "\nface:" << j << " is left of face:" << i;
+            tree.add_branch(i,j);
+          }
+          else if (face.top_left.at(1) + face.side_size() == other_face.top_left.at(1)) {
+            // other face is right neighbour
+            std::cout << "\nface:" << j << " is right of face:" << i;
+            tree.add_branch(i,j);
+          }
+        }
+        else if (face.top_left.at(1)==other_face.top_left.at(1)) {
+          // same "col" of faces
+          if (other_face.top_left.at(0) + face.side_size() == face.top_left.at(0)) {
+            // other is neighbour above
+            std::cout << "\nface:" << j << " is above of face:" << i;
+            tree.add_branch(i,j);
+          }
+          else if (face.top_left.at(0) + face.side_size() == other_face.top_left.at(0)) {
+            // other face is neighbour below
+            std::cout << "\nface:" << j << " is below face:" << i;
+            tree.add_branch(i,j);
+          }
+        }
+      }
+    }
+
+    auto path_to = PathsTo(tree,0);
+
+    auto to_base_3d = std::vector<dim3::affine::Matrix>(6,dim3::affine::to_matrix(dim3::Rotations::RUNIT,{0,0,0})); // face n transformation to 3D space
+
+    // Build the 3D transformations that defines the folds
+    std::set<int> marked{};
+    for (int n=tree.m_adj.size()-1;n>0;--n) {
+      auto path_to_n = path_to(n);
+      for (int k=path_to_n.size()-1;k>0;--k) {
+        auto i=path_to_n[k-1]; // parent
+        auto j=path_to_n[k]; // child
+        std::cout << "\n" << n << " " << i << " " << j;
+        if (j<6 and !marked.contains(j)) {
+          auto& parent = faces[i];
+          auto& child = faces[j];
+          marked.insert(j);
+          if (child.top_left.at(0)==parent.top_left.at(0)) {
+            // same "row" of faces
+            if (child.top_left.at(1) + side_size == parent.top_left.at(1)) {
+              // child is left of parent
+              std::cout << "\nchild:" << j << " is left of parent:" << i;
+              // Use an intermediate frame to rotate at touching edge
+              auto pijI = dim3::Vector{0,-1,0}; // Intermediate to rotate at right edge of face j
+              auto TijI = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X90_Y0_Z0],pijI);
+              // Use an intermediate frame to translate to face child origo (upper left corner)
+              auto pijIj = dim3::Vector{0,-side_size,0};
+              auto TijIj = dim3::affine::to_matrix(dim3::Rotations::RUNIT,pijIj);
+              forward_T[j] = TijI*TijIj;
+            }
+            else if (parent.top_left.at(1) + side_size == child.top_left.at(1)) {
+              // child is right of parent
+              std::cout << "\nchild:" << j << " is right of parent:" << i;
+              auto pij = dim3::Vector{0,side_size,-1};
+              auto Tij = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0],pij);
+              forward_T[j] = Tij;
+
+            }
+          }
+          else if (child.top_left.at(1)==parent.top_left.at(1)) {
+            // same "col" of faces
+            if (child.top_left.at(0) + side_size == parent.top_left.at(0)) {
+              // child is above parent
+              std::cout << "\nchild:" << j << " is above parent:" << i;
+              throw std::runtime_error("Can't fold map with child face above parent face");
+            }
+            else if (parent.top_left.at(0) + side_size == child.top_left.at(0)) {
+              // child is below
+              std::cout << "\nchild:" << j << " is below parent:" << i;
+              auto pij = dim3::Vector{side_size,0,-1};
+              auto Tij = dim3::affine::to_matrix(dim3::ROTATIONS[dim3::Rotations::Y90_Z0_X0],pij);
+              forward_T[j] = Tij;
+
+            }
+          }          
+        }
+      }
+    }
+
+    // Cerate the full 3D transformations to each face
+    for (int n=0;n<faces.size();++n) {
+      for (int w : path_to(n)) {to_base_3d[n] = to_base_3d[n]*forward_T[w];}
+    }
+
+    // Create a 3D map to walk
+    int m{0};
+    std::map<dim3::Vector,char> cube{};
+    std::map<dim3::Vector,std::pair<int,dim2::Vector>> cube2flat{};
+    for (int n=0;n<faces.size();++n) {
+      auto const& face = faces[n];
+      for (int row=0;row<face.side_size();++row) {
+        for (int col=0;col<face.side_size();++col) {
+          auto face_pos = dim2::Vector{row,col};
+          auto face_pos_3d = dim3::Vector{row,col,0};
+          auto affine_face_pos = dim3::affine::to_vector(face_pos_3d);
+          auto affine_cube_pos = to_base_3d[n]*affine_face_pos;
+          auto cube_pos_3d = dim3::Vector{affine_cube_pos[0],affine_cube_pos[1],affine_cube_pos[2]};
+          if (row < 10 and col < 10) std::cout << "\n" << ++m << " " << n << " " << face_pos_3d << " " << cube_pos_3d << face.rows[row][col];
+          if (cube.contains(cube_pos_3d)) {
+            // Overlap error
+            std::cout << "\nERROR: face:" << n << " " << face_pos_3d << " maps to previous " << cube_pos_3d;
+          }
+          cube[cube_pos_3d] = face.rows[row][col];
+          cube2flat[cube_pos_3d] = {n,face_pos};
+        }
+      }
+    }
+    // Now make a Player that walks in 3D space
+    struct Player {
+      dim3::Vector pos; // Position in base frame
+      dim3::Matrix orientation; // rotation of player frame
+    };
+
+    auto const& TURN_LEFT = dim3::ROTATIONS[dim3::Rotations::Z90_Y0_X0];
+    auto const& TURN_RIGHT = dim3::ROTATIONS[dim3::Rotations::Z270_Y0_X0];
+    auto const& LEAN_FORWARD = dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0];
+    
+    // Test walking free-runs around created 3D cube  
+    if (true) {
+      dim3::Vector start{faces[0].top_left[0],faces[0].top_left[1],0};
+      Player player{start,dim3::Rotations::RUNIT}; // Start at corner 0 of face 0
+      auto delta = player.orientation*dim3::Y_UNIT; // start with Forward = +y relative base frame
+      for (int lap=0;lap<4;++lap) {
+        auto delta = player.orientation*dim3::Y_UNIT; // start with Forward = +y relative base frame
+        for (int i=0;i<side_size*4;++i) {
+          std::cout << "\nplayer:" << player.pos << " " << delta << std::flush;
+          auto next = player.pos+delta;
+          std::cout << " next:" << next << std::flush;
+          if (cube.contains(next)) {
+            player.pos = next;
+          }
+          else {
+            // wrap around to next face
+            // We expect the next face on a cube to be found by rotating next "forward" and go one step
+            // Forward means rotating +90 clockwise around the x-axis (using the y-axis as the "forward" for our player)
+            player.orientation = player.orientation*LEAN_FORWARD; // Apply lean forward to y=forward, then reorient player in base frame
+            delta = player.orientation*dim3::Y_UNIT; 
+            player.pos = next+delta; // walk the offset to next frame
+            std::cout << " wrapped to " << player.pos << " " << delta << std::flush;
+            assert(cube.contains(player.pos));
+          }
+        }
+        // Turn left
+        player.orientation = player.orientation*TURN_LEFT;
+        delta = player.orientation*dim3::Y_UNIT; 
+      }
+    }
+
+    dim3::Vector start{faces[0].top_left[0],faces[0].top_left[1],0};
+    Player player{start,dim3::Rotations::RUNIT}; // Start at corner 0 of face 0
+    auto delta = player.orientation*dim3::Y_UNIT; // start with Forward = +y relative base frame
+
+    auto rendered = m_strings;
+    player.pos = start; // Start at corner 0 of face 0
+    player.orientation = dim3::Rotations::RUNIT; 
+    delta = player.orientation*dim3::Y_UNIT; // start with Forward = +y relative base frame
+    int facing{0}; // Facing is 0 for right (>), 1 for down (v), 2 for left (<), and 3 for up (^)
+    int step_count{0};
+    for (auto move : path) {
+      if (true) {
+        // LOG
+        std::cout << "\nmove:" << move;
+        std::cout << " player:" << player.pos << std::flush;
+      }
+      switch (move.second) {
+        case 'R': {
+          facing = (facing+1)%4;
+          player.orientation = player.orientation*dim3::ROTATIONS[dim3::Rotations::Z270_Y0_X0];
+          auto delta = player.orientation*dim3::Y_UNIT; 
+          std::cout << " delta:" << delta << to_facing_char(facing);
+        } break;
+        case 'L': {
+          facing = (facing+3)%4; // -1 the same as +3 in modulus 4
+          player.orientation = player.orientation*dim3::ROTATIONS[dim3::Rotations::Z90_Y0_X0];
+          auto delta = player.orientation*dim3::Y_UNIT; 
+          std::cout << " delta:" << delta << to_facing_char(facing);
+        } break;
+        default: {
+          for (int i=0;i<move.first;++i) {
+            auto delta = player.orientation*dim3::Y_UNIT;
+            auto next = player.pos+delta;
+            if (cube.contains(next)) {
+              if (cube[next]=='.') {
+                player.pos = next;
+                if (true) {
+                  // LOG
+                  std::cout << "\n\t" << i << " delta:" << delta << " next:" << next << " " << cube[next] << std::flush;
+                  ++step_count;
+                }
+              }
+              else {
+                std::cout << "\n\t " << i << " BLOCKED";
+              }
+            }
+            else {
+              // wrap "forward"
+              auto const& LEAN_FORWARD = dim3::ROTATIONS[dim3::Rotations::X270_Y0_Z0];
+              auto next_orientation = player.orientation*LEAN_FORWARD; // Apply lean forward to y=forward, then reorient player in base frame 
+              auto next_delta = next_orientation*dim3::Y_UNIT;
+              next = next + next_delta; // cross the edge
+              if (cube.contains(next) and cube[next]=='.') {
+                player.orientation = next_orientation;
+                player.pos = next; // walk the offset to next frame
+                delta = next_delta;
+                std::cout << "\n\t" << i << " wrapped to " << player.pos << " " << delta << std::flush;
+                ++step_count;
+                auto flat_delta = cube2flat[next+next_delta].second - cube2flat[next].second;
+                if (flat_delta[0]==0) facing = (flat_delta[1]>0)?0:2;
+                else facing = (flat_delta[0]>0)?1:3;
+              }
+              else {
+                std::cout << "\n\t " << i << " BLOCKED";
+              }
+            }
+            if (true) {
+              // LOG
+              auto [fix,v] = cube2flat[player.pos];
+              auto const& face = faces[fix];
+              auto flat_pos = face.top_left + v;
+              std::cout << " face:" << fix << " " << v << " rendered:" << flat_pos << " " << to_facing_char(facing);
+              auto [r,c] = flat_pos;
+              rendered[r][c] = to_facing_char(facing);
+              // rendered[r][c] = 'a'+(step_count%25);
+            }
+          }
+        } break;
+      }
+      if (true) {
+        // LOG
+        auto [fix,v] = cube2flat[player.pos];
+        auto const& face = faces[fix];
+        auto flat_pos = face.top_left + v;
+        std::cout << " face:" << fix << " " << v << " rendered:" << flat_pos << " " << to_facing_char(facing);
+        auto [r,c] = flat_pos;
+        rendered[r][c] = to_facing_char(facing);
+        // rendered[r][c] = 'a'+(step_count%25);
+      }
+    }
+    std::cout << "\n" << rendered;
+    std::cout << "\nENDED at " << player.pos << " " << cube[player.pos];
+    // So, where are we on the flat map?
+    auto [fix,v] = cube2flat[player.pos];
+    auto const& face = faces[fix];
+    auto flat_pos = face.top_left + v;
+    auto puzzle_coordinates = flat_pos+dim2::Vector{1,1};
+    std::cout << " = 2D map " << flat_pos << " puzzle coordinates " << puzzle_coordinates << " facing " << to_facing_char(facing);
+    auto answer = 1000*puzzle_coordinates[0] + 4*puzzle_coordinates[1] + facing; // My puzzle data = 184106
+    std::cout << "\nANSWER:" << answer;
+    m_facing = facing;
+    m_frame_0_pos = flat_pos;
+  }
+};
+
 class Traveler {
 public:
   Traveler(Strings const& strings,Path const path) : m_strings{strings},m_path{path},rendered{strings} {}
-  Vector walk_as_if_flat() {
+  std::pair<Vector,int> walk_as_if_flat() {
     // Walk the flat map using the rules of wrap around on the flat grid
     // return the position on the flat strings map
     StringsWalker walker{m_strings};
     walk_the_path(walker);
-    return walker.frame_0_pos();
+    return {walker.frame_0_pos(),to_facing(this->char_of_direction(walker))};
   }
-  Vector walk_as_if_cube() {
+  std::pair<Vector,int> walk_as_if_cube() {
     // Fold the flat map defined by strings into a cube
     // Walk the cube
     // return the position on the flat strings map
-    Faces faces = to_faces(m_strings);
-    dim3::CubeHullFolder folder{};
-    for (auto const& face : faces) {
-      dim3::Vector pos{face.top_left[0],face.top_left[1],0};
-      folder.push_back(dim3::to_xy_square(pos,face.side_size()));
-    }
-    auto hull = folder.hull();
-    dim3::FoldedCubeHullWalker walker{hull};
-    walk_the_path(walker);
-    auto frame_0_pos = walker.frame_0_pos();
-    auto row = frame_0_pos[ROW];
-    auto col = frame_0_pos[COL];
-    dim2::Vector strings_pos{row,col};
-    return strings_pos;
+    FoldedCubeHullWalker walker{m_strings,m_path};
+    // walk_the_path(walker); // Hack! The walk happens at construction...
+    return {walker.frame_0_pos(),to_facing(this->char_of_direction(walker))};
   }
+
 private:
   friend std::ostream& operator<<(std::ostream& os,Traveler const& traveler);
   Strings m_strings{};
@@ -890,8 +1189,8 @@ namespace part1 {
       auto data_model = parse(in);
       std::cout << data_model;
       Traveler traveler{data_model.first,data_model.second};
-      auto pos = traveler.walk_as_if_flat();
-      result = 1000*(pos[ROW]+1) + 4*(pos[COL]+1);
+      auto [pos,facing] = traveler.walk_as_if_flat();
+      result = 1000*(pos[ROW]+1) + 4*(pos[COL]+1) + facing;
       std::cout << traveler;
       return result;
   }
@@ -905,9 +1204,9 @@ namespace part2 {
       auto data_model = parse(in);
       std::cout << data_model;
       Traveler traveler{data_model.first,data_model.second};
-      auto pos = traveler.walk_as_if_cube();
-      result = 1000*(pos[ROW]+1) + 4*(pos[COL]+1);
-      std::cout << traveler;
+      auto [pos,facing] = traveler.walk_as_if_cube();
+      result = 1000*(pos[ROW]+1) + 4*(pos[COL]+1) + facing;
+      // std::cout << traveler; // Hack, the walk and rendering happens at execution above
       return result;
   }
 }
@@ -1292,13 +1591,13 @@ int main(int argc, char *argv[])
     std::chrono::time_point<std::chrono::system_clock> start_time{};
     std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
     exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-    // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-    // exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    exec_times.push_back(std::chrono::system_clock::now());
     answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-    // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+    exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 2     ",part2::solve_for(pData)});
     exec_times.push_back(std::chrono::system_clock::now());
     std::cout << "\n\nANSWERS";
     for (int i=0;i<answers.size();++i) {
