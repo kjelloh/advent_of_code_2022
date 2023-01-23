@@ -15,6 +15,7 @@
 #include <algorithm> // E.g., std::find, std::all_of,...
 #include <numeric> // E.g., std::accumulate
 #include <limits> // E.g., std::numeric_limits
+#include <cassert>
 
 extern char const* pTest;
 extern char const* pData;
@@ -144,9 +145,11 @@ public:
   }
   bool is_free(Vector const& pos) {
     bool result{};
-    if (pos.row<=m_top_left.row) result=false;
-    else if (pos.col<=m_top_left.col or pos.col>=m_bottom_right.col) result = false;
+    if (pos.row<m_top_left.row) result = false;
+    else if (pos.row>m_bottom_right.row) result = false;
+    else if (pos.row==m_top_left.row and pos.col!=1) result = false;
     else if (pos.row==m_bottom_right.row and pos.col!=m_bottom_right.col-1) result = false;
+    else if (pos.col<=m_top_left.col or pos.col>=m_bottom_right.col) result = false;
     else result = (has_blizzard_at_pos(pos) == false);
     // std::cout << "\nis_free(" << pos << ") = " << result;
     return result;
@@ -284,21 +287,30 @@ class DFS {
 public:
   class State {
   public:
-    State(int t,Valley const& valley,Vector const& pos) : m_t{t},m_valley{valley},m_pos{pos} {}
+    State(int t,Valley const& valley,Vector const& pos,int run_count) 
+      : m_t{t}
+       ,m_valley{valley}
+       ,m_pos{pos}
+       ,m_run_count{run_count} {}
     Result t() const {return m_t;}
     Valley const& valley() const {return m_valley;}
     Vector const& pos() const {return m_pos;}
+    int run_count() const {return m_run_count;}
     bool operator<(State const& other) const {
       auto height = (m_valley.bottom_right().row - m_valley.top_left().row)+1;
       auto width = (m_valley.bottom_right().col - m_valley.top_left().col)+1;
       auto cycle = (height-1)*(width-2);
-      if ((m_t % cycle) == (other.m_t % cycle)) return (m_pos < other.m_pos);
-      else return ((m_t % cycle) < (other.m_t % cycle));
+      if (m_run_count==other.m_run_count) {
+        if ((m_t % cycle) == (other.m_t % cycle)) return (m_pos < other.m_pos);
+        else return ((m_t % cycle) < (other.m_t % cycle));
+      }
+      else return (m_run_count < other.m_run_count);
     }
   private:
     Result m_t;
     Valley m_valley;
     Vector m_pos;
+    int m_run_count;
   };
   struct StateHash
   {
@@ -308,11 +320,12 @@ public:
           result ^= (BlizzardsHash{}(state.valley().blizzards()) << 1);
           result ^= (std::hash<int>{}(state.pos().row) << 1);
           result ^= (std::hash<int>{}(state.pos().col) << 1);
+          result ^= (std::hash<int>{}(state.run_count()) << 1);
           return result;
       }
   };  
-  DFS(Valley const& valley_at_0) 
-    : m_initial_state(0,valley_at_0,Vector{.row=0,.col=1})
+  DFS(Valley const& valley_at_0,bool rerun = false) 
+    : m_initial_state(0,valley_at_0,Vector{.row=0,.col=1},rerun?3:1)
      ,m_end{.row=valley_at_0.bottom_right().row,.col = valley_at_0.bottom_right().col-1} {
     m_best = dfs(m_initial_state);
   }
@@ -325,19 +338,21 @@ private:
   std::set<State> m_seen{};
   Result m_best{std::numeric_limits<Result>::max()};
   std::vector<State> adj(State const& state_t) {
+    if (state_t.pos().row==0 or state_t.pos().row==1) std::cout << "\nadj(" << state_t.t() << "," << state_t.pos() << ")";
     std::vector<State> result{};
     auto adj_valley = valley_at_t(m_initial_state.valley(),state_t.t()+1);
     for (auto const& delta : DIRS) {
       auto adj_pos = state_t.pos() + delta;
-      // std::cout << "\nadj_pos:" << adj_pos;
+      if (adj_pos.row==0 or adj_pos.row==1) std::cout << " adj_pos:" << adj_pos;
       if (adj_valley.is_free(adj_pos)) {
-        // std::cout << "\nfree adj_pos:" << adj_pos;
-        result.push_back(State(state_t.t()+1,adj_valley,adj_pos));
+        if (adj_pos.row==0 or adj_pos.row==1) std::cout << " free adj_pos:" << adj_pos;
+        result.push_back(State(state_t.t()+1,adj_valley,adj_pos,state_t.run_count()));
       }
     }
     if (adj_valley.is_free(state_t.pos())) {
       // wait at t+1 without moving
-      result.push_back(State(state_t.t()+1,adj_valley,state_t.pos()));
+      if (state_t.pos().row==0 or state_t.pos().row==1) std::cout << " wait in pos:" << state_t.pos();
+      result.push_back(State(state_t.t()+1,adj_valley,state_t.pos(),state_t.run_count()));
     }
     // std::cout << "\nadj:" << result.size();
     return result;
@@ -347,72 +362,70 @@ private:
     m_Q.push_back(initial_state);
     int hit_count{};
     Result call_count{};
-    while (m_Q.size()>0) {
-      if (call_count++ % 1000 == 0) std::cout << "\n" << m_Q.size() << " hit_count:" << hit_count << std::flush;
-      // std::cout << "\nm_Q:" << m_Q.size();
-      auto state = m_Q.back();
-      m_Q.pop_back();
-      // std::cout << "\nt:" << state.t() << " pos:" << state.pos();
-      // std::cout << "\n" << state.valley();
-      // m_revisited[state.pos()].push_back(state);
-      if (state.pos()==m_end) {
-        result = std::min(result,state.t());
-        std::cout << "\nCANDIDATE:" << result;
-        ++hit_count;
-        continue;
-      }
-      m_seen.insert(state);
-      for (auto const& adj_state : adj(state)) {
-        if (adj_state.t()>=result) {
-          // std::cout << "\nBEST:" << result;
-          break;
-        }
-        if (adj_state.t()>TIME_LIMIT) {
-          // std::cout << "\nTIME EXHAUST at t:" << adj_state.t();
-          break;
-        }
-        if (m_seen.contains(adj_state)) {
-          // std::cout << "\nseen t:" << adj_state.t() << " " << adj_state.pos();
+    State state=initial_state;
+    State best_end_state=initial_state;
+    Result acc_result{};
+    do {
+      result = std::numeric_limits<Result>::max()-1;
+      hit_count=0;
+      while (m_Q.size()>0) {
+        if (call_count++ % 1000 == 0) std::cout << "\n" << call_count << " " << state.run_count() << " " << state.pos() << " " << m_Q.size() << " hit_count:" << hit_count << std::flush;
+        // std::cout << "\nm_Q:" << m_Q.size();
+        state = m_Q.back();
+        m_Q.pop_back();
+        // std::cout << "\nt:" << state.t() << " pos:" << state.pos();
+        // std::cout << "\n" << state.valley();
+        // m_revisited[state.pos()].push_back(state);
+        if (state.pos()==m_end) {
+          if (state.t()<result) {
+            best_end_state = state;
+            result = state.t();
+            std::cout << "\nCANDIDATE:" << result;
+            call_count=0;
+          }
+          ++hit_count;
           continue;
         }
-        // if (m_revisited[adj_state.pos()].size() > REVISIT_LIMIT) {
-        //     // std::cout << "\nREVISIT EXHAUST pos:" << adj_state.pos() << " count:" << m_revisited[adj_state.pos()].size();
-        //     continue;
-        // }
-        // std::cout << "\nnew t:" << adj_state.t() << " " << adj_state.pos();
-        m_Q.push_back(adj_state);
+        m_seen.insert(state);
+        for (auto const& adj_state : adj(state)) {
+          if (adj_state.t()>=result) {
+            // std::cout << "\nBEST:" << result;
+            break;
+          }
+          if (adj_state.t()>TIME_LIMIT) {
+            // std::cout << "\nTIME EXHAUST at t:" << adj_state.t();
+            break;
+          }
+          if (m_seen.contains(adj_state)) {
+            // std::cout << "\nseen t:" << adj_state.t() << " " << adj_state.pos();
+            continue;
+          }
+          // if (m_revisited[adj_state.pos()].size() > REVISIT_LIMIT) {
+          //     // std::cout << "\nREVISIT EXHAUST pos:" << adj_state.pos() << " count:" << m_revisited[adj_state.pos()].size();
+          //     continue;
+          // }
+          // std::cout << "\nnew t:" << adj_state.t() << " " << adj_state.pos();
+          m_Q.push_back(adj_state);
+        }
+      } 
+      // One run done
+      assert(hit_count>0);
+      std::cout << "\nBEST:" << result;
+      acc_result += result;
+      std::cout << "\nACC:" << acc_result;
+      if (m_end==Vector{.row=state.valley().bottom_right().row,.col = state.valley().bottom_right().col-1}) {
+        m_end=Vector{0,1};
+        std::cout << "\nTURNING BACK TO BEGINNING";
       }
-    }
-    // std::set<std::pair<Vector,int>> missing_state{EXPECTED};
-    // for (auto const& [pos,time] : EXPECTED) {
-    //   for (auto const& [pos,v] : m_revisited) {
-    //     for (auto state : v) {
-    //       if (state.pos()==pos and state.t()==time) missing_state.erase(std::pair<Vector,int>{pos,time});
-    //     }
-    //   }
-    // }
-    // if (missing_state.size()>0) {
-    //   for (auto const [pos,time] : missing_state) {
-    //     std::cout << "\nMISSING STATE time:" << time << " pos:" << pos;
-    //   }
-    // }
-    // std::pair<Vector,int> furthest{};
-    // for (auto const& [pos,v] : m_revisited) {
-    //   for (auto state : v) {
-    //     if (pos.row+pos.col > furthest.first.row+furthest.first.col) {
-    //       furthest.first = pos;
-    //       furthest.second = state.t();
-    //     }
-    //   }
-    // }
-    // std::cout << "\nSEARCH SPACE SIZE:" << std::accumulate(m_revisited.begin(),m_revisited.end(),Result{0},[](auto acc,auto const& entry){
-    //   acc += entry.second.size();
-    //   return acc;
-    // });
-    // std::cout << "\nFURTHEST t:" << furthest.second << " pos:" << furthest.first;
-    std::cout << "\nhit_count:" << hit_count;
-    std::cout << "\nBEST:" << result;
-    return result;
+      else if (m_end==Vector{0,1}) {
+        m_end=Vector{.row=state.valley().bottom_right().row,.col = state.valley().bottom_right().col-1};
+        std::cout << "\nTURNING BACK TO END";
+      }
+      state = State(best_end_state.t(),best_end_state.valley(),best_end_state.pos(),best_end_state.run_count()-1);
+      m_Q.push_back(state);
+      call_count=0;
+    } while (state.run_count()>0);
+    return acc_result;
   }
 };
 
@@ -438,6 +451,9 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      DFS dfs{data_model,true};
+      result = dfs.best();
+      std::cout << "\nvalley bottom_right:" << data_model.bottom_right();
       return result;
   }
 }
@@ -457,9 +473,9 @@ int main(int argc, char *argv[])
   exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
   // exec_times.push_back(std::chrono::system_clock::now());
-  answers.push_back({"Part 1     ",part1::solve_for(pData)});
+  // answers.push_back({"Part 1     ",part1::solve_for(pData)});
   // exec_times.push_back(std::chrono::system_clock::now());
-  // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+  answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
   // exec_times.push_back(std::chrono::system_clock::now());
   // answers.push_back({"Part 2     ",part2::solve_for(pData)});
   exec_times.push_back(std::chrono::system_clock::now());
