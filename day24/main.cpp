@@ -45,7 +45,6 @@ std::ostream& operator<<(std::ostream& os,Vector const& v) {
   return os;
 }
 
-bool operator<(const Vector& v1,const Vector& v2) {return (v1[0]==v2[0])?(v1[1]<v2[1]):v1[0]<v2[0];}
 using Obstacle = std::pair<Vector,char>;
 using Obstacles = std::set<Obstacle>;
 using Occupied = std::set<Vector>;
@@ -238,9 +237,9 @@ int main(int argc, char *argv[])
     std::chrono::time_point<std::chrono::system_clock> start_time{};
     std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
     exec_times.push_back(std::chrono::system_clock::now());
-    answers.push_back({"Part 1 Test",part1::solve_for(pTest0)});
+    // answers.push_back({"Part 1 Test",part1::solve_for(pTest0)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 1     ",part1::solve_for(pData)});
     // exec_times.push_back(std::chrono::system_clock::now());
