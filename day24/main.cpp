@@ -22,6 +22,7 @@
 #include <cmath> // pow
 #include <functional> // E.g., std::reference_wrapper 
 
+extern char const* pTest0;
 extern char const* pTest;
 extern char const* pData;
 
@@ -73,10 +74,12 @@ struct Valley {
     do {
       std::cout << "\nobstacles[" << obstacles.size() << "]";
       obstacles.push_back({obstacles_t});
+      bad.push_back({});
       // Where are all the obstacles at t+1?
       obstacles_t.clear();
       for (auto const& [pos,ch] : obstacles.back()) {
         Vector next = pos;
+        bad.back().insert(pos);
         switch (ch) {
           case '#': break; // leave where it is
           case '>': next = Vector{pos[0],((pos[1])%width_cycle)+1};break; // col 1,2,3,4,5 -> next (1,2,3,4,5)%5+1 ->next col 2,3,4,5,1
@@ -86,10 +89,12 @@ struct Valley {
           default: std::cerr << "\nERROR: Unknown char " << ch;
         }
         obstacles_t.insert(Obstacle{next,ch}); // update
-        std::cout << "\n" << pos << " " << pos[1]%5 << " " << next << "=" << ch;
+        // std::cout << "\n" << pos << " " << pos[1]%5 << " " << next << "=" << ch;
       }
-      std::cout << "\n" << obstacles.size() << " " << (obstacles_t == obstacles[0]);
+      // std::cout << "\n" << obstacles.size() << " " << (obstacles_t == obstacles[0]);
     } while ((obstacles.size()==1) or ((obstacles.size()>1) and (obstacles_t != obstacles[0])));
+    std::cout << "\n" << obstacles.size() << " " << bad.size();
+    assert(obstacles.size()==bad.size());
   }
   Vector top_left{};
   Vector bottom_right{};
@@ -98,12 +103,33 @@ struct Valley {
   int width_cycle{};
   int height_cycle{};
   std::vector<Obstacles> obstacles{}; // obstacles[t] is set of obstacles at time t
+  std::vector<Occupied> bad{}; // bad[t] is all positions at time t that are occupied
 };
 
 using Model = Valley;
 
-std::ostream& operator<<(std::ostream& os,Model) {
-
+std::ostream& operator<<(std::ostream& os,Model const& model) {
+  for (int n=0;n<model.obstacles.size();++n) {
+    std::cout << "\n" << n << " " << model.obstacles.size();
+    {
+      auto map = std::vector<std::string>(model.bottom_right[0]-model.top_left[0]+1,std::string(model.bottom_right[1]-model.top_left[1]+1,' '));
+      for (auto const& [pos,ch] : model.obstacles[n]) {
+        map[pos[0]-model.top_left[0]][pos[1]-model.top_left[1]] = ch;
+      }
+      for (int row=0;row<map.size();++row) {
+        os << "\n" << map[row];
+      }
+    }
+    {
+      auto map = std::vector<std::string>(model.bottom_right[0]-model.top_left[0]+1,std::string(model.bottom_right[1]-model.top_left[1]+1,' '));
+      for (auto const& pos : model.bad[n]) {
+        map[pos[0]-model.top_left[0]][pos[1]-model.top_left[1]] = '+';
+      }
+      for (int row=0;row<map.size();++row) {
+        os << "\n" << map[row];
+      }
+    }    
+  }
   return os;
 }
 
@@ -125,12 +151,56 @@ Model parse(auto& in) {
   return Model{obstacles};
 }
 
+struct DFS {
+  using State = std::pair<Vector,int>; // row, col, t
+  DFS(Valley const& valley) : m_valley{valley} {}
+  bool not_bad(State const& state) {
+    auto const& [pos,t] = state;
+    bool bad = m_seen.contains({pos,t%m_valley.bad.size()}) or m_valley.bad[t%m_valley.bad.size()].contains(pos);
+    if (!bad) std::cout << "\nnot bad: " << pos << " " << t << " " << m_seen.contains({pos,t%m_valley.bad.size()}) << " " << m_valley.bad[t%m_valley.bad.size()].contains(pos);
+    return !bad;
+  }
+  // Earliest arrival at "to" when starting at "start" from "from"
+  Result earliest_arrival(Vector const& from,Vector const& to,int start) {
+    Result result{std::numeric_limits<Result>{}.max()};
+    std::vector<State> q{};
+    q.push_back({from,start});
+    int call_count{-1};
+    int hit_count{};
+    while (q.size()>0) {
+      auto state = q.back();
+      q.pop_back();
+      auto const& [pos,t] = state;
+      if (pos==to) {
+        result = std::min(result,t);
+        ++hit_count;
+        continue;
+      }
+      if (t>result) continue;
+      if (++call_count%1==0) std::cout << "\n" << call_count << " " << q.size() << " " << m_seen.size() << " " << pos << " " << hit_count << " " << result;
+      if (auto adj = State{pos+Vector{0,-1},t+1}; not_bad(adj)) q.push_back(adj);
+      if (auto adj = State{pos+Vector{-1,0},t+1}; not_bad(adj)) q.push_back(adj);
+      if (auto adj = State{pos+Vector{0,0},t+1}; not_bad(adj)) q.push_back(adj);
+      if (auto adj = State{pos+Vector{1,0},t+1}; not_bad(adj)) q.push_back(adj);
+      if (auto adj = State{pos+Vector{0,1},t+1}; not_bad(adj)) q.push_back(adj);
+      m_seen.insert({pos,t%m_valley.bad.size()});
+    }
+    return 0;
+  }
+  Valley const& m_valley;
+  std::set<State> m_seen{};
+};
+
 namespace part1 {
   Result solve_for(char const* pData) {
       std::cout << "\n\nPART 1";
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      std::cout << "\n" << data_model;
+      DFS dfs{data_model};
+      auto t0=0;
+      result = dfs.earliest_arrival(data_model.entrance,data_model.exit,t0);
       return result;
   }
 }
@@ -141,6 +211,12 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
+      DFS dfs{data_model};
+      auto t0=0;
+      auto t1=dfs.earliest_arrival(data_model.entrance,data_model.exit,t0);
+      auto t2=dfs.earliest_arrival(data_model.exit,data_model.entrance,t1);
+      auto t3=dfs.earliest_arrival(data_model.entrance,data_model.exit,t2);
+      result = t3-t0;
       return result;
   }
 }
@@ -162,7 +238,9 @@ int main(int argc, char *argv[])
     std::chrono::time_point<std::chrono::system_clock> start_time{};
     std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
     exec_times.push_back(std::chrono::system_clock::now());
-    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    answers.push_back({"Part 1 Test",part1::solve_for(pTest0)});
+    // exec_times.push_back(std::chrono::system_clock::now());
+    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 1     ",part1::solve_for(pData)});
     // exec_times.push_back(std::chrono::system_clock::now());
@@ -180,13 +258,20 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-char const* pTest = R"(#.#####
+char const* pTest0 = R"(#.#####
 #.....#
 #>....#
 #.....#
 #...v.#
 #.....#
 #####.#)";
+
+char const* pTest = R"(#.######
+#>>.<^<#
+#.<..<<#
+#>v.><>#
+#<^v^^>#
+######.#)";
 char const* pData = R"(#.####################################################################################################
 #>^v^v>><.>>><>^v<>^v>v<>^<<>>v>>.>><v>^<>^.<>v.>v^>vvvv<<<<>>^v^^^>><><.^^^.<<<>><^v^vv^v<.v.v>>.vv<#
 #>^><>^v^<>.<v><.<.v<v>vv<^<vvvv.^^...<<<^^vv<<v<>>>>v^<>>^^^><.>>>>v<<>^.>.^^<v<.><<.<><.>>>^^^>>.<>#
