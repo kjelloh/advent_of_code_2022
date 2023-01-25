@@ -53,8 +53,21 @@ namespace part1 {
 
 namespace part2 {
   Result solve_for(char const* pData) {
+      using namespace std::literals;
       std::cout << "\n\nPART 2";
       Result result{};
+      std::string_view in{pData};
+      std::vector<int> sums{};
+      for (auto pack : std::views::split(in,"\n\n"sv)) {
+        sums.push_back(0);
+        for (auto s : std::views::split(pack,"\n"sv)) {
+          sums.back() +=  std::stoi(std::string_view{s.begin(),s.end()}.data());
+        }
+      }
+      std::ranges::sort(sums, std::greater<int>());
+      for (auto sum : sums | std::views::take(3)) {
+        result += sum;
+      }
       return result;
   }
 }
@@ -76,11 +89,11 @@ int main(int argc, char *argv[])
     std::chrono::time_point<std::chrono::system_clock> start_time{};
     std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
     exec_times.push_back(std::chrono::system_clock::now());
-    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 1     ",part1::solve_for(pData)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 2     ",part2::solve_for(pData)});
     exec_times.push_back(std::chrono::system_clock::now());
