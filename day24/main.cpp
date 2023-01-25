@@ -59,7 +59,7 @@ struct Valley {
     for (auto const& [pos,ch] : obstacles_0) {
       top_left = to_top_left(top_left,pos); 
       bottom_right = to_bottom_right(bottom_right,pos);
-      std::cout << "\n" << pos << " " << ch;
+      // std::cout << "\n" << pos << " " << ch;
     }
     width_cycle = bottom_right[1]-top_left[1]-1; // Example col 6-0-1 = 5 (for 7 wide valley)
     height_cycle = bottom_right[0]-top_left[0]-1; // Example row 6-0-1 = 5 (for 7 high valley)
@@ -92,7 +92,7 @@ struct Valley {
       }
       // std::cout << "\n" << obstacles.size() << " " << (obstacles_t == obstacles[0]);
     } while ((obstacles.size()==1) or ((obstacles.size()>1) and (obstacles_t != obstacles[0])));
-    std::cout << "\n" << obstacles.size() << " " << bad.size();
+    // std::cout << "\n" << obstacles.size() << " " << bad.size();
     assert(obstacles.size()==bad.size());
   }
   Vector top_left{};
@@ -109,7 +109,7 @@ using Model = Valley;
 
 std::ostream& operator<<(std::ostream& os,Model const& model) {
   for (int n=0;n<model.obstacles.size();++n) {
-    std::cout << "\n" << n << " " << model.obstacles.size();
+    // std::cout << "\n" << n << " " << model.obstacles.size();
     {
       auto map = std::vector<std::string>(model.bottom_right[0]-model.top_left[0]+1,std::string(model.bottom_right[1]-model.top_left[1]+1,' '));
       for (auto const& [pos,ch] : model.obstacles[n]) {
@@ -138,12 +138,10 @@ Model parse(auto& in) {
   Obstacles obstacles{};
   int row{};
   while (std::getline(in,line)) {
-    std::cout << "\n";
     for (int col=0;col<line.size();++col) {
       if (line[col]!='.') {
         obstacles.insert(Obstacle{Vector{row,col},line[col]});
       }
-      std::cout << line[col];
     }
     ++row;
   }
@@ -186,7 +184,6 @@ struct BFS {
     std::deque<State> q{};
     q.push_back({from,start});
     int call_count{-1};
-    int hit_count{};
     std::set<State> m_seen{};
     while (q.size()>0) {
       auto state = q.front();
@@ -197,10 +194,10 @@ struct BFS {
       m_seen.insert({pos,t%m_valley.bad.size()});
       if (pos==to) {
         result = t;
-        std::cout << "\nFOUND " << t;
+        std::cout << "\nARRIVED t=" << t;
         break;
       }
-      if (++call_count%1==0) std::cout << "\n" << call_count << " " << q.size() << " " << m_seen.size() << " " << t << " " << " " << pos << " " << hit_count << " " << result;
+      if (++call_count%1000==0) std::cout << "\n" << call_count << " " << q.size() << " " << m_seen.size() << " " << t << " " << " " << pos;
       if (auto adj = State{pos+Vector{0,0},t+1}; not_bad(adj)) q.push_back(adj);
       if (auto adj = State{pos+Vector{1,0},t+1}; not_bad(adj)) q.push_back(adj);
       if (auto adj = State{pos+Vector{0,1},t+1}; not_bad(adj)) q.push_back(adj);
@@ -259,14 +256,14 @@ int main(int argc, char *argv[])
     std::chrono::time_point<std::chrono::system_clock> start_time{};
     std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
     exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 1 Test",part1::solve_for(pTest0)});
-    // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-    // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-    // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-    // exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 1 Test 0",part1::solve_for(pTest0)});
+    exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    exec_times.push_back(std::chrono::system_clock::now());
     answers.push_back({"Part 2     ",part2::solve_for(pData)});
     exec_times.push_back(std::chrono::system_clock::now());
     std::cout << "\n\nANSWERS";
@@ -275,6 +272,15 @@ int main(int argc, char *argv[])
       std::cout << " answer[" << answers[i].first << "] " << answers[i].second;
     }
     std::cout << "\n";
+    /*
+    For my input:
+    ANSWERS
+    duration:1ms answer[Part 1 Test 0] 10
+    duration:1ms answer[Part 1 Test] 18
+    duration:8234ms answer[Part 1     ] 260
+    duration:1ms answer[Part 2 Test] 54
+    duration:9542ms answer[Part 2     ] 747
+    */    
   }
   return 0;
 }
