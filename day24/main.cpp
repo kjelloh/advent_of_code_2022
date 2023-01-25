@@ -84,7 +84,7 @@ struct Valley {
           case '>': next = Vector{pos[0],((pos[1])%width_cycle)+1};break; // col 1,2,3,4,5 -> next (1,2,3,4,5)%5+1 ->next col 2,3,4,5,1
           case '<': next = Vector{pos[0],((pos[1]+(width_cycle-2))%width_cycle)+1};break; // col 5,4,3,2,1 -> next (8,7,6,5,4)%5+1 ->col 4,3,2,1,5
           case 'v': next = Vector{((pos[0])%height_cycle)+1,pos[1]};break; // row 1,2,3,4,5 -> next (1,2,3,4,5)%5+1 -> next row 2,3,4,5,1
-          case '^': next = Vector{((pos[0]+(width_cycle-2))%width_cycle)+1,pos[1]};break; // row 5,4,3,2,1 -> next (8,7,6,5,4)%5+1 -> next 4,3,2,1,5
+          case '^': next = Vector{((pos[0]+(height_cycle-2))%height_cycle)+1,pos[1]};break; // row 5,4,3,2,1 -> next (8,7,6,5,4)%5+1 -> next 4,3,2,1,5
           default: std::cerr << "\nERROR: Unknown char " << ch;
         }
         obstacles_t.insert(Obstacle{next,ch}); // update
@@ -150,41 +150,62 @@ Model parse(auto& in) {
   return Model{obstacles};
 }
 
-struct DFS {
+/*
+
+Minute 18, move down:
+#.######
+#>2.<.<#
+#.2v^2<#
+#>..>2>#
+#<....>#
+######E#
+
+6 12
+ #      
+# ######
+#>v < <#
+# ^v^^<#
+#>  >^>#
+#<    >#
+###### #
+      # 
+
+*/
+
+struct BFS {
   using State = std::pair<Vector,int>; // row, col, t
-  DFS(Valley const& valley) : m_valley{valley} {}
+  BFS(Valley const& valley) : m_valley{valley} {}
   bool not_bad(State const& state) {
     auto const& [pos,t] = state;
-    bool bad = m_seen.contains({pos,t%m_valley.bad.size()}) or m_valley.bad[t%m_valley.bad.size()].contains(pos);
-    if (!bad) std::cout << "\nnot bad: " << pos << " " << t << " " << m_seen.contains({pos,t%m_valley.bad.size()}) << " " << m_valley.bad[t%m_valley.bad.size()].contains(pos);
-    return !bad;
+    return !m_valley.bad[t%m_valley.bad.size()].contains(pos);
   }
   // Earliest arrival at "to" when starting at "start" from "from"
   Result earliest_arrival(Vector const& from,Vector const& to,int start) {
     Result result{std::numeric_limits<Result>{}.max()};
-    std::vector<State> q{};
+    std::deque<State> q{};
     q.push_back({from,start});
     int call_count{-1};
     int hit_count{};
     while (q.size()>0) {
-      auto state = q.back();
-      q.pop_back();
+      auto state = q.front();
+      q.pop_front();
       auto const& [pos,t] = state;
-      if (pos==to) {
-        result = std::min(result,t);
-        ++hit_count;
-        continue;
-      }
       if (t>result) continue;
-      if (++call_count%1==0) std::cout << "\n" << call_count << " " << q.size() << " " << m_seen.size() << " " << pos << " " << hit_count << " " << result;
-      if (auto adj = State{pos+Vector{0,-1},t+1}; not_bad(adj)) q.push_back(adj);
-      if (auto adj = State{pos+Vector{-1,0},t+1}; not_bad(adj)) q.push_back(adj);
+      if (m_seen.contains({pos,t%m_valley.bad.size()})) continue;
+      m_seen.insert({pos,t%m_valley.bad.size()});
+      if (pos==to) {
+        result = t;
+        std::cout << "\nFOUND " << t;
+        break;
+      }
+      if (++call_count%1==0) std::cout << "\n" << call_count << " " << q.size() << " " << m_seen.size() << " " << t << " " << " " << pos << " " << hit_count << " " << result;
       if (auto adj = State{pos+Vector{0,0},t+1}; not_bad(adj)) q.push_back(adj);
       if (auto adj = State{pos+Vector{1,0},t+1}; not_bad(adj)) q.push_back(adj);
       if (auto adj = State{pos+Vector{0,1},t+1}; not_bad(adj)) q.push_back(adj);
-      m_seen.insert({pos,t%m_valley.bad.size()});
+      if (auto adj = State{pos+Vector{0,-1},t+1}; not_bad(adj)) q.push_back(adj);
+      if (auto adj = State{pos+Vector{-1,0},t+1}; not_bad(adj)) q.push_back(adj);
     }
-    return 0;
+    return result;
   }
   Valley const& m_valley;
   std::set<State> m_seen{};
@@ -197,9 +218,9 @@ namespace part1 {
       std::stringstream in{ pData };
       auto data_model = parse(in);
       std::cout << "\n" << data_model;
-      DFS dfs{data_model};
+      BFS bfs{data_model};
       auto t0=0;
-      result = dfs.earliest_arrival(data_model.entrance,data_model.exit,t0);
+      result = bfs.earliest_arrival(data_model.entrance,data_model.exit,t0);
       return result;
   }
 }
@@ -210,11 +231,11 @@ namespace part2 {
       Result result{};
       std::stringstream in{ pData };
       auto data_model = parse(in);
-      DFS dfs{data_model};
+      BFS bfs{data_model};
       auto t0=0;
-      auto t1=dfs.earliest_arrival(data_model.entrance,data_model.exit,t0);
-      auto t2=dfs.earliest_arrival(data_model.exit,data_model.entrance,t1);
-      auto t3=dfs.earliest_arrival(data_model.entrance,data_model.exit,t2);
+      auto t1=bfs.earliest_arrival(data_model.entrance,data_model.exit,t0);
+      auto t2=bfs.earliest_arrival(data_model.exit,data_model.entrance,t1);
+      auto t3=bfs.earliest_arrival(data_model.entrance,data_model.exit,t2);
       result = t3-t0;
       return result;
   }
@@ -239,9 +260,9 @@ int main(int argc, char *argv[])
     exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 1 Test",part1::solve_for(pTest0)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    answers.push_back({"Part 1     ",part1::solve_for(pData)});
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
@@ -258,12 +279,20 @@ int main(int argc, char *argv[])
 }
 
 char const* pTest0 = R"(#.#####
-#.....#
+#<.^..#
 #>....#
 #.....#
 #...v.#
 #.....#
 #####.#)";
+
+// char const* pTest0 = R"(#.#####
+// #.....#
+// #>....#
+// #.....#
+// #...v.#
+// #.....#
+// #####.#)";
 
 char const* pTest = R"(#.######
 #>>.<^<#
