@@ -181,11 +181,13 @@ struct BFS {
   }
   // Earliest arrival at "to" when starting at "start" from "from"
   Result earliest_arrival(Vector const& from,Vector const& to,int start) {
+    std::cout << "\nearliest_arrival(" << from << "," << to << "," << start << ")";
     Result result{std::numeric_limits<Result>{}.max()};
     std::deque<State> q{};
     q.push_back({from,start});
     int call_count{-1};
     int hit_count{};
+    std::set<State> m_seen{};
     while (q.size()>0) {
       auto state = q.front();
       q.pop_front();
@@ -208,7 +210,6 @@ struct BFS {
     return result;
   }
   Valley const& m_valley;
-  std::set<State> m_seen{};
 };
 
 namespace part1 {
@@ -262,9 +263,9 @@ int main(int argc, char *argv[])
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 2     ",part2::solve_for(pData)});
     exec_times.push_back(std::chrono::system_clock::now());
