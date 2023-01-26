@@ -1,6 +1,7 @@
 #include <iostream>
 #include <iomanip> // E.g., std::quoted
 #include <string>
+#include <string_view>
 #include <sstream> // E.g., std::istringstream, std::ostringstream
 #include <vector>
 #include <set>
@@ -21,6 +22,7 @@
 #include <bitset>
 #include <cmath> // pow
 #include <functional> // E.g., std::reference_wrapper 
+#include <iterator>
 
 extern char const* pTest;
 extern char const* pData;
