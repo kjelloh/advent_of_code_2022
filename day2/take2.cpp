@@ -37,23 +37,24 @@ using Model = std::vector<std::pair<char,char>>;
 
 namespace part1 {
   auto score(char opp,char you) {
-    int o = opp - 'A'; // rock.paper,scissors -> 0,1,2
-    int y = you - 'X'; // rock.paper,scissors -> 0,1,2
-    // rock > scissor > paper > rock > ...
-    // 0 > 1 > 2 > 0 > ...?
-    // In modulo calculus this means (x+1)%3 is always "greater" than x
-    // This is, if (you+1)==opponent then opponent > you
+    int o = opp - 'A'; // rock,paper,scissors -> 0,1,2
+    int y = you - 'X'; // rock,paper,scissors -> 0,1,2
+    // rock < paper < scissors < rock ...
+    // 0 < 1 < 2 < 0 < ...
+    // In modulo calculus this means (x+1)%3 is always "less" than x
+    // This is, if (you+1)==opponent then you < opponent
     // Thus, (y+1)%3==o means you loose :)
+    // 
     int result = ((y+1)%3==o)?0:(o==y)?3:6;
     std::cout << "\noutcome " << opp << " " << you << " " << result;
     result += you-'X' + 1;
-    std::cout << " + you:" << you-'X' + 1; 
+    std::cout << " + " << you-'X' + 1; 
    return result;
   }
 
   Result solve_for(char const* pData) {
-      using namespace std::literals;
       std::cout << "\n\nPART 1";
+      using namespace std::literals;
       Result result{};
       std::string_view in{ pData };
       auto scores = in | std::views::split("\n"sv) | std::views::transform([](auto s){return score(s[0],s[2]);});
@@ -63,10 +64,27 @@ namespace part1 {
 }
 
 namespace part2 {
+  auto score(char opp,char outcome) {
+    // outcome X,Y,Z -> loose,draw,win
+    int o = opp - 'A'; // rock.paper,scissors -> 0,1,2
+    int c = outcome - 'X'; // loose,draw,win -> 0,1,2
+    // rock < paper < scissors < rock ...
+    // 0 < 1 < 2 < 0 < ...
+    // In modulo calculus this means (x+1)%3 is always "less" than x
+    // To win we must thus always play (o+1)%3 and to loose we must play (o-1)%3 == (o+2)%3
+    int y = (c==0)?(o+2)%3:(c==1)?o:(o+1)%3;
+    std::cout << "\n" << opp << " " << outcome << " -> " << o << " " << c << " play:" << y; 
+    int result = c*3 + (y+1);
+    std::cout << " score:" << c*3 << " + " << y+1 << " = " << result;
+    return result;
+  }
   Result solve_for(char const* pData) {
       std::cout << "\n\nPART 2";
+      using namespace std::literals;
       Result result{};
       std::string_view in{ pData };
+      auto scores = in | std::views::split("\n"sv) | std::views::transform([](auto s){return score(s[0],s[2]);});
+      result = std::accumulate(scores.begin(),scores.end(),0);
       return result;
   }
 }
@@ -88,11 +106,11 @@ int main(int argc, char *argv[])
     std::chrono::time_point<std::chrono::system_clock> start_time{};
     std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
     exec_times.push_back(std::chrono::system_clock::now());
-    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 1     ",part1::solve_for(pData)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 2     ",part2::solve_for(pData)});
     exec_times.push_back(std::chrono::system_clock::now());
