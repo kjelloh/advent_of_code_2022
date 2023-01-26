@@ -120,19 +120,26 @@ int main(int argc, char *argv[])
     std::chrono::time_point<std::chrono::system_clock> start_time{};
     std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
     exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
-    // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
-    // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
-    // exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
+    exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    exec_times.push_back(std::chrono::system_clock::now());
+    answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    exec_times.push_back(std::chrono::system_clock::now());
     answers.push_back({"Part 2     ",part2::solve_for(pData)});
     exec_times.push_back(std::chrono::system_clock::now());
     std::cout << "\n\nANSWERS";
     for (int i=0;i<answers.size();++i) {
-      std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms"; 
+      std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::microseconds>(exec_times[i+1] - exec_times[i]).count() << "us"; 
       std::cout << " answer[" << answers[i].first << "] " << answers[i].second;
     }
+    /*
+    ANSWERS
+    duration:183us answer[Part 1 Test] 157
+    duration:9074us answer[Part 1     ] 7980
+    duration:62us answer[Part 2 Test] 70
+    duration:3194us answer[Part 2     ] 2881
+    */    
     std::cout << "\n";
   }
   return 0;
