@@ -124,9 +124,9 @@ int main(int argc, char *argv[])
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 1     ",part1::solve_for(pData)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 2     ",part2::solve_for(pData)});
+    answers.push_back({"Part 2     ",part2::solve_for(pData)});
     exec_times.push_back(std::chrono::system_clock::now());
     std::cout << "\n\nANSWERS";
     for (int i=0;i<answers.size();++i) {
