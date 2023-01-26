@@ -21,7 +21,8 @@
 #include <cassert>
 #include <bitset>
 #include <cmath> // pow
-#include <functional> // E.g., std::reference_wrapper 
+#include <functional> // E.g., std::reference_wrapper
+#include <iterator>
 
 extern char const* pTest;
 extern char const* pData;
@@ -32,30 +33,37 @@ using Integer = int;
 using Result = Integer;
 using Answers = std::vector<std::pair<std::string,Result>>;
 
+using Items = std::bitset<52>;
+auto to_items = [](auto s){
+  std::cout << "\n" << std::string_view{s.begin(),s.end()};
+  Items result{};
+  for (char ch : s) {
+    int index= (ch<='Z')?ch-'A'+26:ch-'a';
+    result[index] = true;
+    // std::cout << "\n" << ch << " " << index;
+  }
+  std::cout << " -> " << result.to_string();
+  return result;
+};
+
+int to_priority(Items const& items) {
+  int result{};
+  while (!items[result]) ++result;
+  std::cout << "\n" << result+1;
+  return result+1;
+}
+
+
 namespace part1 {
-  using Items = std::bitset<52>;
   auto left_half = [](auto r){return r | std::views::take(r.size()/2);};
   auto right_half = [](auto r){return r | std::views::drop(r.size()/2);};
-  auto to_items = [](auto s){
-    std::cout << "\n" << std::string_view{s.begin(),s.end()};
-    Items result{};
-    for (char ch : s) {
-      int index= (ch<='Z')?ch-'A'+26:ch-'a';
-      result[index] = true;
-      // std::cout << "\n" << ch << " " << index;
-    }
-    std::cout << " -> " << result.to_string();
-    return result;
-  };
   int to_priority(Items const& l_items,Items const& r_items) {
     int result{};
     auto items = (l_items & r_items);
     std::cout << "\n" << l_items.to_string();
     std::cout << "\n" << r_items.to_string();
     std::cout << "\n" << items.to_string();
-    while (!items[result]) ++result;
-    std::cout << "\n" << result+1;
-    return result+1;
+    return ::to_priority(items);
   }
   Result solve_for(char const* pData) {
       using namespace std::literals;
@@ -76,7 +84,21 @@ namespace part2 {
       using namespace std::literals;
       std::cout << "\n\nPART 2";
       Result result{};
-      std::stringstream in{ pData };
+      std::string_view in{ pData };
+      auto items = in | std::views::split("\n"sv) | std::views::transform(to_items);
+      auto begin = items.begin();
+      auto end = std::next(begin,3);
+      std::vector<int> priorities{};
+      while (begin != items.end()) {
+        auto sticker = Items((1L << 52)-1); // all ones
+        for (auto iter=begin;iter!=end;++iter) {
+          sticker &= *iter;
+        }
+        priorities.push_back(to_priority(sticker));
+        begin = end;
+        end = (begin!=items.end())?std::next(begin,3):begin;
+      }
+      result = std::accumulate(priorities.begin(),priorities.end(),0);
       return result;
   }
 }
@@ -100,9 +122,9 @@ int main(int argc, char *argv[])
     exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 1 Test",part1::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    answers.push_back({"Part 1     ",part1::solve_for(pData)});
+    // answers.push_back({"Part 1     ",part1::solve_for(pData)});
     // exec_times.push_back(std::chrono::system_clock::now());
-    // answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
+    answers.push_back({"Part 2 Test",part2::solve_for(pTest)});
     // exec_times.push_back(std::chrono::system_clock::now());
     // answers.push_back({"Part 2     ",part2::solve_for(pData)});
     exec_times.push_back(std::chrono::system_clock::now());
